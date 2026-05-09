@@ -10,6 +10,7 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -128,6 +129,33 @@ public class AuditLogStorageRotationRegressionTest {
         }
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    public void scriptConsoleAccessFilterMatchesLegacyActionName() throws Exception {
+        Path tempDir = Files.createTempDirectory("auditflow-script-access-filter");
+        AuditLogStorage storage = newStorage();
+
+        try {
+            Path logsDir = Files.createDirectories(tempDir.resolve("auditflow-logs"));
+
+            writeJsonLine(logsDir.resolve("audit.jsonl"), entry("alice", "SCRIPT_CONSOLE_ACCESSED", 1_746_691_200_000L));
+            writeJsonLine(logsDir.resolve("audit.jsonl"), entry("alice", "SCRIPT_CONSOLE_ACCESS", 1_746_691_201_000L));
+
+            Method loadEntries = AuditLogStorage.class.getDeclaredMethod(
+                    "loadEntriesFromDisk", java.io.File.class, String.class, String.class, Long.class, Long.class);
+            loadEntries.setAccessible(true);
+
+            List<AuditLogEntry> entries = (List<AuditLogEntry>) loadEntries.invoke(
+                    storage, logsDir.toFile(), null, "SCRIPT_CONSOLE_ACCESS", null, null);
+
+            assertEquals(2, entries.size());
+            assertEquals("SCRIPT_CONSOLE_ACCESSED", entries.get(0).getAction());
+            assertEquals("SCRIPT_CONSOLE_ACCESS", entries.get(1).getAction());
+        } finally {
+            storage.shutdown();
+        }
+    }
+
     private static AuditLogStorage newStorage() throws Exception {
         Constructor<AuditLogStorage> constructor = AuditLogStorage.class.getDeclaredConstructor();
         constructor.setAccessible(true);
@@ -143,7 +171,11 @@ public class AuditLogStorageRotationRegressionTest {
     }
 
     private static void writeJsonLine(Path file, AuditLogEntry entry) throws IOException {
-        Files.writeString(file, GSON.toJson(entry) + System.lineSeparator(), StandardCharsets.UTF_8);
+        Files.writeString(file,
+                GSON.toJson(entry) + System.lineSeparator(),
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.APPEND);
     }
 
     private static String legacyRotatedName(LocalDate date, String time) {

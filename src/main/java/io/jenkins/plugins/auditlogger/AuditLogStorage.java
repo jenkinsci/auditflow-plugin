@@ -649,13 +649,24 @@ public class AuditLogStorage {
         if (username != null && !username.isEmpty() && !entry.getUsername().equalsIgnoreCase(username)) {
             return false;
         }
-        if (action != null && !action.isEmpty() && !entry.getAction().equalsIgnoreCase(action)) {
+        if (action != null && !action.isEmpty() && !matchesActionFilter(entry.getAction(), action)) {
             return false;
         }
         if (startTime != null && entry.getTimestamp() < startTime) {
             return false;
         }
         return endTime == null || entry.getTimestamp() <= endTime;
+    }
+
+    private boolean matchesActionFilter(String entryAction, String requestedAction) {
+        if (entryAction == null || requestedAction == null) {
+            return false;
+        }
+        if (entryAction.equalsIgnoreCase(requestedAction)) {
+            return true;
+        }
+        return "SCRIPT_CONSOLE_ACCESS".equalsIgnoreCase(requestedAction)
+                && "SCRIPT_CONSOLE_ACCESSED".equalsIgnoreCase(entryAction);
     }
 
     private int getBatchSize() {

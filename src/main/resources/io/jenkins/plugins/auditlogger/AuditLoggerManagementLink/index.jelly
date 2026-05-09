@@ -197,6 +197,9 @@
                             </optgroup>
                             <optgroup label="System">
                                 <option value="SYSTEM_RESTART">Restart</option>
+                                <option value="SCRIPT_CONSOLE_ACCESS">Script Console Access</option>
+                                <option value="SCRIPT_APPROVED">Script Approved</option>
+                                <option value="UNSAFE_SCRIPT_BLOCKED">Unsafe Script Blocked</option>
                                 <option value="GLOBAL_CONFIG_UPDATED">Global Config</option>
                                 <option value="USER_CONFIG_UPDATED">User Config</option>
                                 <option value="SECURITY_CONFIG_UPDATED">Security Config</option>

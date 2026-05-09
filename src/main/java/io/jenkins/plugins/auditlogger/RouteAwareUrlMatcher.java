@@ -58,8 +58,10 @@ public class RouteAwareUrlMatcher {
      * Checks if URI accesses the script console.
      * Valid patterns (must terminate with script action):
      * - /script (global script console)
+        * - /manage/script (Manage Jenkins script console)
      * - /job/{name}/script (job-level script console)
      * - /scriptText (parameterized groovy)
+        * - /manage/scriptText (Manage Jenkins parameterized groovy)
      * 
      * Prevents false positives like:
      * - /view/script (view named "script")
@@ -76,6 +78,12 @@ public class RouteAwareUrlMatcher {
         if (segments.length == 2 && segments[0].isEmpty() && "script".equals(segments[1])) {
             return true;
         }
+
+        // Manage Jenkins script console: exactly /manage/script
+        if (segments.length == 3 && segments[0].isEmpty()
+                && "manage".equals(segments[1]) && "script".equals(segments[2])) {
+            return true;
+        }
         
         // Job-level script console: /job/{name}/script
         if (segments.length >= 4 && segments[0].isEmpty() && "job".equals(segments[1])) {
@@ -86,6 +94,12 @@ public class RouteAwareUrlMatcher {
         
         // Parameterized Groovy endpoint
         if (segments.length == 2 && segments[0].isEmpty() && "scriptText".equals(segments[1])) {
+            return true;
+        }
+
+        // Manage Jenkins parameterized Groovy endpoint
+        if (segments.length == 3 && segments[0].isEmpty()
+                && "manage".equals(segments[1]) && "scriptText".equals(segments[2])) {
             return true;
         }
         

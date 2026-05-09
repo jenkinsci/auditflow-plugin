@@ -37,4 +37,14 @@ public class AuditRequestCapturePluginRouteRegressionTest {
         assertFalse(AuditRequestCapture.isPluginUpdateUri("/manage/pluginManager/updates/"));
         assertNull(AuditRequestCapture.classifyPluginAction("/plugin/greenballs/images/24x24/ball.png"));
     }
+
+    @Test
+    public void scriptConsoleMatcherRecognizesManageRoutesWithoutBroadeningTooFar() {
+        assertTrue(RouteAwareUrlMatcher.isScriptConsoleAccess("/script"));
+        assertTrue(RouteAwareUrlMatcher.isScriptConsoleAccess("/manage/script"));
+        assertTrue(RouteAwareUrlMatcher.isScriptConsoleAccess("/scriptText"));
+        assertTrue(RouteAwareUrlMatcher.isScriptConsoleAccess("/manage/scriptText"));
+        assertFalse(RouteAwareUrlMatcher.isScriptConsoleAccess("/manage/script/console"));
+        assertFalse(RouteAwareUrlMatcher.isScriptConsoleAccess("/manage/configure/script"));
+    }
 }

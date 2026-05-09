@@ -153,7 +153,7 @@ public class AuditRequestCapture {
             boolean systemConfigEventsEnabled = config != null && config.isEnableSystemConfigEvents();
 
             String username = resolveUsername(req);
-            if (username == null) username = "SYSTEM";
+            if (username == null) username = "anonymous";
 
             String action = null;
             String target = null;
@@ -170,20 +170,19 @@ public class AuditRequestCapture {
                 severity = "CRITICAL";
             }
             // ===== SCRIPT CONSOLE ACCESS (NEW - CRITICAL SECURITY) =====
-            // Detects script console/scriptText access regardless of URL structure
+            // Detects script console/scriptText access regardless of URL structure.
+            // Record a single audit row here so one request does not fan out into duplicates.
             else if (systemConfigEventsEnabled && RouteAwareUrlMatcher.isScriptConsoleAccess(uri)) {
-                action = "SCRIPT_CONSOLE_ACCESSED";
+                action = "SCRIPT_CONSOLE_ACCESS";
                 target = "ScriptConsole";
                 String scriptContent = req.getParameter("script");
                 if (scriptContent != null && !scriptContent.isEmpty()) {
                     String preview = scriptContent.substring(0, Math.min(50, scriptContent.length()));
-                    details = "Script console accessed: " + preview + "... by " + username;
+                    details = "Script console access: " + preview + "... | Source: " + uri + " | User: " + username;
                 } else {
-                    details = "Script console accessed by " + username;
+                    details = "Script console access: N/A | Source: " + uri + " | User: " + username;
                 }
                 severity = "CRITICAL";
-                // Also call the ScriptListener for reliable event capture
-                AuditScriptListener.recordScriptConsoleAccess(scriptContent, uri);
             }
             // ===== PLUGIN OPERATIONS (route-aware matching) =====
             else if (pluginEventsEnabled && "POST".equalsIgnoreCase(method) && RouteAwareUrlMatcher.isPluginManagerAction(uri)) {
