@@ -24,7 +24,7 @@
     <licenses>
         <license>
             <name>Commercial License</name>
-            <url>https://github.com/harryofficial/AuditFlow/blob/main/LICENSE.txt</url>
+            <url>https://github.com/${gitHubRepo}/blob/main/LICENSE.txt</url>
         </license>
     </licenses>
 
@@ -79,6 +79,7 @@
     </dependencies>
 
     <build>
+        <finalName>${project.artifactId}-${project.version}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.jenkins-ci.tools</groupId>

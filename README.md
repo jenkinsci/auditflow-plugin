@@ -78,18 +78,18 @@ Most Jenkins audit plugins focus on logging.
 mvn clean package -DskipTests
 ```
 
-Output: `target/auditflow.hpi`
+Output: `target/auditflow-<version>.hpi`
 
 ### Install in Jenkins
 
 1. **Manage Jenkins -> Plugins -> Advanced -> Upload Plugin**
-2. Upload `auditflow.hpi`
+2. Upload `target/auditflow-<version>.hpi`
 3. Restart Jenkins
 
 Or copy directly:
 
 ```bash
-cp auditflow.hpi $JENKINS_HOME/plugins/
+cp target/auditflow-<version>.hpi $JENKINS_HOME/plugins/auditflow.jpi
 systemctl restart jenkins
 ```
 
@@ -259,7 +259,7 @@ Commercial License – See [LICENSE.txt](LICENSE.txt)
 
 ## Support
 
-- **GitHub:** https://github.com/harryofficial/AuditFlow
+- **GitHub:** https://github.com/jenkinsci/auditflow-plugin
 - **Issues:** Report bugs and feature requests on GitHub
 
 ## Version History
