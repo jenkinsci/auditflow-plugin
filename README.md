@@ -67,8 +67,8 @@ Most Jenkins audit plugins focus on logging.
 
 ## Requirements
 
-- Jenkins 2.361.4+
-- Java 11+
+- Jenkins 2.541.3+
+- Java 17+
 
 ## Installation
 
@@ -101,7 +101,7 @@ systemctl restart jenkins
 
 | Category | Events |
 |----------|--------|
-| Authentication | LOGIN, LOGOUT, FAILED_LOGIN, API_AUTH, SSO_LOGIN |
+| Authentication | LOGIN, LOGOUT, LOGIN_FAILED, API_AUTH, SSO_LOGIN |
 | Builds | BUILD_STARTED, BUILD_COMPLETED, BUILD_DELETED |
 | Jobs | JOB_CREATED, JOB_UPDATED, JOB_DELETED, JOB_RENAMED, JOB_COPIED |
 | Credentials | CREDENTIAL_CREATED, CREDENTIAL_ACCESSED, CREDENTIAL_UPDATED, CREDENTIAL_DELETED |
@@ -169,7 +169,7 @@ Parameters: `user`, `action`, `startTime`, `endTime`
 ### Authentication Events
 - `LOGIN` - User login successfully
 - `LOGOUT` - User logout
-- `LOGIN_FAILED` - Authentication failed
+- `LOGIN_FAILED` - Failed login attempt
 - `API_AUTH` - API token or basic auth used
 
 ### Build Events
@@ -249,8 +249,8 @@ src/main/java/io/jenkins/plugins/auditlogger/
 
 ## Compatibility
 
-- **Jenkins:** 2.361.4 or later, with `verify` passing against 2.440 and live regression validation completed on 2.541.3
-- **Java:** 11 or later
+- **Jenkins:** 2.541.3 or later, with `verify` passing against 2.440 and live regression validation completed on 2.541.3
+- **Java:** 17 or later
 - **Deployment:** Standalone, Docker, Kubernetes, Cloud-managed Jenkins
 
 ## License
@@ -259,24 +259,10 @@ Commercial License – See [LICENSE.txt](LICENSE.txt)
 
 ## Support
 
-- **GitHub:** https://github.com/jenkinsci/auditflow-plugin
+- **GitHub:** https://github.com/jenkinsci/auditflow-plugin/
 - **Issues:** Report bugs and feature requests on GitHub
 
 ## Version History
-
-### 1.1.1
-- Refined Insights to summarize current-day activity while honoring the active filters
-- Kept anomaly detection and the anomaly row disabled while still using thresholds for Insights prioritization
-- Preserved non-visible configuration values across Configure System save cycles
-- Validated config round-trips and log rotation behavior live on Jenkins 2.541.3
-
-### 1.1.0
-- Verified plugin build compatibility against Jenkins 2.440
-- Live regression validation completed for credentials, plugin lifecycle events, authentication events, and build outcomes
-- Fixed timestamp reload drift so persisted events keep their original audit time after restart
-- Fixed credential mutation detection on the first post-startup change
-- Fixed plugin manager route handling for modern `/plugin/{name}/...` endpoints
-- Removed runtime anomaly detection work from the audit hot path to keep write latency predictable under load
 
 ### 1.0.0
 - Initial public release

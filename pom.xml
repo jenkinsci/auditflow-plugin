@@ -14,7 +14,7 @@
 
     <groupId>io.jenkins.plugins</groupId>
     <artifactId>auditflow</artifactId>
-    <version>${changelist}</version>
+    <version>1.0.0</version>
     <packaging>hpi</packaging>
 
     <name>AuditFlow</name>
