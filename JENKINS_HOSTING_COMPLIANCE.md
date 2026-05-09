@@ -1,7 +1,7 @@
 # Jenkins Plugin Hosting Compliance Checklist
 
 **Plugin Name:** AuditFlow  
-**Version:** 1.1.1  
+**Version:** 1.0.0  
 **Status:** ✅ READY FOR PRODUCTION & JENKINS HOSTING  
 **Date:** May 9, 2026
 

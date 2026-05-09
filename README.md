@@ -1,4 +1,4 @@
-# AuditFlow – Jenkins Audit Logs You Can Actually Understand
+ # AuditFlow – Jenkins Audit Logs You Can Actually Understand
 
 **Stop digging through Jenkins logs. Start understanding what's happening.**
 
@@ -334,11 +334,13 @@ This project is licensed under a Commercial License. See [LICENSE.txt](LICENSE.t
 
 ## What's New
 
-### Version 1.1.1 (Current)
-- Insights now summarize today's activity while respecting your current filters
-- Anomaly detection runs in the background without slowing down logs
-- Configuration values are preserved across updates
-- Tested on Jenkins 2.541.3 with full regression validation
+### Version 1.0.0 (Current)
+- Initial public release
+- Comprehensive audit logging for all Jenkins events
+- Paginated dashboard with filtering and search
+- REST API for programmatic access
+- Automatic log rotation and retention
+- Data masking for sensitive information
 
 ### Version 1.1.0
 - Verified against Jenkins 2.440
