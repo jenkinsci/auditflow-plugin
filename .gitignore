@@ -28,5 +28,4 @@ work/
 
 # Build
 *.hpi
-!releases/*.hpi
 *.jar

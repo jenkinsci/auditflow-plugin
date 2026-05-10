@@ -1,12 +1,24 @@
 package io.jenkins.plugins.auditlogger;
 
 import hudson.Extension;
+import hudson.model.AbstractProject;
+import hudson.model.BuildableItemWithBuildWrappers;
 import hudson.model.Cause;
+import hudson.model.Job;
 import hudson.model.ParameterValue;
 import hudson.model.ParametersAction;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.model.listeners.RunListener;
+import hudson.plugins.git.GitSCM;
+import hudson.plugins.git.UserRemoteConfig;
+import hudson.scm.SCM;
+import hudson.tasks.BuildWrapper;
+import org.jenkinsci.plugins.credentialsbinding.MultiBinding;
+import org.jenkinsci.plugins.credentialsbinding.impl.SecretBuildWrapper;
+import org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition;
+import org.jenkinsci.plugins.workflow.flow.FlowDefinition;
+import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -272,7 +284,7 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
                         "Credentials/" + credId, details);
                 entry.setSeverity("HIGH");
                 AuditLogStorage.getInstance().addEntry(entry);
-                LOGGER.log(Level.INFO, "CREDENTIAL_ACCESSED (SCM, build start): cred={0} job={1} build=#{2}",
+                LOGGER.log(Level.FINE, "CREDENTIAL_ACCESSED (SCM, build start): cred={0} job={1} build=#{2}",
                         new Object[]{credId, jobName, run.getNumber()});
             }
         } catch (Exception e) {
@@ -337,31 +349,17 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
      */
     private void extractCredentialsFromJobWrappers(Run<?, ?> run, Set<String> ids) {
         try {
-            Object job = run.getParent();
-            Method getBuildWrappers = null;
-            try {
-                getBuildWrappers = job.getClass().getMethod("getBuildWrappersList");
-            } catch (NoSuchMethodException ignored) {}
+            Job<?, ?> job = run.getParent();
+            if (!(job instanceof BuildableItemWithBuildWrappers buildableJob)) {
+                return;
+            }
 
-            if (getBuildWrappers != null) {
-                Object wrappersList = getBuildWrappers.invoke(job);
-                if (wrappersList instanceof Iterable) {
-                    for (Object wrapper : (Iterable<?>) wrappersList) {
-                        String wrapperClass = wrapper.getClass().getName();
-                        if (wrapperClass.contains("SecretBuildWrapper")) {
-                            try {
-                                Method getBindingsMethod = wrapper.getClass().getMethod("getBindings");
-                                Object bindingsObj = getBindingsMethod.invoke(wrapper);
-                                if (bindingsObj instanceof Iterable) {
-                                    for (Object binding : (Iterable<?>) bindingsObj) {
-                                        String credId = invokeStringGetter(binding, "getCredentialsId");
-                                        if (credId == null) credId = invokeStringGetter(binding, "getCredentialId");
-                                        if (credId != null && !credId.isEmpty()) {
-                                            ids.add(credId);
-                                        }
-                                    }
-                                }
-                            } catch (NoSuchMethodException ignored) {}
+            for (BuildWrapper wrapper : buildableJob.getBuildWrappersList()) {
+                if (wrapper instanceof SecretBuildWrapper secretBuildWrapper) {
+                    for (MultiBinding<?> binding : secretBuildWrapper.getBindings()) {
+                        String credId = binding.getCredentialsId();
+                        if (credId != null && !credId.isEmpty()) {
+                            ids.add(credId);
                         }
                     }
                 }
@@ -399,31 +397,18 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
      */
     private void extractScmCredentials(Run<?, ?> run, Set<String> ids) {
         try {
-            Object job = run.getParent();
+            Job<?, ?> job = run.getParent();
 
-            // For pipeline jobs (WorkflowJob): getDefinition().getScm()
-            Object scm = null;
-            try {
-                Method getDefinition = job.getClass().getMethod("getDefinition");
-                Object definition = getDefinition.invoke(job);
-                if (definition != null) {
-                    try {
-                        Method getScm = definition.getClass().getMethod("getScm");
-                        scm = getScm.invoke(definition);
-                    } catch (NoSuchMethodException ignored) {}
-                }
-            } catch (NoSuchMethodException ignored) {}
-
-            // For freestyle jobs (AbstractProject): getScm()
-            if (scm == null) {
-                try {
-                    Method getScm = job.getClass().getMethod("getScm");
-                    scm = getScm.invoke(job);
-                } catch (NoSuchMethodException ignored) {}
+            if (job instanceof AbstractProject<?, ?> project) {
+                extractCredentialIdsFromScm(project.getScm(), ids);
+                return;
             }
 
-            if (scm != null) {
-                extractCredentialIdsFromScm(scm, ids);
+            if (job instanceof WorkflowJob workflowJob) {
+                FlowDefinition definition = workflowJob.getDefinition();
+                if (definition instanceof CpsScmFlowDefinition cpsScmFlowDefinition) {
+                    extractCredentialIdsFromScm(cpsScmFlowDefinition.getScm(), ids);
+                }
             }
         } catch (Exception e) {
             LOGGER.log(Level.FINEST, "Could not extract SCM credentials", e);
@@ -433,23 +418,22 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
     /**
      * Extract credential IDs from an SCM object (GitSCM, SubversionSCM, etc.) via reflection.
      */
-    private void extractCredentialIdsFromScm(Object scm, Set<String> ids) {
+    private void extractCredentialIdsFromScm(SCM scm, Set<String> ids) {
+        if (scm == null) {
+            return;
+        }
+
         try {
-            // GitSCM: getUserRemoteConfigs() → list of UserRemoteConfig, each has getCredentialsId()
-            for (Method m : scm.getClass().getMethods()) {
-                if ("getUserRemoteConfigs".equals(m.getName()) && m.getParameterCount() == 0) {
-                    Object configs = m.invoke(scm);
-                    if (configs instanceof Iterable) {
-                        for (Object config : (Iterable<?>) configs) {
-                            String credId = invokeStringGetter(config, "getCredentialsId");
-                            if (credId != null && !credId.isEmpty()) {
-                                ids.add(credId);
-                            }
-                        }
+            if (scm instanceof GitSCM gitScm) {
+                for (UserRemoteConfig config : gitScm.getUserRemoteConfigs()) {
+                    String credId = config.getCredentialsId();
+                    if (credId != null && !credId.isEmpty()) {
+                        ids.add(credId);
                     }
-                    return;
                 }
+                return;
             }
+
             // Generic: try getCredentialsId() directly on the SCM
             String credId = invokeStringGetter(scm, "getCredentialsId");
             if (credId != null && !credId.isEmpty()) {

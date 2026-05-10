@@ -21,7 +21,6 @@ Your analysis identified critical security vulnerabilities in the AuditFlow plug
 
 **Key Methods**:
 - `isRestartAction(uri)` - Validates restart endpoints (exact structure matching)
-- `isScriptConsoleAccess(uri)` - Detects script console endpoints
 - `isPluginManagerAction(uri)` - Validates plugin manager access
 - `isConfigurationChange(uri)` - Detects configuration change endpoints
 - `extractPluginName(uri)` - Safely extracts plugin identifiers
@@ -42,27 +41,23 @@ AFTER:
 
 ### 2. AuditScriptListener (New Class)
 
-**Purpose**: Event-driven script execution tracking (NOT URL-based)
+**Purpose**: Event-driven script execution tracking through Jenkins core `ScriptListener`
 
 **Methods**:
-- `recordScriptApproval(scriptHash, script, approver)` - Logs script approvals
-- `recordScriptConsoleAccess(scriptContent, source)` - Logs console access
-- `recordUnsafeScriptExecution(script, reason)` - Logs policy violations
+- `onScriptExecution(...)` - Logs script execution directly from the callback context
+- `onScriptOutput(...)` - Ignored to avoid duplicate audit rows
 
 **Critical Security Events Now Tracked**:
 ```
-SCRIPT_CONSOLE_ACCESSED - When user accesses /script endpoint
-SCRIPT_APPROVED - When script is approved for execution
-UNSAFE_SCRIPT_BLOCKED - When unapproved script execution attempted
+SCRIPT_CONSOLE_ACCESS - When Jenkins fires a script execution callback
 ```
 
 ### 3. Enhanced AuditRequestCapture
 
 **Changes to `detectAdminAction()` method**:
 - Replaced naive string matching with `RouteAwareUrlMatcher` calls
-- Added GET request detection (script console accessed via GET)
-- Integrated with `AuditScriptListener` for reliable event capture
 - Improved plugin action classification
+- Removed script-console request matching so script auditing comes only from `ScriptListener`
 - Added comprehensive error handling
 
 **Code Migration Example**:
@@ -104,10 +99,10 @@ AFTER:  Correctly identified as job build (not system restart)
 
 ### Scenario 3: Script Console Access
 ```
-URL: /script or /job/myjob/script
+Execution: POST /scriptText or script console execution
 
-BEFORE: No detection whatsoever
-AFTER:  Logs: SCRIPT_CONSOLE_ACCESSED with script preview
+BEFORE: Detection depended on request heuristics
+AFTER:  Logs: SCRIPT_CONSOLE_ACCESS from Jenkins' script execution callback
         ✓ Critical security event now captured
 ```
 
@@ -129,7 +124,7 @@ AFTER:  Correctly identified as job build (not plugin operation)
 
 ### Testing Required
 - [ ] System restart detection (POST to `/restart` and `/manage/restart`)
-- [ ] Script console access (GET/POST to `/script` and `/job/{name}/script`)
+- [ ] Script execution auditing via real `/scriptText` execution
 - [ ] Plugin operations (enable/disable/install/remove)
 - [ ] Security configuration changes
 - [ ] Verify NO false positives for jobs named "script", "restart", etc.
@@ -140,7 +135,7 @@ AFTER:  Correctly identified as job build (not plugin operation)
 - [ ] Update Jenkins: Replace plugin JAR
 - [ ] Restart Jenkins (safe restart recommended)
 - [ ] Verify startup logs contain no errors
-- [ ] Check audit log has new SCRIPT_CONSOLE_ACCESSED entries
+- [ ] Check audit log has new SCRIPT_CONSOLE_ACCESS entries
 
 ### Post-Deployment Monitoring
 - [ ] Review audit logs for script console events
@@ -175,13 +170,13 @@ TOTAL:
    - Mitigation: Works for standard Jenkins installations
    - Risk: Custom plugins with alternate endpoints not detected
 
-2. **Script Interception**: Event-driven within HTTP request boundaries
-   - Mitigation: Captures console access and approvals
-   - Risk: Script execution in jobs/pipelines not captured
+2. **Script Interception**: Event-driven via Jenkins core `ScriptListener`
+  - Mitigation: Captures script console and `scriptText` execution without URL heuristics
+  - Risk: Approval and rejection events are not captured until a separate script-security hook is implemented
 
-3. **Parameter Extraction**: Relies on HTTP request parameters
-   - Mitigation: Covers `/script?script=...` patterns
-   - Risk: Scripts in POST body or serialized formats may not be captured
+3. **Callback Coverage**: Limited to execution paths that fire `ScriptListener`
+  - Mitigation: Covers the Jenkins core paths exercised by the new harness test
+  - Risk: Execution paths outside that extension point remain out of scope
 
 4. **Version Compatibility**: Tested on Jenkins 2.361.4
    - Mitigation: Validated on modern LTS release
@@ -192,7 +187,7 @@ See `SECURITY_HARDENING.md` for detailed limitation analysis and recommendations
 ## Future Enhancements
 
 ### Phase 2: Event-Based Listeners
-- Implement Jenkins listener interfaces for script approvals
+- Implement a separate script-security approval listener when that dependency is added
 - Hook into plugin lifecycle events
 - Better event correlation
 

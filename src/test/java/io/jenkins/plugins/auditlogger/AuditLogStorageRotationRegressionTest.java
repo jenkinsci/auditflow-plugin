@@ -2,8 +2,6 @@ package io.jenkins.plugins.auditlogger;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import org.junit.Test;
-
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -15,12 +13,13 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class AuditLogStorageRotationRegressionTest {
+class AuditLogStorageRotationRegressionTest {
 
     private static final Gson GSON = new GsonBuilder()
             .registerTypeAdapter(AuditLogEntry.class, new AuditLogEntrySerializer())
@@ -29,7 +28,7 @@ public class AuditLogStorageRotationRegressionTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    public void loadEntriesFromDiskIncludesLegacyAndDailyRotatedFilesInTimestampOrder() throws Exception {
+    void loadEntriesFromDiskIncludesLegacyAndDailyRotatedFilesInTimestampOrder() throws Exception {
         Path tempDir = Files.createTempDirectory("auditflow-storage-order");
         AuditLogStorage storage = newStorage();
 
@@ -59,7 +58,7 @@ public class AuditLogStorageRotationRegressionTest {
     }
 
     @Test
-    public void rotateLogFileUsesDailyArchiveNameForFirstSegment() throws Exception {
+    void rotateLogFileUsesDailyArchiveNameForFirstSegment() throws Exception {
         Path tempDir = Files.createTempDirectory("auditflow-day-rotation");
         AuditLogStorage storage = newStorage();
 
@@ -81,7 +80,7 @@ public class AuditLogStorageRotationRegressionTest {
     }
 
     @Test
-    public void rotateLogFileUsesNumberedSuffixWhenDayAlreadyHasArchive() throws Exception {
+    void rotateLogFileUsesNumberedSuffixWhenDayAlreadyHasArchive() throws Exception {
         Path tempDir = Files.createTempDirectory("auditflow-size-rotation");
         AuditLogStorage storage = newStorage();
 
@@ -104,7 +103,7 @@ public class AuditLogStorageRotationRegressionTest {
     }
 
     @Test
-    public void pruneExpiredLogFilesDeletesArchivesOlderThanRetentionWindow() throws Exception {
+    void pruneExpiredLogFilesDeletesArchivesOlderThanRetentionWindow() throws Exception {
         Path tempDir = Files.createTempDirectory("auditflow-retention");
         AuditLogStorage storage = newStorage();
 
@@ -131,7 +130,7 @@ public class AuditLogStorageRotationRegressionTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    public void scriptConsoleAccessFilterMatchesLegacyActionName() throws Exception {
+    void scriptConsoleAccessFilterMatchesLegacyActionName() throws Exception {
         Path tempDir = Files.createTempDirectory("auditflow-script-access-filter");
         AuditLogStorage storage = newStorage();
 

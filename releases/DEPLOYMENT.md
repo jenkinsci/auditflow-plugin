@@ -1,9 +1,9 @@
 # AuditFlow Plugin Deployment Guide
 
 ## Release Information
-- **Version**: 1.0.0
-- **Release Date**: May 9, 2026
-- **Plugin File**: `auditflow-1.0.0.hpi`
+- **Plugin Artifact**: Build the plugin locally and deploy the generated HPI from `target/`.
+- **Current Default Build Output**: `target/auditflow-999999-SNAPSHOT.hpi`
+- **Hosted Releases**: Once the plugin is hosted by Jenkins, use the Artifactory-published HPI instead of committing binary artifacts to this repository.
 
 ## Deployment to Jenkins Controllers
 
@@ -15,7 +15,7 @@ For the development Docker Jenkins controller:
 docker exec jenkins-plugin-dev cp /var/jenkins_home/plugins/auditflow.jpi /var/jenkins_home/plugins/auditflow.jpi.backup
 
 # 2. Deploy new HPI
-docker cp auditflow-1.0.0.hpi jenkins-plugin-dev:/var/jenkins_home/plugins/auditflow.jpi
+docker cp target/auditflow-999999-SNAPSHOT.hpi jenkins-plugin-dev:/var/jenkins_home/plugins/auditflow.jpi
 
 # 3. Remove exploded plugin
 docker exec jenkins-plugin-dev rm -rf /var/jenkins_home/plugins/auditflow
@@ -37,7 +37,7 @@ For standalone Jenkins installations:
 cp $JENKINS_HOME/plugins/auditflow.jpi $JENKINS_HOME/plugins/auditflow.jpi.backup
 
 # 2. Deploy new HPI
-cp auditflow-1.0.0.hpi $JENKINS_HOME/plugins/auditflow.jpi
+cp target/auditflow-999999-SNAPSHOT.hpi $JENKINS_HOME/plugins/auditflow.jpi
 
 # 3. Remove exploded plugin
 rm -rf $JENKINS_HOME/plugins/auditflow
@@ -49,7 +49,7 @@ systemctl restart jenkins  # or equivalent restart command
 ```
 
 ### Multi-Controller Deployment
-For multiple Jenkins controllers, use Jenkins configuration management or deployment orchestration tools (Kubernetes, Ansible, etc.) to deploy `auditflow-1.0.0.hpi` to each controller's plugins directory.
+For multiple Jenkins controllers, use Jenkins configuration management or deployment orchestration tools (Kubernetes, Ansible, etc.) to deploy the generated HPI artifact to each controller's plugins directory.
 
 ## Verification Checklist
 - [ ] Plugin appears in Jenkins **Manage Plugins** list
@@ -70,8 +70,8 @@ systemctl restart jenkins
 ```
 
 ## Requirements
-- Jenkins 2.361.4 or higher
-- Java 11+
+- Jenkins 2.541.3 or higher
+- Java 17+
 - Sufficient disk space for audit logs (depends on build frequency and retention policy)
 
 ## Support

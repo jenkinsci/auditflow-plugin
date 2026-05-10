@@ -1,17 +1,20 @@
 package io.jenkins.plugins.auditlogger;
 
 import hudson.Extension;
+import hudson.BulkChange;
 import hudson.model.Descriptor;
+import hudson.util.ListBoxModel;
 import jenkins.model.GlobalConfiguration;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
+import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.StaplerRequest2;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.time.DateTimeException;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +27,20 @@ import java.util.logging.Logger;
 @Extension
 public class AuditLoggerConfiguration extends GlobalConfiguration {
     private static final Logger LOGGER = Logger.getLogger(AuditLoggerConfiguration.class.getName());
+    private static final List<String> PREFERRED_DISPLAY_TIME_ZONES = List.of(
+            "UTC",
+            "Asia/Kolkata",
+            "America/New_York",
+            "America/Chicago",
+            "America/Los_Angeles",
+            "Europe/London",
+            "Europe/Berlin",
+            "Europe/Paris",
+            "Asia/Tokyo",
+            "Asia/Shanghai",
+            "Asia/Singapore",
+            "Australia/Sydney");
+    private static final List<String> AVAILABLE_DISPLAY_TIME_ZONES = buildAvailableDisplayTimeZones();
 
     // Event Categories
     private boolean enableAuthenticationEvents = true;
@@ -128,115 +145,87 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     }
 
     @Override
-    public String getDisplayName() {
-        return "AuditFlow";
-    }
-
-    @Override
     public boolean configure(StaplerRequest2 req, JSONObject json) throws Descriptor.FormException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
-        try {
-            enableAuthenticationEvents = readBoolean(json, "enableAuthenticationEvents", enableAuthenticationEvents);
-            enableBuildEvents = readBoolean(json, "enableBuildEvents", enableBuildEvents);
-            enableJobConfigEvents = readBoolean(json, "enableJobConfigEvents", enableJobConfigEvents);
-            enablePipelineEvents = readBoolean(json, "enablePipelineEvents", enablePipelineEvents);
-            enableCredentialEvents = readBoolean(json, "enableCredentialEvents", enableCredentialEvents);
-            enablePluginEvents = readBoolean(json, "enablePluginEvents", enablePluginEvents);
-            enableSystemConfigEvents = readBoolean(json, "enableSystemConfigEvents", enableSystemConfigEvents);
-            enableNodeEvents = readBoolean(json, "enableNodeEvents", enableNodeEvents);
-            enableApiEvents = readBoolean(json, "enableApiEvents", enableApiEvents);
-
-            enableFailedLoginDetection = readBoolean(json, "enableFailedLoginDetection", enableFailedLoginDetection);
-            failedLoginThreshold = readInt(json, "failedLoginThreshold", failedLoginThreshold, 1, 100);
-            failedLoginTimeWindowMinutes = readInt(json, "failedLoginTimeWindowMinutes", failedLoginTimeWindowMinutes, 1, 1440);
-
-            anomalyFailedLogins = readBoolean(json, "anomalyFailedLogins", anomalyFailedLogins);
-            anomalyFailedLoginsThreshold = readInt(json, "anomalyFailedLoginsThreshold", anomalyFailedLoginsThreshold, 1, 100);
-            anomalyFailedLoginsWindowMinutes = readInt(json, "anomalyFailedLoginsWindowMinutes", anomalyFailedLoginsWindowMinutes, 1, 1440);
-            anomalyCredentialChanges = readBoolean(json, "anomalyCredentialChanges", anomalyCredentialChanges);
-            anomalyCredentialChangesThreshold = readInt(json, "anomalyCredentialChangesThreshold", anomalyCredentialChangesThreshold, 1, 100);
-            anomalyPluginChanges = readBoolean(json, "anomalyPluginChanges", anomalyPluginChanges);
-            anomalyPluginChangesThreshold = readInt(json, "anomalyPluginChangesThreshold", anomalyPluginChangesThreshold, 1, 100);
-            anomalyGlobalConfigChanges = readBoolean(json, "anomalyGlobalConfigChanges", anomalyGlobalConfigChanges);
-            anomalyGlobalConfigChangesThreshold = readInt(json, "anomalyGlobalConfigChangesThreshold", anomalyGlobalConfigChangesThreshold, 1, 100);
-            anomalyJobConfigChanges = readBoolean(json, "anomalyJobConfigChanges", anomalyJobConfigChanges);
-            anomalyJobConfigChangesThreshold = readInt(json, "anomalyJobConfigChangesThreshold", anomalyJobConfigChangesThreshold, 1, 100);
-            anomalyWatchedJobPatterns = readString(json, "anomalyWatchedJobPatterns", anomalyWatchedJobPatterns);
-            anomalySecurityConfigChanges = readBoolean(json, "anomalySecurityConfigChanges", anomalySecurityConfigChanges);
-            anomalySecurityConfigChangesThreshold = readInt(json, "anomalySecurityConfigChangesThreshold", anomalySecurityConfigChangesThreshold, 1, 100);
-            anomalyOffHoursAdmin = readBoolean(json, "anomalyOffHoursAdmin", anomalyOffHoursAdmin);
-            anomalyBuildFailures = readBoolean(json, "anomalyBuildFailures", anomalyBuildFailures);
-            anomalyBuildFailuresThreshold = readInt(json, "anomalyBuildFailuresThreshold", anomalyBuildFailuresThreshold, 1, 100);
-
-            enableProductionJobChangeAlert = readBoolean(json, "enableProductionJobChangeAlert", enableProductionJobChangeAlert);
-            enableCredentialUpdateAlert = readBoolean(json, "enableCredentialUpdateAlert", enableCredentialUpdateAlert);
-            enablePluginInstallAlert = readBoolean(json, "enablePluginInstallAlert", enablePluginInstallAlert);
-            enableAdminOffHoursAlert = readBoolean(json, "enableAdminOffHoursAlert", enableAdminOffHoursAlert);
-
-            logRetentionDays = readInt(json, "logRetentionDays", logRetentionDays, 0, 3650);
-            maxLogFileSizeMB = readInt(json, "maxLogFileSizeMB", maxLogFileSizeMB, 1, 1024);
-            enableLogRotation = readBoolean(json, "enableLogRotation", enableLogRotation);
-
-            startupGracePeriodSeconds = readInt(json, "startupGracePeriodSeconds", startupGracePeriodSeconds, 5, 300);
+        try (BulkChange bulkChange = new BulkChange(this)) {
+            boolean configured;
+            if (req == null) {
+                applyJsonConfiguration(json);
+                configured = true;
+            } else {
+                configured = super.configure(req, json);
+            }
             StartupPhaseManager.setGracePeriodSeconds(startupGracePeriodSeconds);
-
-            enableAdvancedIndexing = readBoolean(json, "enableAdvancedIndexing", enableAdvancedIndexing);
-            enableAnomalyDetection = false;
-            enableMetricsCollection = readBoolean(json, "enableMetricsCollection", enableMetricsCollection);
-            batchWriteSize = readInt(json, "batchWriteSize", batchWriteSize, 1, 10000);
-            batchFlushIntervalSeconds = readInt(json, "batchFlushIntervalSeconds", batchFlushIntervalSeconds, 1, 300);
-
-            maskTokens = readBoolean(json, "maskTokens", maskTokens);
-            maskEmailAddresses = readBoolean(json, "maskEmailAddresses", maskEmailAddresses);
-            maskCreditCards = readBoolean(json, "maskCreditCards", maskCreditCards);
-
-            enableAlertEngine = readBoolean(json, "enableAlertEngine", enableAlertEngine);
-            enableComplianceReports = readBoolean(json, "enableComplianceReports", enableComplianceReports);
-
-            enableRiskLevels = readBoolean(json, "enableRiskLevels", enableRiskLevels);
-            enableEventCategories = readBoolean(json, "enableEventCategories", enableEventCategories);
-            enableTimelineView = readBoolean(json, "enableTimelineView", enableTimelineView);
-            enableSensitiveEventsPanel = readBoolean(json, "enableSensitiveEventsPanel", enableSensitiveEventsPanel);
-            enableDashboardMetrics = readBoolean(json, "enableDashboardMetrics", enableDashboardMetrics);
-            enableDashboardStats = readBoolean(json, "enableDashboardStats", enableDashboardStats);
-            enableAnomalyRow = false;
-            displayTimeZoneId = sanitizeTimeZoneId(readString(json, "displayTimeZoneId", displayTimeZoneId));
-            showMetricTotal = readBoolean(json, "showMetricTotal", showMetricTotal);
-            showMetricLogins = readBoolean(json, "showMetricLogins", showMetricLogins);
-            showMetricFailedLogins = readBoolean(json, "showMetricFailedLogins", showMetricFailedLogins);
-            showMetricBuilds = readBoolean(json, "showMetricBuilds", showMetricBuilds);
-            showMetricJobs = readBoolean(json, "showMetricJobs", showMetricJobs);
-            showMetricConfig = readBoolean(json, "showMetricConfig", showMetricConfig);
-
-            enableCsvExport = readBoolean(json, "enableCsvExport", enableCsvExport);
-            enableJsonExport = readBoolean(json, "enableJsonExport", enableJsonExport);
-            enablePdfExport = readBoolean(json, "enablePdfExport", enablePdfExport);
-
-            enableAuditApi = readBoolean(json, "enableAuditApi", enableAuditApi);
-
-            save();
-            LOGGER.info("Audit Logger configuration updated");
-            return true;
-        } catch (Exception e) {
-            LOGGER.warning("Error saving Audit Logger configuration: " + e.getMessage());
+            bulkChange.commit();
+            return configured;
+        } catch (IOException e) {
+            LOGGER.warning("Failed to save AuditFlow configuration: " + e.getMessage());
             return false;
         }
     }
 
+    private static List<String> buildAvailableDisplayTimeZones() {
+        List<String> zones = new ArrayList<>();
+        zones.add("SYSTEM");
+        zones.add("UTC");
+
+        for (String preferredZone : PREFERRED_DISPLAY_TIME_ZONES) {
+            if (!zones.contains(preferredZone) && ZoneId.getAvailableZoneIds().contains(preferredZone)) {
+                zones.add(preferredZone);
+            }
+        }
+
+        List<String> remainingZones = new ArrayList<>(ZoneId.getAvailableZoneIds());
+        remainingZones.sort(Comparator.naturalOrder());
+        for (String zoneId : remainingZones) {
+            if (!zones.contains(zoneId)) {
+                zones.add(zoneId);
+            }
+        }
+
+        return List.copyOf(zones);
+    }
+
+    private void applyJsonConfiguration(JSONObject json) {
+        if (json == null) {
+            return;
+        }
+
+        if (json.has("enableAuthenticationEvents")) setEnableAuthenticationEvents(json.optBoolean("enableAuthenticationEvents", enableAuthenticationEvents));
+        if (json.has("enableBuildEvents")) setEnableBuildEvents(json.optBoolean("enableBuildEvents", enableBuildEvents));
+        if (json.has("enableJobConfigEvents")) setEnableJobConfigEvents(json.optBoolean("enableJobConfigEvents", enableJobConfigEvents));
+        if (json.has("enableCredentialEvents")) setEnableCredentialEvents(json.optBoolean("enableCredentialEvents", enableCredentialEvents));
+        if (json.has("enablePluginEvents")) setEnablePluginEvents(json.optBoolean("enablePluginEvents", enablePluginEvents));
+        if (json.has("enableSystemConfigEvents")) setEnableSystemConfigEvents(json.optBoolean("enableSystemConfigEvents", enableSystemConfigEvents));
+
+        if (json.has("enableDashboardStats")) setEnableDashboardStats(json.optBoolean("enableDashboardStats", enableDashboardStats));
+        if (json.has("enableRiskLevels")) setEnableRiskLevels(json.optBoolean("enableRiskLevels", enableRiskLevels));
+        if (json.has("displayTimeZoneId")) setDisplayTimeZoneId(json.optString("displayTimeZoneId", displayTimeZoneId));
+        if (json.has("showMetricTotal")) setShowMetricTotal(json.optBoolean("showMetricTotal", showMetricTotal));
+        if (json.has("showMetricLogins")) setShowMetricLogins(json.optBoolean("showMetricLogins", showMetricLogins));
+        if (json.has("showMetricFailedLogins")) setShowMetricFailedLogins(json.optBoolean("showMetricFailedLogins", showMetricFailedLogins));
+        if (json.has("showMetricBuilds")) setShowMetricBuilds(json.optBoolean("showMetricBuilds", showMetricBuilds));
+        if (json.has("showMetricJobs")) setShowMetricJobs(json.optBoolean("showMetricJobs", showMetricJobs));
+        if (json.has("showMetricConfig")) setShowMetricConfig(json.optBoolean("showMetricConfig", showMetricConfig));
+
+        if (json.has("enableCsvExport")) setEnableCsvExport(json.optBoolean("enableCsvExport", enableCsvExport));
+        if (json.has("enableJsonExport")) setEnableJsonExport(json.optBoolean("enableJsonExport", enableJsonExport));
+        if (json.has("enableAuditApi")) setEnableAuditApi(json.optBoolean("enableAuditApi", enableAuditApi));
+
+        if (json.has("logRetentionDays")) setLogRetentionDays(json.optInt("logRetentionDays", logRetentionDays));
+        if (json.has("maxLogFileSizeMB")) setMaxLogFileSizeMB(json.optInt("maxLogFileSizeMB", maxLogFileSizeMB));
+        if (json.has("enableLogRotation")) setEnableLogRotation(json.optBoolean("enableLogRotation", enableLogRotation));
+        if (json.has("startupGracePeriodSeconds")) setStartupGracePeriodSeconds(json.optInt("startupGracePeriodSeconds", startupGracePeriodSeconds));
+        if (json.has("batchWriteSize")) setBatchWriteSize(json.optInt("batchWriteSize", batchWriteSize));
+        if (json.has("batchFlushIntervalSeconds")) setBatchFlushIntervalSeconds(json.optInt("batchFlushIntervalSeconds", batchFlushIntervalSeconds));
+
+        if (json.has("maskTokens")) setMaskTokens(json.optBoolean("maskTokens", maskTokens));
+        if (json.has("maskEmailAddresses")) setMaskEmailAddresses(json.optBoolean("maskEmailAddresses", maskEmailAddresses));
+        if (json.has("maskCreditCards")) setMaskCreditCards(json.optBoolean("maskCreditCards", maskCreditCards));
+    }
+
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
-    }
-
-    private static boolean readBoolean(JSONObject json, String key, boolean currentValue) {
-        return json.has(key) ? json.optBoolean(key, currentValue) : currentValue;
-    }
-
-    private static int readInt(JSONObject json, String key, int currentValue, int min, int max) {
-        return json.has(key) ? clamp(json.optInt(key, currentValue), min, max) : currentValue;
-    }
-
-    private static String readString(JSONObject json, String key, String currentValue) {
-        return json.has(key) ? json.optString(key, currentValue) : currentValue;
     }
 
     private static String sanitizeTimeZoneId(String value) {
@@ -254,6 +243,169 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         } catch (DateTimeException ignored) {
             return "UTC";
         }
+    }
+
+    @DataBoundSetter
+    public void setEnableAuthenticationEvents(boolean enableAuthenticationEvents) {
+        this.enableAuthenticationEvents = enableAuthenticationEvents;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableBuildEvents(boolean enableBuildEvents) {
+        this.enableBuildEvents = enableBuildEvents;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableJobConfigEvents(boolean enableJobConfigEvents) {
+        this.enableJobConfigEvents = enableJobConfigEvents;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableCredentialEvents(boolean enableCredentialEvents) {
+        this.enableCredentialEvents = enableCredentialEvents;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnablePluginEvents(boolean enablePluginEvents) {
+        this.enablePluginEvents = enablePluginEvents;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableSystemConfigEvents(boolean enableSystemConfigEvents) {
+        this.enableSystemConfigEvents = enableSystemConfigEvents;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableDashboardStats(boolean enableDashboardStats) {
+        this.enableDashboardStats = enableDashboardStats;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableRiskLevels(boolean enableRiskLevels) {
+        this.enableRiskLevels = enableRiskLevels;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setDisplayTimeZoneId(String displayTimeZoneId) {
+        this.displayTimeZoneId = sanitizeTimeZoneId(displayTimeZoneId);
+        save();
+    }
+
+    @DataBoundSetter
+    public void setShowMetricTotal(boolean showMetricTotal) {
+        this.showMetricTotal = showMetricTotal;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setShowMetricLogins(boolean showMetricLogins) {
+        this.showMetricLogins = showMetricLogins;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setShowMetricFailedLogins(boolean showMetricFailedLogins) {
+        this.showMetricFailedLogins = showMetricFailedLogins;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setShowMetricBuilds(boolean showMetricBuilds) {
+        this.showMetricBuilds = showMetricBuilds;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setShowMetricJobs(boolean showMetricJobs) {
+        this.showMetricJobs = showMetricJobs;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setShowMetricConfig(boolean showMetricConfig) {
+        this.showMetricConfig = showMetricConfig;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableCsvExport(boolean enableCsvExport) {
+        this.enableCsvExport = enableCsvExport;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableJsonExport(boolean enableJsonExport) {
+        this.enableJsonExport = enableJsonExport;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableAuditApi(boolean enableAuditApi) {
+        this.enableAuditApi = enableAuditApi;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setLogRetentionDays(int logRetentionDays) {
+        this.logRetentionDays = clamp(logRetentionDays, 0, 3650);
+        save();
+    }
+
+    @DataBoundSetter
+    public void setMaxLogFileSizeMB(int maxLogFileSizeMB) {
+        this.maxLogFileSizeMB = clamp(maxLogFileSizeMB, 1, 1024);
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableLogRotation(boolean enableLogRotation) {
+        this.enableLogRotation = enableLogRotation;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setStartupGracePeriodSeconds(int startupGracePeriodSeconds) {
+        this.startupGracePeriodSeconds = clamp(startupGracePeriodSeconds, 5, 300);
+        StartupPhaseManager.setGracePeriodSeconds(this.startupGracePeriodSeconds);
+        save();
+    }
+
+    @DataBoundSetter
+    public void setBatchWriteSize(int batchWriteSize) {
+        this.batchWriteSize = clamp(batchWriteSize, 1, 10000);
+        save();
+    }
+
+    @DataBoundSetter
+    public void setBatchFlushIntervalSeconds(int batchFlushIntervalSeconds) {
+        this.batchFlushIntervalSeconds = clamp(batchFlushIntervalSeconds, 1, 300);
+        save();
+    }
+
+    @DataBoundSetter
+    public void setMaskTokens(boolean maskTokens) {
+        this.maskTokens = maskTokens;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setMaskEmailAddresses(boolean maskEmailAddresses) {
+        this.maskEmailAddresses = maskEmailAddresses;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setMaskCreditCards(boolean maskCreditCards) {
+        this.maskCreditCards = maskCreditCards;
+        save();
     }
 
     // --- Getters ---
@@ -323,28 +475,36 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isEnableDashboardStats() { return enableDashboardStats; }
     public boolean isEnableAnomalyRow() { return false; }
     public String getDisplayTimeZoneId() { return displayTimeZoneId; }
+    public String getDisplayTimeZoneDisplayName() {
+        return toDisplayTimeZoneLabel(displayTimeZoneId);
+    }
     public ZoneId getDisplayTimeZone() {
         return "SYSTEM".equalsIgnoreCase(displayTimeZoneId)
                 ? ZoneId.systemDefault()
                 : ZoneId.of(displayTimeZoneId);
     }
     public List<String> getAvailableDisplayTimeZoneIds() {
-        // Curated list of professional timezones commonly used in enterprise environments
-        List<String> professionalTimeZones = Arrays.asList(
-            "SYSTEM",
-            "UTC",
-            "America/New_York",
-            "America/Chicago",
-            "America/Los_Angeles",
-            "Europe/London",
-            "Europe/Berlin",
-            "Europe/Paris",
-            "Asia/Tokyo",
-            "Asia/Shanghai",
-            "Asia/Singapore",
-            "Australia/Sydney"
-        );
-        return new ArrayList<>(professionalTimeZones);
+        return AVAILABLE_DISPLAY_TIME_ZONES;
+    }
+    public List<String> getPopularDisplayTimeZoneIds() {
+        return PREFERRED_DISPLAY_TIME_ZONES;
+    }
+    public String getAvailableDisplayTimeZonesJson() {
+        return new com.google.gson.Gson().toJson(toDisplayTimeZoneOptions(AVAILABLE_DISPLAY_TIME_ZONES));
+    }
+    public String getPopularDisplayTimeZonesJson() {
+        return new com.google.gson.Gson().toJson(toDisplayTimeZoneOptions(PREFERRED_DISPLAY_TIME_ZONES));
+    }
+    public ListBoxModel doFillDisplayTimeZoneIdItems() {
+        ListBoxModel items = new ListBoxModel();
+        String selectedTimeZone = sanitizeTimeZoneId(displayTimeZoneId);
+        for (String timeZoneId : AVAILABLE_DISPLAY_TIME_ZONES) {
+            items.add(new ListBoxModel.Option(
+                    toDisplayTimeZoneLabel(timeZoneId),
+                    timeZoneId,
+                    timeZoneId.equals(selectedTimeZone)));
+        }
+        return items;
     }
     public boolean isShowMetricTotal() { return showMetricTotal; }
     public boolean isShowMetricLogins() { return showMetricLogins; }
@@ -370,6 +530,25 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         anomalyConfig.put("securityConfigChangesThreshold", anomalySecurityConfigChangesThreshold);
         anomalyConfig.put("buildFailuresThreshold", anomalyBuildFailuresThreshold);
         return new com.google.gson.Gson().toJson(anomalyConfig);
+    }
+
+    private static String toDisplayTimeZoneLabel(String timeZoneId) {
+        String sanitized = sanitizeTimeZoneId(timeZoneId);
+        if ("SYSTEM".equals(sanitized)) {
+            return "System default (" + ZoneId.systemDefault().getId() + ")";
+        }
+        return sanitized;
+    }
+
+    private static List<Map<String, String>> toDisplayTimeZoneOptions(List<String> zoneIds) {
+        List<Map<String, String>> options = new ArrayList<>();
+        for (String zoneId : zoneIds) {
+            Map<String, String> option = new LinkedHashMap<>();
+            option.put("id", zoneId);
+            option.put("label", toDisplayTimeZoneLabel(zoneId));
+            options.add(option);
+        }
+        return options;
     }
 
     private static String escapeJsonString(String s) {

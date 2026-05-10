@@ -1,14 +1,16 @@
 <?jelly escape-by-default='true'?>
-<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
-    <!-- AuditFlow Configuration — Simplified grouped layout -->
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form" xmlns:st="jelly:stapler">
+    <st:adjunct includes="io.jenkins.plugins.auditlogger.AuditLoggerConfiguration.auditflow-timezone-picker"/>
     <f:section title="AuditFlow Configuration">
-
-        <!-- ============================== -->
-        <!-- WHAT TO TRACK                  -->
-        <!-- ============================== -->
         <f:block>
-            <h4 style="margin-top: 15px; margin-bottom: 5px;">What to Track</h4>
-            <div style="margin-left: 20px; font-size: 0.9em; color: var(--text-color-secondary, #666); margin-bottom: 10px;">
+            <div class="jenkins-section__description">
+                Control which audit categories are stored, how the dashboard renders them, and which export endpoints stay available.
+            </div>
+        </f:block>
+
+        <f:block>
+            <h4>What to Track</h4>
+            <div class="jenkins-section__description">
                 Uncheck an item to stop capturing and storing that category of audit event.
             </div>
             <f:entry title="Authentication (login, logout, failed login, API auth)">
@@ -31,12 +33,9 @@
             </f:entry>
         </f:block>
 
-        <!-- ============================== -->
-        <!-- DASHBOARD DISPLAY              -->
-        <!-- ============================== -->
         <f:block>
-            <h4 style="margin-top: 15px; margin-bottom: 5px;">Dashboard Display</h4>
-            <div style="margin-left: 20px; font-size: 0.9em; color: var(--text-color-secondary, #666); margin-bottom: 10px;">
+            <h4>Dashboard Display</h4>
+            <div class="jenkins-section__description">
                 These options only change what the dashboard shows. They do not affect logging.
             </div>
             <f:entry title="Stats counters row">
@@ -45,31 +44,56 @@
             <f:entry title="Risk level badges (Low / Medium / High / Critical)">
                 <f:checkbox name="enableRiskLevels" checked="${descriptor.isEnableRiskLevels()}"/>
             </f:entry>
-            <f:entry title="Display time zone">
-                <select name="displayTimeZoneId" class="jenkins-select__input" style="min-width: 320px;">
-                    <j:forEach var="timeZoneId" items="${descriptor.availableDisplayTimeZoneIds}">
-                        <j:choose>
-                            <j:when test="${timeZoneId == descriptor.displayTimeZoneId}">
-                                <option value="${timeZoneId}" selected="selected">${timeZoneId}</option>
-                            </j:when>
-                            <j:otherwise>
-                                <option value="${timeZoneId}">${timeZoneId}</option>
-                            </j:otherwise>
-                        </j:choose>
-                    </j:forEach>
-                </select>
-                <div style="margin-left: 20px; font-size: 0.9em; color: var(--text-color-secondary, #666);">
-                    Stored timestamps stay unchanged. This only controls how AuditFlow renders dates in the UI and exports.
+            <f:entry title="Display time zone"
+                     field="displayTimeZoneId"
+                     description="Stored timestamps stay unchanged. This only controls how AuditFlow renders dates in the UI and exports.">
+                <div class="auditflow-timezone-picker" id="auditflowTimezonePicker">
+                    <input type="hidden" name="displayTimeZoneId" id="auditflowDisplayTimeZoneId" value="${descriptor.displayTimeZoneId}"/>
+                    <button type="button"
+                            class="auditflow-timezone-picker__trigger"
+                            id="auditflowTimezoneTrigger"
+                            aria-haspopup="dialog"
+                            aria-expanded="false">
+                        <span class="auditflow-timezone-picker__trigger-value" id="auditflowTimezoneValue">${descriptor.displayTimeZoneDisplayName}</span>
+                        <span class="auditflow-timezone-picker__trigger-tools">
+                            <span class="auditflow-timezone-picker__trigger-search">Search</span>
+                            <span class="auditflow-timezone-picker__trigger-caret" aria-hidden="true"></span>
+                        </span>
+                    </button>
+                    <div class="auditflow-timezone-picker__popup jenkins-hidden"
+                         id="auditflowTimezonePopup"
+                         role="dialog"
+                         aria-label="Select display time zone">
+                        <input type="search"
+                               class="jenkins-input auditflow-timezone-picker__search"
+                               id="auditflowTimezoneSearch"
+                               placeholder="Search timezone..."
+                               autocomplete="off"/>
+                        <div class="auditflow-timezone-picker__section" id="auditflowTimezoneRecentSection">
+                            <div class="auditflow-timezone-picker__section-title">Recent</div>
+                            <div class="auditflow-timezone-picker__option-list" id="auditflowTimezoneRecentList"></div>
+                        </div>
+                        <div class="auditflow-timezone-picker__section" id="auditflowTimezonePopularSection">
+                            <div class="auditflow-timezone-picker__section-title">Popular</div>
+                            <div class="auditflow-timezone-picker__option-list" id="auditflowTimezonePopularList"></div>
+                        </div>
+                        <div class="auditflow-timezone-picker__section jenkins-hidden" id="auditflowTimezoneResultsSection">
+                            <div class="auditflow-timezone-picker__section-title">Results</div>
+                            <div class="auditflow-timezone-picker__option-list" id="auditflowTimezoneResultsList"></div>
+                        </div>
+                        <div class="auditflow-timezone-picker__empty" id="auditflowTimezoneEmpty">Type to search all time zones.</div>
+                    </div>
+                    <script type="application/json" id="auditflowTimezoneOptions">${descriptor.availableDisplayTimeZonesJson}</script>
+                    <script type="application/json" id="auditflowTimezonePopularOptions">${descriptor.popularDisplayTimeZonesJson}</script>
                 </div>
             </f:entry>
         </f:block>
 
-        <!-- ============================== -->
-        <!-- METRIC CARDS                   -->
-        <!-- ============================== -->
         <f:block>
-            <h4 style="margin-top: 15px; margin-bottom: 5px;">Metric Cards</h4>
-            <div style="margin-left: 20px; font-size: 0.9em; color: var(--text-color-secondary, #666); margin-bottom: 8px;">Pick which counters show in the stats row (auto-scales to fit).</div>
+            <h4>Metric Cards</h4>
+            <div class="jenkins-section__description">
+                Pick which counters show in the stats row.
+            </div>
             <f:entry title="Total Events">
                 <f:checkbox name="showMetricTotal" checked="${descriptor.isShowMetricTotal()}"/>
             </f:entry>
@@ -90,12 +114,11 @@
             </f:entry>
         </f:block>
 
-        <!-- ============================== -->
-        <!-- EXPORT FORMATS                 -->
-        <!-- ============================== -->
         <f:block>
-            <h4 style="margin-top: 15px; margin-bottom: 5px;">Export</h4>
-            <div style="margin-left: 20px; font-size: 0.9em; color: var(--text-color-secondary, #666); margin-bottom: 8px;">These switches only enable or disable the export/API endpoints.</div>
+            <h4>Export</h4>
+            <div class="jenkins-section__description">
+                These switches only enable or disable the export and API endpoints.
+            </div>
             <f:entry title="CSV Export">
                 <f:checkbox name="enableCsvExport" checked="${descriptor.isEnableCsvExport()}"/>
             </f:entry>
@@ -107,14 +130,12 @@
             </f:entry>
         </f:block>
 
-        <!-- =========================================== -->
-        <!-- ADVANCED SETTINGS (collapsed by default)    -->
-        <!-- =========================================== -->
         <f:advanced title="Advanced Settings">
-
-            <!-- Log Retention -->
             <f:block>
-                <h4 style="margin-top: 15px; margin-bottom: 5px;">Log Retention</h4>
+                <h4>Log Retention</h4>
+                <div class="jenkins-section__description">
+                    AuditFlow stores audit entries in rotating log files on the controller.
+                </div>
                 <f:entry title="Keep logs for (days, 0 = forever)">
                     <f:number name="logRetentionDays" value="${descriptor.getLogRetentionDays()}"/>
                 </f:entry>
@@ -126,13 +147,14 @@
                 </f:entry>
             </f:block>
 
-            <!-- Performance -->
             <f:block>
-                <h4 style="margin-top: 15px; margin-bottom: 5px;">Performance</h4>
-                <div style="margin-left: 20px; font-size: 0.9em; color: var(--text-color-secondary, #666); margin-bottom: 8px;">Anomaly detection is temporarily disabled to keep writes predictable under load.</div>
-                <f:entry title="Startup grace period (seconds)">
+                <h4>Performance</h4>
+                <div class="jenkins-section__description">
+                    Anomaly detection is temporarily disabled to keep writes predictable under load.
+                </div>
+                <f:entry title="Startup grace period (seconds)"
+                         description="Suppress config-reload noise during startup. Valid range: 5-300.">
                     <f:number name="startupGracePeriodSeconds" value="${descriptor.getStartupGracePeriodSeconds()}"/>
-                    <div style="margin-left: 20px; font-size: 0.9em; color: var(--text-color-secondary, #666);">Suppress config-reload noise during startup (5-300)</div>
                 </f:entry>
                 <f:entry title="Batch write size">
                     <f:number name="batchWriteSize" value="${descriptor.getBatchWriteSize()}"/>
@@ -142,9 +164,8 @@
                 </f:entry>
             </f:block>
 
-            <!-- Privacy -->
             <f:block>
-                <h4 style="margin-top: 15px; margin-bottom: 5px;">Privacy / Data Masking</h4>
+                <h4>Privacy / Data Masking</h4>
                 <f:entry title="Mask tokens and secrets">
                     <f:checkbox name="maskTokens" checked="${descriptor.isMaskTokens()}"/>
                 </f:entry>
@@ -156,13 +177,12 @@
                 </f:entry>
             </f:block>
 
-            <!-- API -->
             <f:block>
-                <h4 style="margin-top: 15px; margin-bottom: 5px;">API</h4>
-                <div style="margin-left: 20px; font-size: 0.9em; color: var(--text-color-secondary, #666);">Only currently supported runtime options are shown on this page.</div>
+                <h4>API</h4>
+                <div class="jenkins-section__description">
+                    Only currently supported runtime options are shown on this page.
+                </div>
             </f:block>
-
         </f:advanced>
-
     </f:section>
 </j:jelly>

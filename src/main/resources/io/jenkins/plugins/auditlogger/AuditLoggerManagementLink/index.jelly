@@ -1,26 +1,42 @@
 <?jelly escape-by-default='true'?>
-<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:l="/lib/layout" xmlns:f="/lib/form">
-    <l:layout permission="${app.ADMINISTER}" title="AuditFlow Logs">
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:l="/lib/layout" xmlns:dd="/lib/layout/dropdowns">
+    <l:layout permission="${app.ADMINISTER}" title="${it.pageTitle}">
         <l:header>
-            <st:adjunct includes="io.jenkins.plugins.auditlogger.AuditLoggerManagementLink.auditflow-management" />
+            <st:adjunct includes="io.jenkins.plugins.auditlogger.AuditLoggerManagementLink.auditflow-management"/>
         </l:header>
 
         <l:main-panel>
-            <div class="audit-container">
-                <h1>AuditFlow - Audit Logs</h1>
-                <p class="result-count" id="displayTimeZoneLabel">Audit Dashboard</p>
+              <div class="audit-container" id="auditContainer"
+                  data-default-view-mode="${it.defaultViewMode}"
+                  data-default-date-preset="${it.defaultDatePreset}"
+                  data-default-date-from="${it.defaultDateFrom}"
+                  data-default-date-to="${it.defaultDateTo}">
+                <h1>${it.pageHeading}</h1>
 
-                <!-- Onboarding banner for first run -->
-                <j:set var="firstRun" value="${it.firstRun}"/>
-                <div class="${firstRun ? 'onboarding-banner' : 'onboarding-banner is-hidden'}" id="onboardingBanner">
-                    <h2>Welcome to AuditFlow</h2>
-                    <p>AuditFlow is now tracking authentication, builds, and configuration changes.
-                       Events will appear here as they occur. You can customize what gets tracked in
-                       <a href="${rootURL}/manage/configure">Manage Jenkins &gt; System</a>.</p>
-                    <button type="button" class="dismiss-btn" id="dismissOnboardingButton">Got it</button>
+                <div class="insights-panel insights-panel--top jenkins-hidden" id="insightsPanel">
+                    <div class="insights-panel__header">
+                        <div>
+                            <h3>Top Issues Today</h3>
+                            <p class="insights-panel__description">A compact summary of the busiest or riskiest activity seen today in the current display time zone.</p>
+                        </div>
+                        <button type="button" class="jenkins-button" id="closeInsightsButton">Close</button>
+                    </div>
+                    <ul class="insights-list" id="insightsList">
+                        <li class="insights-empty">Loading...</li>
+                    </ul>
                 </div>
 
-                <!-- Stats counters (today only, auto-scaling) -->
+                <j:set var="firstRun" value="${it.firstRun}"/>
+                <div class="${firstRun ? 'onboarding-banner' : 'onboarding-banner jenkins-hidden'}" id="onboardingBanner">
+                    <h2>Welcome to AuditFlow</h2>
+                    <p>
+                        AuditFlow is now tracking authentication, builds, and configuration changes.
+                        Events will appear here as they occur. You can customize what gets tracked in
+                        <a href="${rootURL}/manage/configure">Manage Jenkins &gt; System</a>.
+                    </p>
+                    <button type="button" class="jenkins-button onboarding-banner__dismiss" id="dismissOnboardingButton">Got it</button>
+                </div>
+
                 <j:set var="cfg" value="${it.statsEnabled}"/>
                 <j:set var="mTotal" value="${it.showMetricTotal}"/>
                 <j:set var="mLogins" value="${it.showMetricLogins}"/>
@@ -28,7 +44,7 @@
                 <j:set var="mBuilds" value="${it.showMetricBuilds}"/>
                 <j:set var="mJobs" value="${it.showMetricJobs}"/>
                 <j:set var="mConfig" value="${it.showMetricConfig}"/>
-                <div class="${cfg ? 'stats' : 'stats is-hidden'}" id="stats">
+                <div class="${cfg ? 'stats' : 'stats jenkins-hidden'}" id="stats">
                     <j:if test="${mTotal}">
                         <div class="stat-box" data-metric="total">
                             <div class="stat-number" id="stat-total">0</div>
@@ -67,178 +83,191 @@
                     </j:if>
                 </div>
 
-                <!-- Anomaly Detection Row -->
                 <j:set var="anomalyRowOn" value="${it.anomalyRowEnabled}"/>
-                <div class="${anomalyRowOn ? 'anomaly-box' : 'anomaly-box is-hidden'}" id="anomalyBox">
-                    <div class="anomaly-label">Anomaly Detection:</div>
+                <div class="${anomalyRowOn ? 'anomaly-box' : 'anomaly-box jenkins-hidden'}" id="anomalyBox">
+                    <div class="anomaly-label">Anomaly Detection</div>
                     <div class="anomaly-status" id="anomalyStatus">No anomaly detected</div>
-                    <button type="button" class="btn-investigate" id="btnInvestigate">Investigate</button>
-                    <button type="button" class="btn-dismiss" id="btnDismiss">Dismiss</button>
+                    <button type="button" class="jenkins-button btn-investigate" id="btnInvestigate">Investigate</button>
+                    <button type="button" class="jenkins-button btn-dismiss" id="btnDismiss">Dismiss</button>
                 </div>
 
-                <!-- Insights Panel (hidden by default, toggle via button) -->
-                <div class="insights-panel" id="insightsPanel">
-                    <button type="button" class="insights-close" id="closeInsightsButton" title="Close">&#x2715; Close</button>
-                    <h3>&#x1F4CA; Top Issues Today</h3>
-                    <ul class="insights-list" id="insightsList">
-                        <li class="insights-empty">Loading...</li>
-                    </ul>
-                </div>
-
-                <!-- High Risk Events summary panel -->
                 <j:set var="riskEnabled" value="${it.riskLevelsEnabled}"/>
-                <div class="${riskEnabled ? 'risk-panel' : 'risk-panel is-hidden'}" id="riskPanel">
+                <div class="${riskEnabled ? 'risk-panel' : 'risk-panel jenkins-hidden'}" id="riskPanel">
                     <h3>High Risk Events</h3>
                     <div class="risk-grid">
                         <div class="risk-card risk-red" id="riskFailedLogins">
                             <div class="risk-title">Failed Login Spikes</div>
                             <div class="risk-value" id="riskFailedCount">0</div>
-                            <div class="risk-desc">Failed logins in last 24h</div>
+                            <div class="risk-desc">Failed logins in the last 24 hours</div>
                         </div>
                         <div class="risk-card risk-orange" id="riskCredentials">
                             <div class="risk-title">Credential Access</div>
                             <div class="risk-value" id="riskCredentialCount">0</div>
-                            <div class="risk-desc">Credential events in last 24h</div>
+                            <div class="risk-desc">Credential events in the last 24 hours</div>
                         </div>
                         <div class="risk-card risk-green" id="riskSuspiciousIps">
                             <div class="risk-title">Unique Source IPs</div>
                             <div class="risk-value" id="riskIpCount">0</div>
-                            <div class="risk-desc">Distinct IPs in last 24h</div>
+                            <div class="risk-desc">Distinct IPs in the last 24 hours</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="toolbar">
-                    <!-- Row 1: Search + Reset + Result count ... Export + Refresh -->
-                    <div class="toolbar-row">
+                    <div class="toolbar-row toolbar-row--primary">
                         <div class="search-group">
-                            <select id="searchColumn">
-                                <option value="all">All Columns</option>
-                                <option value="user">User</option>
-                                <option value="action">Action</option>
-                                <option value="target">Target</option>
-                                <option value="details">Details</option>
-                                <option value="sourceIp">Source IP</option>
-                                <option value="authMethod">Auth Method</option>
-                            </select>
-                            <input type="text" id="searchText" placeholder="Search logs..." />
-                            <button type="button" class="search-btn" id="applySearchButton">Search</button>
-                            <button type="button" class="reset-btn" id="clearAllButton">Reset</button>
+                            <div class="jenkins-select audit-select audit-select--column">
+                                <select id="searchColumn" class="jenkins-select__input">
+                                    <option value="all">All Columns</option>
+                                    <option value="user">User</option>
+                                    <option value="action">Action</option>
+                                    <option value="target">Target</option>
+                                    <option value="details">Details</option>
+                                    <option value="sourceIp">Source IP</option>
+                                    <option value="authMethod">Auth Method</option>
+                                </select>
+                            </div>
+                            <input type="text" id="searchText" class="jenkins-input audit-search-input" placeholder="Search logs..."/>
+                            <button type="button" class="jenkins-button" id="applySearchButton">Search</button>
+                            <button type="button" class="jenkins-button" id="clearAllButton">Reset</button>
                         </div>
                         <span class="result-count" id="resultCount"></span>
-                        <span class="spacer"></span>
-                        <!-- Export buttons: only show formats enabled in config -->
                         <j:set var="csvOn" value="${it.csvExportEnabled}"/>
                         <j:set var="jsonOn" value="${it.jsonExportEnabled}"/>
-                        <j:if test="${csvOn or jsonOn}">
-                            <div class="export-wrapper">
-                                <button type="button" class="btn-export" id="toggleExportMenuButton">&#x2B07; Export</button>
-                                <div class="export-menu" id="exportMenu">
+                        <div class="toolbar-actions">
+                            <j:if test="${csvOn or jsonOn}">
+                                <l:overflowButton text="Export" icon="symbol-download-outline plugin-ionicons-api">
                                     <j:if test="${csvOn}">
-                                        <button type="button" data-export-format="csv">&#x1F4C4; Export CSV</button>
+                                        <dd:custom>
+                                            <button type="button" class="jenkins-dropdown__item data-export" data-export-format="csv">
+                                                <div class="jenkins-dropdown__item__icon">
+                                                    <l:icon src="symbol-document-outline plugin-ionicons-api" />
+                                                </div>
+                                                Export CSV
+                                            </button>
+                                        </dd:custom>
                                     </j:if>
                                     <j:if test="${jsonOn}">
-                                        <button type="button" data-export-format="json">&#x1F4CB; Export JSON</button>
+                                        <dd:custom>
+                                            <button type="button" class="jenkins-dropdown__item data-export" data-export-format="json">
+                                                <div class="jenkins-dropdown__item__icon">
+                                                    <l:icon src="symbol-document-text-outline plugin-ionicons-api" />
+                                                </div>
+                                                Export JSON
+                                            </button>
+                                        </dd:custom>
                                     </j:if>
-                                </div>
-                            </div>
-                        </j:if>
-                        <button type="button" class="audit-btn btn-refresh" id="refreshLogsButton">&#x21bb; Refresh</button>
-                        <button type="button" class="btn-insights" id="toggleInsightsButton">&#x1F4CA; Insights</button>
+                                </l:overflowButton>
+                            </j:if>
+                            <button type="button" class="jenkins-button" id="refreshLogsButton">
+                                <l:icon src="symbol-refresh-outline plugin-ionicons-api" />
+                                Refresh
+                            </button>
+                            <button type="button" class="jenkins-button" id="toggleInsightsButton">
+                                <l:icon src="symbol-stats-chart-outline plugin-ionicons-api" />
+                                Insights
+                            </button>
+                        </div>
                     </div>
-                    <!-- Row 2: View mode + Action filter + Date filter -->
-                    <div class="toolbar-row">
-                        <label>
-                            <input type="radio" name="viewMode" value="all" />
-                            All Logs
-                        </label>
-                        <label>
-                            <input type="radio" name="viewMode" value="user-only" checked="checked" />
-                            User-Initiated Only
-                        </label>
-                        <select id="filterAction" class="filter-input">
-                            <option value="">All Actions</option>
-                            <optgroup label="Authentication">
-                                <option value="LOGIN">Login</option>
-                                <option value="SSO_LOGIN">SSO Login</option>
-                                <option value="LOGOUT">Logout</option>
-                                <option value="FAILED_LOGIN">Failed Login</option>
-                                <option value="API_AUTH">API Auth</option>
-                                <option value="SESSION_TERMINATED">Session Terminated</option>
-                            </optgroup>
-                            <optgroup label="Builds">
-                                <option value="BUILD_STARTED">Build Started</option>
-                                <option value="BUILD_COMPLETED">Build Completed</option>
-                                <option value="BUILD_FAILED">Build Failed</option>
-                                <option value="BUILD_ABORTED">Build Aborted</option>
-                                <option value="BUILD_DELETED">Build Deleted</option>
-                                <option value="BUILDS_PURGED">Builds Purged</option>
-                            </optgroup>
-                            <optgroup label="Jobs">
-                                <option value="JOB_CREATED">Job Created</option>
-                                <option value="JOB_DELETED">Job Deleted</option>
-                                <option value="JOB_CONFIG_UPDATED">Job Config Updated</option>
-                                <option value="JOB_RENAMED">Job Renamed</option>
-                                <option value="JOB_COPIED">Job Copied</option>
-                                <option value="JOB_MOVED">Job Moved</option>
-                            </optgroup>
-                            <optgroup label="Credentials">
-                                <option value="CREDENTIAL_ACCESSED">Credential Accessed</option>
-                                <option value="CREDENTIAL_CREATED">Credential Created</option>
-                                <option value="CREDENTIAL_UPDATED">Credential Updated</option>
-                                <option value="CREDENTIAL_DELETED">Credential Deleted</option>
-                            </optgroup>
-                            <optgroup label="Plugins">
-                                <option value="PLUGIN_INSTALLED">Plugin Installed</option>
-                                <option value="PLUGIN_REMOVED">Plugin Removed</option>
-                                <option value="PLUGIN_UPDATED">Plugin Updated</option>
-                                <option value="PLUGIN_ENABLED">Plugin Enabled</option>
-                                <option value="PLUGIN_DISABLED">Plugin Disabled</option>
-                            </optgroup>
-                            <optgroup label="System">
-                                <option value="SYSTEM_RESTART">Restart</option>
-                                <option value="SCRIPT_CONSOLE_ACCESS">Script Console Access</option>
-                                <option value="SCRIPT_APPROVED">Script Approved</option>
-                                <option value="UNSAFE_SCRIPT_BLOCKED">Unsafe Script Blocked</option>
-                                <option value="GLOBAL_CONFIG_UPDATED">Global Config</option>
-                                <option value="USER_CONFIG_UPDATED">User Config</option>
-                                <option value="SECURITY_CONFIG_UPDATED">Security Config</option>
-                                <option value="AUTH_STRATEGY_CHANGED">Auth Strategy Changed</option>
-                            </optgroup>
-                        </select>
-                        <span class="spacer"></span>
-                        <select id="pageSize" class="filter-input">
-                            <option value="100">100 per page</option>
-                            <option value="500">500 per page</option>
-                            <option value="1000">1000 per page</option>
-                            <option value="0">Show All</option>
-                        </select>
-                        <select id="datePreset" class="filter-input">
-                            <option value="">Custom Range</option>
-                            <option value="today">Today</option>
-                            <option value="7d">Last 7 Days</option>
-                            <option value="30d">Last 30 Days</option>
-                            <option value="1m">Last 1 Month</option>
-                            <option value="3m">Last 3 Months</option>
-                            <option value="6m">Last 6 Months</option>
-                            <option value="12m">Last 12 Months</option>
-                        </select>
-                        <input type="date" id="dateFrom" class="date-input" title="From date" />
-                        <span class="date-range-separator">to</span>
-                        <input type="date" id="dateTo" class="date-input" title="To date" />
+
+                    <div class="toolbar-row toolbar-row--filters">
+                        <div class="audit-toggle-group">
+                            <label class="audit-view-toggle">
+                                <input type="radio" name="viewMode" value="all" checked="checked"/>
+                                <span>All Logs</span>
+                            </label>
+                            <label class="audit-view-toggle">
+                                <input type="radio" name="viewMode" value="user-only"/>
+                                <span>User-Initiated Only</span>
+                            </label>
+                        </div>
+                        <div class="jenkins-select audit-select audit-select--action">
+                            <select id="filterAction" class="jenkins-select__input">
+                                <option value="">All Actions</option>
+                                <optgroup label="Authentication">
+                                    <option value="LOGIN">Login</option>
+                                    <option value="SSO_LOGIN">SSO Login</option>
+                                    <option value="LOGOUT">Logout</option>
+                                    <option value="FAILED_LOGIN">Failed Login</option>
+                                    <option value="API_AUTH">API Auth</option>
+                                    <option value="SESSION_TERMINATED">Session Terminated</option>
+                                </optgroup>
+                                <optgroup label="Builds">
+                                    <option value="BUILD_STARTED">Build Started</option>
+                                    <option value="BUILD_COMPLETED">Build Completed</option>
+                                    <option value="BUILD_FAILED">Build Failed</option>
+                                    <option value="BUILD_ABORTED">Build Aborted</option>
+                                    <option value="BUILD_DELETED">Build Deleted</option>
+                                    <option value="BUILDS_PURGED">Builds Purged</option>
+                                </optgroup>
+                                <optgroup label="Jobs">
+                                    <option value="JOB_CREATED">Job Created</option>
+                                    <option value="JOB_DELETED">Job Deleted</option>
+                                    <option value="JOB_CONFIG_UPDATED">Job Config Updated</option>
+                                    <option value="JOB_RENAMED">Job Renamed</option>
+                                    <option value="JOB_COPIED">Job Copied</option>
+                                    <option value="JOB_MOVED">Job Moved</option>
+                                </optgroup>
+                                <optgroup label="Credentials">
+                                    <option value="CREDENTIAL_ACCESSED">Credential Accessed</option>
+                                    <option value="CREDENTIAL_CREATED">Credential Created</option>
+                                    <option value="CREDENTIAL_UPDATED">Credential Updated</option>
+                                    <option value="CREDENTIAL_DELETED">Credential Deleted</option>
+                                </optgroup>
+                                <optgroup label="Plugins">
+                                    <option value="PLUGIN_INSTALLED">Plugin Installed</option>
+                                    <option value="PLUGIN_REMOVED">Plugin Removed</option>
+                                    <option value="PLUGIN_UPDATED">Plugin Updated</option>
+                                    <option value="PLUGIN_ENABLED">Plugin Enabled</option>
+                                    <option value="PLUGIN_DISABLED">Plugin Disabled</option>
+                                </optgroup>
+                                <optgroup label="System">
+                                    <option value="SYSTEM_RESTART">Restart</option>
+                                    <option value="SCRIPT_CONSOLE_ACCESS">Script Console Access</option>
+                                    <option value="SCRIPT_APPROVED">Script Approved</option>
+                                    <option value="UNSAFE_SCRIPT_BLOCKED">Unsafe Script Blocked</option>
+                                    <option value="GLOBAL_CONFIG_UPDATED">Global Config</option>
+                                    <option value="USER_CONFIG_UPDATED">User Config</option>
+                                    <option value="SECURITY_CONFIG_UPDATED">Security Config</option>
+                                    <option value="AUTH_STRATEGY_CHANGED">Auth Strategy Changed</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="jenkins-select audit-select audit-select--compact">
+                            <select id="pageSize" class="jenkins-select__input">
+                                <option value="100">100 per page</option>
+                                <option value="500">500 per page</option>
+                                <option value="1000">1000 per page</option>
+                                <option value="0">Show All</option>
+                            </select>
+                        </div>
+                        <div class="jenkins-select audit-select audit-select--compact">
+                            <select id="datePreset" class="jenkins-select__input">
+                                <option value="">Custom Range</option>
+                                <option value="7d">Last 7 Days</option>
+                                <option value="month">Current Month</option>
+                                <option value="3m">Last 3 Months</option>
+                                <option value="6m">Last 6 Months</option>
+                            </select>
+                        </div>
+                        <div class="audit-date-range">
+                            <input type="date" id="dateFrom" class="jenkins-input audit-date-input" title="From date"/>
+                            <span class="date-range-separator">to</span>
+                            <input type="date" id="dateTo" class="jenkins-input audit-date-input" title="To date"/>
+                        </div>
                     </div>
                 </div>
 
-                <table class="audit-table" id="logsTable">
+                <table class="jenkins-table audit-logs-table" id="logsTable">
                     <thead>
                         <tr>
-                            <th data-sort-field="readable">Timestamp</th>
-                            <th data-sort-field="user">User</th>
-                            <th data-sort-field="action">Action</th>
-                            <th data-sort-field="target">Target</th>
-                            <th>Details</th>
-                            <th data-sort-field="sourceIp">Source IP</th>
-                            <th>Auth / Trigger</th>
+                            <th data-sort-field="readable" scope="col">Timestamp<span class="timestamp-header__zone" id="timestampTimeZone"></span></th>
+                            <th data-sort-field="user" scope="col">User</th>
+                            <th data-sort-field="action" scope="col">Action</th>
+                            <th data-sort-field="target" scope="col">Target</th>
+                            <th data-sort-disable="true" scope="col">Details</th>
+                            <th data-sort-field="sourceIp" scope="col">Source IP</th>
+                            <th data-sort-disable="true" scope="col">Auth / Trigger</th>
                         </tr>
                     </thead>
                     <tbody id="tbody">
@@ -246,12 +275,12 @@
                     </tbody>
                 </table>
 
-                <div class="pagination is-hidden" id="paginationBar">
-                    <button type="button" id="btnFirst" disabled="disabled">&#171; First</button>
-                    <button type="button" id="btnPrev" disabled="disabled">&#8249; Prev</button>
+                <div class="pagination jenkins-hidden" id="paginationBar">
+                    <button type="button" class="jenkins-button" id="btnFirst" disabled="disabled">First</button>
+                    <button type="button" class="jenkins-button" id="btnPrev" disabled="disabled">Prev</button>
                     <span class="page-info" id="pageInfo">Page 1 of 1</span>
-                    <button type="button" id="btnNext" disabled="disabled">Next &#8250;</button>
-                    <button type="button" id="btnLast" disabled="disabled">Last &#187;</button>
+                    <button type="button" class="jenkins-button" id="btnNext" disabled="disabled">Next</button>
+                    <button type="button" class="jenkins-button" id="btnLast" disabled="disabled">Last</button>
                 </div>
             </div>
         </l:main-panel>

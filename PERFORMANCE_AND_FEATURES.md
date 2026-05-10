@@ -357,7 +357,7 @@ Built-in report generator for:
 
 ## Deployment Checklist
 
-- [ ] Copy `target/auditflow-<version>.hpi` to `JENKINS_HOME/plugins/auditflow.jpi`
+- [ ] Build the plugin and copy the generated HPI from `target/` to `JENKINS_HOME/plugins/auditflow.jpi`
 - [ ] Restart Jenkins (or wait for plugin auto-load)
 - [ ] Navigate to **Manage Jenkins → Configure System → Audit Logger**
 - [ ] Configure event categories, anomaly rules, retention

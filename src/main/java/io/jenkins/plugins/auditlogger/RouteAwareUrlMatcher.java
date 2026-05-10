@@ -27,6 +27,7 @@ public class RouteAwareUrlMatcher {
      * Valid patterns:
      * - /restart, /safeRestart (global)
      * - /manage/restart, /manage/safeRestart (manage page)
+    * - /updateCenter/restart, /updateCenter/safeRestart (post-plugin-install flow)
      * 
      * Invalid patterns that would bypass string matching:
      * - /static/restart (prefix noise)
@@ -50,57 +51,11 @@ public class RouteAwareUrlMatcher {
             String action = segments[2];
             return "restart".equals(action) || "safeRestart".equals(action);
         }
-        
-        return false;
-    }
 
-    /**
-     * Checks if URI accesses the script console.
-     * Valid patterns (must terminate with script action):
-     * - /script (global script console)
-        * - /manage/script (Manage Jenkins script console)
-     * - /job/{name}/script (job-level script console)
-     * - /scriptText (parameterized groovy)
-        * - /manage/scriptText (Manage Jenkins parameterized groovy)
-     * 
-     * Prevents false positives like:
-     * - /view/script (view named "script")
-     * - /script/whatever (arbitrary suffix)
-     * - /configure/script (config page with "script" in name)
-     */
-    public static boolean isScriptConsoleAccess(String uri) {
-        if (uri == null || uri.isEmpty()) return false;
-        
-        String normalized = normalizeUri(uri);
-        String[] segments = normalized.split("/");
-        
-        // Global script console: exactly /script
-        if (segments.length == 2 && segments[0].isEmpty() && "script".equals(segments[1])) {
-            return true;
-        }
-
-        // Manage Jenkins script console: exactly /manage/script
-        if (segments.length == 3 && segments[0].isEmpty()
-                && "manage".equals(segments[1]) && "script".equals(segments[2])) {
-            return true;
-        }
-        
-        // Job-level script console: /job/{name}/script
-        if (segments.length >= 4 && segments[0].isEmpty() && "job".equals(segments[1])) {
-            // Last segment must be "script"
-            String lastSegment = segments[segments.length - 1];
-            return "script".equals(lastSegment);
-        }
-        
-        // Parameterized Groovy endpoint
-        if (segments.length == 2 && segments[0].isEmpty() && "scriptText".equals(segments[1])) {
-            return true;
-        }
-
-        // Manage Jenkins parameterized Groovy endpoint
-        if (segments.length == 3 && segments[0].isEmpty()
-                && "manage".equals(segments[1]) && "scriptText".equals(segments[2])) {
-            return true;
+        // Or: "" / "updateCenter" / "restart" or "" / "updateCenter" / "safeRestart"
+        if (segments.length == 3 && segments[0].isEmpty() && "updateCenter".equals(segments[1])) {
+            String action = segments[2];
+            return "restart".equals(action) || "safeRestart".equals(action);
         }
         
         return false;
@@ -136,9 +91,77 @@ public class RouteAwareUrlMatcher {
     }
 
     /**
+     * Checks if URI is an exact plugin installation endpoint.
+     */
+    public static boolean isPluginInstallAction(String uri) {
+        if (uri == null || uri.isEmpty()) return false;
+
+        String normalized = normalizeUri(uri);
+        String[] segments = normalized.split("/");
+
+        if (segments.length == 3 && segments[0].isEmpty() && "pluginManager".equals(segments[1])) {
+            return isTerminalAction(segments[2], "install", "installNecessaryPlugins", "installPlugins", "uploadPlugin");
+        }
+
+        if (segments.length == 4 && segments[0].isEmpty() && "manage".equals(segments[1])
+                && "pluginManager".equals(segments[2])) {
+            return isTerminalAction(segments[3], "install", "installNecessaryPlugins", "installPlugins", "uploadPlugin");
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks if URI is an exact plugin update endpoint.
+     */
+    public static boolean isPluginUpdateAction(String uri) {
+        if (uri == null || uri.isEmpty()) return false;
+
+        String normalized = normalizeUri(uri);
+        String[] segments = normalized.split("/");
+
+        if (segments.length == 3 && segments[0].isEmpty() && "pluginManager".equals(segments[1])) {
+            return isTerminalAction(segments[2], "update", "deploy");
+        }
+
+        if (segments.length == 4 && segments[0].isEmpty() && "manage".equals(segments[1])
+                && "pluginManager".equals(segments[2])) {
+            return isTerminalAction(segments[3], "update", "deploy");
+        }
+
+        return false;
+    }
+
+    /**
+     * Classifies exact plugin lifecycle endpoints for enable, disable, and uninstall actions.
+     */
+    public static String classifyPluginLifecycleAction(String uri) {
+        if (uri == null || uri.isEmpty()) return null;
+
+        String normalized = normalizeUri(uri);
+        String[] segments = normalized.split("/");
+
+        if (segments.length == 4 && segments[0].isEmpty() && "plugin".equals(segments[1])) {
+            return resolvePluginLifecycleAction(segments[3]);
+        }
+
+        if (segments.length == 5 && segments[0].isEmpty() && "pluginManager".equals(segments[1])
+                && "plugin".equals(segments[2])) {
+            return resolvePluginLifecycleAction(segments[4]);
+        }
+
+        if (segments.length == 6 && segments[0].isEmpty() && "manage".equals(segments[1])
+                && "pluginManager".equals(segments[2]) && "plugin".equals(segments[3])) {
+            return resolvePluginLifecycleAction(segments[5]);
+        }
+
+        return null;
+    }
+
+    /**
      * Checks if URI is a configuration/security change endpoint.
      * Valid patterns:
-     * - /configureSecurity, /manage/configureSecurity
+     * - /configureSecurity, /manage/configureSecurity, /manage/configureSecurity/configure
      * - /manage/configure, /configSubmit, /manage/configSubmit
      */
     public static boolean isConfigurationChange(String uri) {
@@ -151,9 +174,12 @@ public class RouteAwareUrlMatcher {
             return false;
         }
         
-        // Check for /configureSecurity
+        // Check for /configureSecurity and its form submit route
         if ((segments.length == 2 && "configureSecurity".equals(segments[1])) ||
-            (segments.length == 3 && "manage".equals(segments[1]) && "configureSecurity".equals(segments[2]))) {
+            (segments.length == 3 && "manage".equals(segments[1]) && "configureSecurity".equals(segments[2])) ||
+            (segments.length == 4 && "manage".equals(segments[1])
+                    && "configureSecurity".equals(segments[2])
+                    && "configure".equals(segments[3]))) {
             return true;
         }
         
@@ -165,6 +191,35 @@ public class RouteAwareUrlMatcher {
         }
         
         return false;
+    }
+
+    private static boolean isTerminalAction(String candidate, String... allowedActions) {
+        for (String allowedAction : allowedActions) {
+            if (allowedAction.equals(candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String resolvePluginLifecycleAction(String actionSegment) {
+        if (actionSegment == null || actionSegment.isEmpty()) {
+            return null;
+        }
+
+        switch (actionSegment) {
+            case "uninstall":
+            case "doUninstall":
+                return "PLUGIN_REMOVED";
+            case "makeEnabled":
+            case "enable":
+                return "PLUGIN_ENABLED";
+            case "makeDisabled":
+            case "disable":
+                return "PLUGIN_DISABLED";
+            default:
+                return null;
+        }
     }
 
     /**

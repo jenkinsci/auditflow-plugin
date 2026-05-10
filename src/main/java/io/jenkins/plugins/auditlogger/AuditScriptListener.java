@@ -2,142 +2,86 @@ package io.jenkins.plugins.auditlogger;
 
 import hudson.Extension;
 import hudson.model.User;
-import jakarta.servlet.http.HttpServletRequest;
+import groovy.lang.Binding;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import jenkins.util.ScriptListener;
 
 /**
- * Script execution listener: captures script console access and approvals.
- * 
- * CRITICAL SECURITY: Replaces unreliable URL pattern matching with actual
- * event interception. This ensures we capture:
- * - Script console access (regardless of URL path)
- * - Script approval (when user reviews/approves scripts)
- * - Script parameters
- * - Groovy execution events
- * 
- * Uses ScriptApproval listener pattern which fires BEFORE execution,
- * guaranteeing reliable capture even if URL routing changes.
+ * Audits Groovy execution from Jenkins' core ScriptListener callback.
  */
 @Extension
-public class AuditScriptListener {
+public class AuditScriptListener implements ScriptListener {
     private static final Logger LOGGER = Logger.getLogger(AuditScriptListener.class.getName());
 
-    /**
-     * Intercept script approval events.
-     * Called when user approves a pending script.
-     */
-    public static void recordScriptApproval(String scriptHash, String script, String approver) {
+    @Override
+    public void onScriptExecution(String script, Binding binding, Object feature, Object context,
+                                  String correlationId, User user) {
         try {
             AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
             if (config == null || !config.isEnableSystemConfigEvents()) {
                 return;
             }
 
-            String username = approver != null ? approver : resolveCurrentUser();
+            String username = resolveCurrentUser(user);
             if (username == null) username = "SYSTEM";
 
+            String target = resolveTarget(feature);
             String details = String.format(
-                "Script approved: %s characters | Hash: %s | Approved by %s",
-                script != null ? script.length() : 0,
-                scriptHash != null ? scriptHash.substring(0, Math.min(16, scriptHash.length())) + "..." : "UNKNOWN",
-                username
+                    "Script execution: %s | Feature: %s | Context: %s | Correlation: %s | User: %s",
+                    preview(script),
+                    describeObject(feature),
+                    describeObject(context),
+                    describeCorrelation(correlationId),
+                    username
             );
 
-            AuditLogEntry entry = new AuditLogEntry(username, "SCRIPT_APPROVED", "ScriptConsole", details);
+            AuditLogEntry entry = new AuditLogEntry(username, "SCRIPT_CONSOLE_ACCESS", target, details);
             entry.setSeverity("CRITICAL");
             AuditLogStorage.getInstance().addEntry(entry);
 
-            LOGGER.log(Level.INFO, "SCRIPT_APPROVED: hash={0} by user={1}",
-                    new Object[]{scriptHash, username});
+            LOGGER.log(Level.INFO, "SCRIPT_CONSOLE_ACCESS: target={0}, feature={1}, user={2}",
+                    new Object[]{target, describeObject(feature), username});
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Error recording script approval", e);
+            LOGGER.log(Level.FINE, "Error recording script execution", e);
         }
     }
 
-    /**
-     * Intercept script console access attempt (before execution).
-     * This is more reliable than URL matching as it fires regardless of routing.
-     */
-    public static void recordScriptConsoleAccess(String scriptContent, String scriptSource) {
-        try {
-            AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
-            if (config == null || !config.isEnableSystemConfigEvents()) {
-                return;
-            }
-
-            String username = resolveCurrentUser();
-            if (username == null) username = "SYSTEM";
-
-            String details = String.format(
-                "Script console access: %s | Source: %s | User: %s",
-                scriptContent != null ? scriptContent.substring(0, Math.min(50, scriptContent.length())) + "..." : "N/A",
-                scriptSource != null ? scriptSource : "unknown",
-                username
-            );
-
-            AuditLogEntry entry = new AuditLogEntry(username, "SCRIPT_CONSOLE_ACCESS", "ScriptConsole", details);
-            entry.setSeverity("CRITICAL");
-            AuditLogStorage.getInstance().addEntry(entry);
-
-            LOGGER.log(Level.INFO, "SCRIPT_CONSOLE_ACCESS: source={0} by user={1}",
-                    new Object[]{scriptSource, username});
-        } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Error recording script console access", e);
-        }
+    @Override
+    public void onScriptOutput(String output, Object feature, Object context, String correlationId, User user) {
+        // The execution callback records a single audit event per script run.
     }
 
-    /**
-     * Intercept unsafe (unapproved) script execution attempts.
-     * These are security-critical events that indicate policy violations.
-     */
-    public static void recordUnsafeScriptExecution(String script, String reason) {
-        try {
-            AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
-            if (config == null || !config.isEnableSystemConfigEvents()) {
-                return;
-            }
-
-            String username = resolveCurrentUser();
-            if (username == null) username = "SYSTEM";
-
-            String details = String.format(
-                "Unsafe script execution blocked: %s | Reason: %s | User: %s",
-                script != null ? script.substring(0, Math.min(50, script.length())) + "..." : "N/A",
-                reason != null ? reason : "unapproved",
-                username
-            );
-
-            AuditLogEntry entry = new AuditLogEntry(username, "UNSAFE_SCRIPT_BLOCKED", "ScriptConsole", details);
-            entry.setSeverity("CRITICAL");
-            AuditLogStorage.getInstance().addEntry(entry);
-
-            LOGGER.log(Level.WARNING, "UNSAFE_SCRIPT_BLOCKED: reason={0} by user={1}",
-                    new Object[]{reason, username});
-        } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Error recording unsafe script execution", e);
+    private static String resolveTarget(Object feature) {
+        String featureName = describeObject(feature);
+        if (featureName.contains("RemotingDiagnostics")) {
+            return "ScriptConsole";
         }
+        if (featureName.contains("GroovyCommand")) {
+            return "GroovyCLI";
+        }
+        return "GroovyExecution";
     }
 
-    /**
-     * Resolve current user from multiple sources (same pattern as other listeners).
-     */
-    private static String resolveCurrentUser() {
+    private static String resolveCurrentUser(User user) {
         try {
-            // 1. Try servlet request (from RequestHolder)
-            HttpServletRequest req = RequestHolder.get();
-            if (req != null) {
-                String user = (String) req.getAttribute("AUDIT_USER");
-                if (user != null) return user;
+            if (user != null && isRealUser(user.getId())) {
+                return user.getId();
             }
 
-            // 2. Try Jenkins User.current()
+            jakarta.servlet.http.HttpServletRequest request = RequestHolder.get();
+            if (request != null) {
+                String requestUser = (String) request.getAttribute("AUDIT_USER");
+                if (isRealUser(requestUser)) {
+                    return requestUser;
+                }
+            }
+
             User u = User.current();
             if (u != null && isRealUser(u.getId())) {
                 return u.getId();
             }
 
-            // 3. Try Spring SecurityContext
             org.springframework.security.core.Authentication auth =
                     org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && isRealUser(auth.getName())) {
@@ -145,6 +89,38 @@ public class AuditScriptListener {
             }
         } catch (Exception ignored) {}
         return null;
+    }
+
+    private static String preview(String script) {
+        if (script == null || script.isEmpty()) {
+            return "N/A";
+        }
+        String collapsed = script.replaceAll("[\\r\\n\\t]+", " ").trim();
+        if (collapsed.length() <= 80) {
+            return collapsed;
+        }
+        return collapsed.substring(0, 80) + "...";
+    }
+
+    private static String describeObject(Object value) {
+        if (value == null) {
+            return "N/A";
+        }
+        if (value instanceof Class<?>) {
+            return ((Class<?>) value).getName();
+        }
+        String text = value.toString();
+        if (text == null || text.isBlank()) {
+            return value.getClass().getName();
+        }
+        return text;
+    }
+
+    private static String describeCorrelation(String correlationId) {
+        if (correlationId == null || correlationId.isBlank()) {
+            return "N/A";
+        }
+        return correlationId;
     }
 
     private static boolean isRealUser(String name) {

@@ -45,15 +45,13 @@ if (path.contains("/scriptText") || path.contains("/script")) {
 
 **Vulnerabilities:**
 - Script console access completely unaudited
-- Script approvals not tracked
-- Unsafe script execution not detected
 - No reliable event capture
 
 **Solution: AuditScriptListener**
-- Implements proper script execution event listeners
-- Tracks script approvals, console access, and unsafe execution attempts
-- Uses event-driven approach instead of URL matching
-- Captures script content (for detection), hash (for forensics), and user context
+- Implements Jenkins core `ScriptListener`
+- Tracks script execution from the callback context instead of request URIs
+- Keeps the stable `SCRIPT_CONSOLE_ACCESS` action for script console and `scriptText` execution
+- Captures script preview, feature source, correlation id, and user context from the listener callback
 
 ### 3. Route-Unaware Matching
 
@@ -88,26 +86,22 @@ if (segments.length == 3 && "manage".equals(segments[1]) && "restart".equals(seg
 #### 1. `RouteAwareUrlMatcher.java`
 Provides route-aware URL matching functions:
 - `isRestartAction(uri)` - Detects global and manage-page restarts only
-- `isScriptConsoleAccess(uri)` - Detects script console endpoints
 - `isPluginManagerAction(uri)` - Validates plugin manager access
 - `isConfigurationChange(uri)` - Detects config endpoints
 - `extractPluginName(uri)` - Extracts plugin name from URI
 - `normalizeUri(uri)` - Cleans up URI for processing
 
 #### 2. `AuditScriptListener.java`
-Provides event-based script execution tracking:
-- `recordScriptApproval()` - Logs when users approve scripts
-- `recordScriptConsoleAccess()` - Logs console access attempts
-- `recordUnsafeScriptExecution()` - Logs policy violations
+Provides event-based script execution tracking via Jenkins core `ScriptListener`:
+- `onScriptExecution(...)` - Logs script execution directly from the callback context
+- `onScriptOutput(...)` - Intentionally ignored to avoid duplicate audit rows
 
 ### Modified Classes
 
 #### `AuditRequestCapture.java`
 - Updated `detectAdminAction()` to use `RouteAwareUrlMatcher`
-- Added script console access detection
 - Enhanced plugin action classification
-- Now detects GET requests for script access (in addition to POST)
-- Integrated with `AuditScriptListener` for event capture
+- Removed script console request matching so script auditing only happens at execution time
 
 ## Security Improvements
 
@@ -130,11 +124,10 @@ Restart detection: Route-validated, exact segment matching
   - Prevents: /view/restart
   - Validates: /restart, /manage/restart only
 
-Script detection: NEW - Route-aware and event-driven
-  - Detects: /script, /job/{name}/script, /scriptText
-  - Prevents: /job/script/... (not console access)
-  - Prevents: /view/script (view named "script")
-  - Integrates with event listeners
+Script detection: Listener-driven from Jenkins core
+  - Captures: script console and `scriptText` execution via `ScriptListener`
+  - Avoids: false positives from route heuristics
+  - Integrates with callback context rather than request URIs
 
 Plugin detection: Route-validated at manager root level
   - Prevents: /job/plugins/... (job named "plugins")
@@ -159,19 +152,19 @@ Even with route-aware matching, the plugin matches HTTP URLs, not actual Jenkins
 
 **Mitigation**: Use Jenkins event system where possible. For methods with no dedicated events, URL matching + comprehensive testing is the best option.
 
-### 2. Script Interception Without ScriptApproval Integration
-The current implementation detects script console access attempts, but doesn't have deep integration with Jenkins' ScriptApproval mechanism.
+### 2. Script Interception Scope
+The current implementation now uses Jenkins core `ScriptListener`, so it captures real script execution callbacks rather than HTTP path guesses.
 
-**What we capture**: Console access, approvals detected via HTTP
-**What we don't capture**: Script execution within jobs, Pipelines, or other indirect execution paths
+**What we capture**: Script console and `scriptText` execution, plus other Groovy execution paths exposed through `ScriptListener`
+**What we don't capture yet**: Script approval and rejection events from the script-security plugin
 
-**Better approach** (future): Hook into Jenkins' actual script approval/execution events at the core level.
+**Future approach**: Add a separate approval listener only when a real script-security extension point is wired.
 
 ### 3. Complex Parameter Extraction
-Script content detection relies on HTTP request parameters, which might not capture all script execution vectors.
+Script details now come from the `ScriptListener` callback, but coverage still depends on which execution paths fire that extension point.
 
-**What we capture**: Scripts passed via `?script=` parameter
-**What we don't capture**: Scripts in POST body, multipart uploads, or other serialization formats
+**What we capture**: The script text exposed by the callback and listener metadata such as feature and correlation id
+**What we don't capture**: Approval decisions and execution paths that do not fire Jenkins core `ScriptListener`
 
 ### 4. Jenkins Version Compatibility
 These changes are tested on Jenkins 2.361.4. Behavior may vary on:
@@ -185,8 +178,11 @@ These changes are tested on Jenkins 2.361.4. Behavior may vary on:
 - `RouteAwareUrlMatcher` test suite covering:
   - Valid restart patterns: `/restart`, `/manage/restart`, `/manage/safeRestart`
   - Invalid patterns: `/static/restart`, `/job/restart`, `/view/restart`
-  - Script console: `/script`, `/job/{name}/script`, `/scriptText`
   - Plugin manager: root-level `/pluginManager/plugin/...` only
+
+- `AuditScriptListenerTest` covering:
+  - Real `POST /scriptText` execution through Jenkins test harness
+  - Audit entry emission with the stable `SCRIPT_CONSOLE_ACCESS` action
 
 ### Integration Tests (Manual)
 1. **Restart Detection**
@@ -195,9 +191,8 @@ These changes are tested on Jenkins 2.361.4. Behavior may vary on:
    - Attempt prefix injection → Not detected (good)
 
 2. **Script Console Access**
-   - Access `/script` → Audit entry: `SCRIPT_CONSOLE_ACCESSED`
-   - Access `/job/test/script` → Audit entry with script preview
-   - Access via API → Audit entry created
+  - Execute `POST /scriptText` with a valid crumb → Audit entry: `SCRIPT_CONSOLE_ACCESS`
+  - Execute from script console UI → Audit entry with script preview and listener metadata
 
 3. **Plugin Operations**
    - Install plugin → `PLUGIN_INSTALLED`
@@ -209,18 +204,18 @@ These changes are tested on Jenkins 2.361.4. Behavior may vary on:
 ### For Plugin Operators
 - No configuration changes required
 - Script console access now automatically audited
-- Review audit logs for new `SCRIPT_CONSOLE_ACCESSED` entries
+- Review audit logs for new `SCRIPT_CONSOLE_ACCESS` entries
 
 ### For Security Officers
 - Add script console events to compliance monitoring
 - Review existing logs - script console access was undetected before
-- Consider implementing API for real-time script approval alerts
+- Treat approval/rejection auditing as unsupported until a real script-security hook is added
 
 ## Future Improvements
 
 ### Phase 2: Event-Based Detection
 - Implement proper Jenkins listener interfaces for:
-  - Script approval events (when available)
+  - Script approval events from script-security (when available)
   - Restart completion events
   - Plugin state change events
 

@@ -6,6 +6,7 @@ import hudson.security.Permission;
 import jenkins.model.Jenkins;
 import org.kohsuke.stapler.StaplerRequest2;
 import org.kohsuke.stapler.StaplerResponse2;
+import org.kohsuke.stapler.verb.GET;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -29,6 +30,7 @@ import java.util.logging.Logger;
 @Extension
 public class AuditLoggerManagementLink extends ManagementLink {
     private static final Logger LOGGER = Logger.getLogger(AuditLoggerManagementLink.class.getName());
+    private static final String PLUGIN_SHORT_NAME = "auditflow";
     private static final int DEFAULT_PAGE_SIZE = 100;
     private static final int MAX_PAGE_SIZE = 5_000;
     private static final int MAX_EXPORT_ROWS = 100_000;
@@ -36,12 +38,32 @@ public class AuditLoggerManagementLink extends ManagementLink {
 
     @Override
     public String getIconFileName() {
-        return "document-properties.png";
+        return "symbol-document-text-outline plugin-ionicons-api";
     }
 
     @Override
     public String getDisplayName() {
         return "AuditFlow Logs";
+    }
+
+    public String getPageTitle() {
+        return "AuditFlow - " + getPluginVersion();
+    }
+
+    public String getPageHeading() {
+        return getPageTitle();
+    }
+
+    public String getPluginVersion() {
+        var plugin = Jenkins.get().getPluginManager().getPlugin(PLUGIN_SHORT_NAME);
+        if (plugin != null && plugin.getVersion() != null && !plugin.getVersion().isBlank()) {
+            return sanitizePluginVersion(plugin.getVersion());
+        }
+        Package pkg = AuditLoggerManagementLink.class.getPackage();
+        String implementationVersion = pkg != null ? pkg.getImplementationVersion() : null;
+        return implementationVersion != null && !implementationVersion.isBlank()
+                ? sanitizePluginVersion(implementationVersion)
+                : "dev";
     }
 
     @Override
@@ -64,11 +86,18 @@ public class AuditLoggerManagementLink extends ManagementLink {
         return Jenkins.ADMINISTER;
     }
 
+    @GET
     public void doApi(StaplerRequest2 req, StaplerResponse2 res) throws IOException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        if (config != null && !config.isEnableAuditApi()) {
+            res.setStatus(403);
+            res.setContentType("application/json; charset=UTF-8");
+            res.getWriter().write("{\"error\":\"Audit API is disabled in configuration\",\"logs\":[]}");
+            return;
+        }
 
         try {
-            AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
             ZoneId displayZone = resolveDisplayZone(config);
             AuditViewRequest viewRequest = AuditViewRequest.fromRequest(req, displayZone);
             List<AuditLogEntry> filteredEntries = loadFilteredEntries(viewRequest, displayZone);
@@ -95,6 +124,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
         }
     }
 
+    @GET
     public void doExportCsv(StaplerRequest2 req, StaplerResponse2 res) throws IOException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
 
@@ -183,6 +213,26 @@ public class AuditLoggerManagementLink extends ManagementLink {
 
     public String getDisplayTimeZoneId() {
         return resolveDisplayZone(AuditLoggerConfiguration.get()).getId();
+    }
+
+    public String getDefaultViewMode() {
+        return "all";
+    }
+
+    public String getDefaultDatePreset() {
+        return computeDefaultDatePreset();
+    }
+
+    public String getDefaultDateFrom() {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        ZoneId displayZone = resolveDisplayZone(config);
+        return computeDefaultDateFrom(LocalDate.now(displayZone));
+    }
+
+    public String getDefaultDateTo() {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        ZoneId displayZone = resolveDisplayZone(config);
+        return computeDefaultDateTo(LocalDate.now(displayZone));
     }
 
     public boolean getStatsEnabled() {
@@ -275,6 +325,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
         return !AuditLogStorage.getInstance().hasEntries();
     }
 
+    @GET
     public void doExportJson(StaplerRequest2 req, StaplerResponse2 res) throws IOException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
 
@@ -312,6 +363,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
         }
     }
 
+    @GET
     public void doExportTxt(StaplerRequest2 req, StaplerResponse2 res) throws IOException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
 
@@ -603,7 +655,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
 
         List<Map<String, Object>> insights = new ArrayList<>();
         if (failedLogins > 0) {
-            insights.add(insight("\u26A0\uFE0F",
+            insights.add(insight("warning.svg",
                     failedLogins >= failedLoginThreshold ? "Failed login spike" : "Failed login activity",
                     failedLogins,
                     failedLogins >= failedLoginThreshold ? "critical" : "medium"));
@@ -613,7 +665,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
         failedBuildEntries.sort((left, right) -> Integer.compare(right.getValue(), left.getValue()));
         for (int index = 0; index < Math.min(failedBuildEntries.size(), 3); index++) {
             Map.Entry<String, Integer> build = failedBuildEntries.get(index);
-            insights.add(insight("\u274C",
+            insights.add(insight("error.svg",
                     build.getValue() + " failed build" + (build.getValue() > 1 ? "s" : "") + " (" + build.getKey() + ")",
                     build.getValue(),
                     build.getValue() >= buildFailuresThreshold ? "high" : "medium"));
@@ -625,30 +677,30 @@ public class AuditLoggerManagementLink extends ManagementLink {
             if (credCreates > 0) credentialParts.add(credCreates + " created");
             if (credUpdates > 0) credentialParts.add(credUpdates + " updated");
             if (credDeletes > 0) credentialParts.add(credDeletes + " deleted");
-            insights.add(insight("\uD83D\uDD11",
+            insights.add(insight("keys.svg",
                     "Credential changes: " + String.join(", ", credentialParts),
                     totalCreds,
                     totalCreds >= credentialChangesThreshold ? "high" : "medium"));
         }
 
         if (secCfg > 0) {
-            insights.add(insight("\uD83D\uDEE1\uFE0F", "Security config changes", secCfg,
+            insights.add(insight("shield.svg", "Security config changes", secCfg,
                     secCfg >= securityConfigChangesThreshold ? "critical" : "high"));
         }
         if (globalCfg > 0) {
-            insights.add(insight("\u2699\uFE0F", "Global config changes", globalCfg,
+            insights.add(insight("gear.svg", "Global config changes", globalCfg,
                     globalCfg >= globalConfigChangesThreshold ? "high" : "low"));
         }
         if (jobCfg > 0) {
-            insights.add(insight("\uD83D\uDCC4", "Job config changes", jobCfg,
+            insights.add(insight("document-properties.svg", "Job config changes", jobCfg,
                     jobCfg >= jobConfigChangesThreshold ? "high" : "medium"));
         }
         if (pluginChanges > 0) {
-            insights.add(insight("\uD83D\uDCE6", "Plugin changes", pluginChanges,
+            insights.add(insight("plugin.svg", "Plugin changes", pluginChanges,
                     pluginChanges >= pluginChangesThreshold ? "high" : "medium"));
         }
         if (jobDeletes > 0) {
-            insights.add(insight("\uD83D\uDDD1\uFE0F", "Jobs deleted", jobDeletes,
+            insights.add(insight("delete-document.svg", "Jobs deleted", jobDeletes,
                     jobDeletes >= 3 ? "critical" : "high"));
         }
 
@@ -661,10 +713,10 @@ public class AuditLoggerManagementLink extends ManagementLink {
             }
         }
         if (topUser != null) {
-            insights.add(insight("\uD83D\uDC64", "Most active: " + topUser, topCount, "low"));
+            insights.add(insight("person.svg", "Most active: " + topUser, topCount, "low"));
         }
         if (logins > 0) {
-            insights.add(insight("\u2705", "Successful logins", logins, "low"));
+            insights.add(insight("accept.svg", "Successful logins", logins, "low"));
         }
 
         insights.sort((left, right) -> {
@@ -758,6 +810,31 @@ public class AuditLoggerManagementLink extends ManagementLink {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    static String sanitizePluginVersion(String version) {
+        if (version == null || version.isBlank()) {
+            return "dev";
+        }
+        return version.replaceFirst("\\s+\\(.*\\)$", "").trim();
+    }
+
+    static String computeDefaultDatePreset() {
+        return "7d";
+    }
+
+    static String computeDefaultDateFrom(LocalDate today) {
+        if (today == null) {
+            return "";
+        }
+        return today.minusDays(6L).toString();
+    }
+
+    static String computeDefaultDateTo(LocalDate today) {
+        if (today == null) {
+            return "";
+        }
+        return today.toString();
     }
 
     static final class AuditViewRequest {

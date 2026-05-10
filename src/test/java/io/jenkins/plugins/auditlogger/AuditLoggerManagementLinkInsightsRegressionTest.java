@@ -1,17 +1,16 @@
 package io.jenkins.plugins.auditlogger;
 
-import org.junit.Test;
-
 import java.lang.reflect.Method;
 import java.util.Map;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class AuditLoggerManagementLinkInsightsRegressionTest {
+class AuditLoggerManagementLinkInsightsRegressionTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    public void buildAnomalyConfigProvidesStableInsightThresholdDefaults() throws Exception {
+    void buildAnomalyConfigProvidesStableInsightThresholdDefaults() throws Exception {
         Method buildAnomalyConfig = AuditLoggerManagementLink.class
                 .getDeclaredMethod("buildAnomalyConfig", AuditLoggerConfiguration.class);
         buildAnomalyConfig.setAccessible(true);

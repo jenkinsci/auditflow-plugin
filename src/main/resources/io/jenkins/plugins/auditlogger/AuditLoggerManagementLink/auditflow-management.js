@@ -11,9 +11,84 @@
     var anomalyConfig = {};
     var displayTimeZone = 'UTC';
     var displayToday = '';
+    var defaultViewMode = 'all';
+    var defaultDatePreset = '';
+    var defaultDateFrom = '';
+    var defaultDateTo = '';
     var anomalyActions = [];
     var anomalyDismissedKey = 'auditflow-anomaly-dismissed-' + new Date().toISOString().slice(0, 10);
     var anomalyDismissed = sessionStorage.getItem(anomalyDismissedKey) === 'true';
+
+    function setHidden(element, hidden) {
+        if (element) {
+            element.classList.toggle('jenkins-hidden', hidden);
+        }
+    }
+
+    function getRootUrl() {
+        var head = document.querySelector('head');
+        if (head && head.dataset && typeof head.dataset.rooturl === 'string') {
+            return head.dataset.rooturl;
+        }
+        return '';
+    }
+
+    function loadUiDefaults() {
+        var container = document.getElementById('auditContainer');
+        if (!container || !container.dataset) {
+            return;
+        }
+        defaultViewMode = container.dataset.defaultViewMode || 'all';
+        defaultDatePreset = container.dataset.defaultDatePreset || '';
+        defaultDateFrom = container.dataset.defaultDateFrom || '';
+        defaultDateTo = container.dataset.defaultDateTo || '';
+    }
+
+    function applyConfiguredDefaults() {
+        var searchText = document.getElementById('searchText');
+        if (searchText) {
+            searchText.value = '';
+        }
+
+        var searchColumn = document.getElementById('searchColumn');
+        if (searchColumn) {
+            searchColumn.value = 'all';
+        }
+
+        var filterAction = document.getElementById('filterAction');
+        if (filterAction) {
+            filterAction.value = '';
+        }
+
+        var pageSizeSelect = document.getElementById('pageSize');
+        if (pageSizeSelect) {
+            pageSizeSelect.value = '100';
+        }
+        pageSize = 100;
+        currentPage = 1;
+        sortField = 'timestampMs';
+        sortAsc = false;
+
+        var selectedViewMode = document.querySelector('input[name="viewMode"][value="' + defaultViewMode + '"]');
+        if (selectedViewMode) {
+            selectedViewMode.checked = true;
+        }
+
+        var datePreset = document.getElementById('datePreset');
+        if (datePreset) {
+            datePreset.value = defaultDatePreset;
+        }
+
+        var dateFrom = document.getElementById('dateFrom');
+        if (dateFrom) {
+            dateFrom.value = defaultDateFrom;
+        }
+
+        var dateTo = document.getElementById('dateTo');
+        if (dateTo) {
+            dateTo.value = defaultDateTo;
+        }
+    }
 
     function loadLogs(resetPage) {
         if (resetPage) {
@@ -27,7 +102,12 @@
 
         var params = buildRequestParams(true);
         fetch('api?' + params.toString())
-            .then(function(response) { return response.json(); })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('Request failed with status ' + response.status);
+                }
+                return response.json();
+            })
             .then(function(data) {
                 allLogs = data.logs || [];
                 currentInsights = data.insights || [];
@@ -51,9 +131,7 @@
 
                 if (totalLogs > 0) {
                     var banner = document.getElementById('onboardingBanner');
-                    if (banner) {
-                        banner.style.display = 'none';
-                    }
+                    setHidden(banner, true);
                 }
             })
             .catch(function() {
@@ -71,7 +149,7 @@
         params.set('action', document.getElementById('filterAction').value || '');
 
         var checkedViewMode = document.querySelector('input[name="viewMode"]:checked');
-        params.set('viewMode', checkedViewMode ? checkedViewMode.value : 'user-only');
+        params.set('viewMode', checkedViewMode ? checkedViewMode.value : defaultViewMode);
         params.set('sortField', sortField || 'timestampMs');
         params.set('sortDir', sortAsc ? 'asc' : 'desc');
 
@@ -108,9 +186,11 @@
     }
 
     function updateTimeZoneLabel() {
-        var label = document.getElementById('displayTimeZoneLabel');
+        var label = document.getElementById('timestampTimeZone');
         if (label) {
-            label.textContent = 'Audit Dashboard';
+            label.textContent = displayTimeZone
+                ? ' (' + displayTimeZone + ')'
+                : '';
         }
     }
 
@@ -134,10 +214,10 @@
             return;
         }
         if (pageSize <= 0 || totalPagesCount <= 1 || totalLogs === 0) {
-            bar.style.display = 'none';
+            setHidden(bar, true);
             return;
         }
-        bar.style.display = 'flex';
+        setHidden(bar, false);
         document.getElementById('pageInfo').textContent = 'Page ' + currentPage + ' of ' + totalPagesCount;
         document.getElementById('btnFirst').disabled = currentPage <= 1;
         document.getElementById('btnPrev').disabled = currentPage <= 1;
@@ -185,6 +265,9 @@
 
     function renderTable(logs) {
         var tbody = document.getElementById('tbody');
+        if (!tbody) {
+            return;
+        }
         tbody.innerHTML = '';
         if (!logs || logs.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" class="empty-state">'
@@ -220,9 +303,13 @@
         document.getElementById('riskIpCount').textContent = ipCount;
 
         var failedCard = document.getElementById('riskFailedLogins');
-        failedCard.className = 'risk-card ' + (failedLogins >= 5 ? 'risk-red' : failedLogins >= 2 ? 'risk-orange' : 'risk-green');
+        if (failedCard) {
+            failedCard.className = 'risk-card ' + (failedLogins >= 5 ? 'risk-red' : failedLogins >= 2 ? 'risk-orange' : 'risk-green');
+        }
         var credentialCard = document.getElementById('riskCredentials');
-        credentialCard.className = 'risk-card ' + (credentialEvents >= 10 ? 'risk-red' : credentialEvents >= 3 ? 'risk-orange' : 'risk-green');
+        if (credentialCard) {
+            credentialCard.className = 'risk-card ' + (credentialEvents >= 10 ? 'risk-red' : credentialEvents >= 3 ? 'risk-orange' : 'risk-green');
+        }
     }
 
     function renderStats(summary) {
@@ -298,7 +385,8 @@
         var box = document.getElementById('anomalyBox');
         var status = document.getElementById('anomalyStatus');
         if (box) {
-            box.className = 'anomaly-box';
+            box.classList.remove('anomaly-alert');
+            box.classList.remove('anomaly-dismissed');
         }
         if (status) {
             status.textContent = 'No anomaly detected';
@@ -347,17 +435,7 @@
     }
 
     function clearAll() {
-        document.getElementById('searchText').value = '';
-        document.getElementById('searchColumn').value = 'all';
-        document.getElementById('filterAction').value = '';
-        document.getElementById('datePreset').value = '';
-        document.getElementById('dateFrom').value = '';
-        document.getElementById('dateTo').value = '';
-        document.getElementById('pageSize').value = '100';
-        pageSize = 100;
-        currentPage = 1;
-        sortField = 'timestampMs';
-        sortAsc = false;
+        applyConfiguredDefaults();
         loadLogs(false);
     }
 
@@ -372,15 +450,14 @@
         var base = getPresetBaseDate();
         var to = formatDateForInput(base);
         var fromDate = new Date(base.getTime());
-        if (preset === 'today') {
-            fromDate = new Date(base.getTime());
-        } else if (preset === '7d') {
-            fromDate.setUTCDate(fromDate.getUTCDate() - 7);
-        } else if (preset === '30d') {
-            fromDate.setUTCDate(fromDate.getUTCDate() - 30);
-        } else {
-            var months = parseInt(preset, 10);
-            fromDate.setUTCMonth(fromDate.getUTCMonth() - months);
+        if (preset === '7d') {
+            fromDate.setUTCDate(fromDate.getUTCDate() - 6);
+        } else if (preset === 'month') {
+            fromDate = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), 1));
+        } else if (preset === '3m') {
+            fromDate = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() - 2, 1));
+        } else if (preset === '6m') {
+            fromDate = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() - 5, 1));
         }
         document.getElementById('dateFrom').value = formatDateForInput(fromDate);
         document.getElementById('dateTo').value = to;
@@ -410,28 +487,7 @@
         return year + '-' + month + '-' + day;
     }
 
-    function toggleExportMenu() {
-        var menu = document.getElementById('exportMenu');
-        if (menu) {
-            menu.classList.toggle('show');
-        }
-    }
-
-    document.addEventListener('click', function(event) {
-        var wrapper = document.querySelector('.export-wrapper');
-        if (wrapper && !wrapper.contains(event.target)) {
-            var menu = document.getElementById('exportMenu');
-            if (menu) {
-                menu.classList.remove('show');
-            }
-        }
-    });
-
     function exportData(fmt) {
-        var menu = document.getElementById('exportMenu');
-        if (menu) {
-            menu.classList.remove('show');
-        }
         var params = buildRequestParams(false).toString();
         if (fmt === 'json') {
             window.location.href = 'exportJson?' + params;
@@ -442,9 +498,7 @@
 
     function dismissOnboarding() {
         var banner = document.getElementById('onboardingBanner');
-        if (banner) {
-            banner.style.display = 'none';
-        }
+        setHidden(banner, true);
         try {
             localStorage.setItem('auditflow-onboarded', '1');
         } catch (ignored) {
@@ -468,7 +522,7 @@
 
     function refreshInsightsIfVisible() {
         var panel = document.getElementById('insightsPanel');
-        if (panel && panel.classList.contains('show')) {
+        if (panel && !panel.classList.contains('jenkins-hidden')) {
             renderInsights(currentInsights);
         }
     }
@@ -478,8 +532,8 @@
         if (!panel) {
             return;
         }
-        var showing = panel.classList.toggle('show');
-        if (showing) {
+        var hidden = panel.classList.toggle('jenkins-hidden');
+        if (!hidden) {
             renderInsights(currentInsights);
         }
     }
@@ -487,7 +541,7 @@
     function closeInsights() {
         var panel = document.getElementById('insightsPanel');
         if (panel) {
-            panel.classList.remove('show');
+            panel.classList.add('jenkins-hidden');
         }
     }
 
@@ -496,7 +550,7 @@
         if (!list) {
             return;
         }
-        if (insights.length === 0) {
+        if (!insights || insights.length === 0) {
             list.innerHTML = '<li class="insights-empty">No notable activity recorded today.</li>';
             return;
         }
@@ -511,8 +565,12 @@
                     : insight.severity === 'medium'
                         ? 'badge-medium'
                         : 'badge-low';
+            var iconUrl = insight.icon ? escAttr(getRootUrl() + '/images/svgs/' + insight.icon) : '';
+            var iconHtml = iconUrl
+                ? '<img class="insights-icon" src="' + iconUrl + '" alt="" />'
+                : '<span class="insights-icon insights-icon--placeholder"></span>';
             html += '<li>'
-                + '<span class="insights-icon">' + insight.icon + '</span>'
+                + iconHtml
                 + '<span class="insights-text">' + esc(insight.text) + '</span>'
                 + '<span class="badge insights-badge ' + severityClass + '">' + insight.count + '</span>'
                 + '</li>';
@@ -520,7 +578,32 @@
         list.innerHTML = html;
     }
 
+    function bindExportAction(button) {
+        if (!button || button.dataset.auditflowBound === 'true') {
+            return;
+        }
+        button.dataset.auditflowBound = 'true';
+        button.addEventListener('click', function(event) {
+            event.preventDefault();
+            exportData(button.getAttribute('data-export-format'));
+        });
+    }
+
+    function registerExportHandlers() {
+        if (window.Behaviour && typeof window.Behaviour.specify === 'function') {
+            Behaviour.specify('.data-export', 'auditflow-export', 0, bindExportAction);
+            if (typeof Behaviour.applySubtree === 'function') {
+                Behaviour.applySubtree(document);
+            }
+            return;
+        }
+
+        Array.prototype.forEach.call(document.querySelectorAll('.data-export'), bindExportAction);
+    }
+
     function bindUiHandlers() {
+        registerExportHandlers();
+
         var searchText = document.getElementById('searchText');
         if (searchText) {
             searchText.addEventListener('keydown', function(event) {
@@ -539,17 +622,6 @@
         if (clearAllButton) {
             clearAllButton.addEventListener('click', clearAll);
         }
-
-        var toggleExportMenuButton = document.getElementById('toggleExportMenuButton');
-        if (toggleExportMenuButton) {
-            toggleExportMenuButton.addEventListener('click', toggleExportMenu);
-        }
-
-        Array.prototype.forEach.call(document.querySelectorAll('[data-export-format]'), function(button) {
-            button.addEventListener('click', function() {
-                exportData(button.getAttribute('data-export-format'));
-            });
-        });
 
         var refreshLogsButton = document.getElementById('refreshLogsButton');
         if (refreshLogsButton) {
@@ -640,13 +712,12 @@
     }
 
     window.addEventListener('load', function() {
+        loadUiDefaults();
+        applyConfiguredDefaults();
         bindUiHandlers();
         try {
             if (localStorage.getItem('auditflow-onboarded') === '1') {
-                var banner = document.getElementById('onboardingBanner');
-                if (banner) {
-                    banner.style.display = 'none';
-                }
+                setHidden(document.getElementById('onboardingBanner'), true);
             }
         } catch (ignored) {
             // Ignore localStorage availability issues.

@@ -569,8 +569,7 @@ public class AuditSecurityListener extends jenkins.security.SecurityListener {
             if (path.startsWith("/api/") || path.contains("/api/")
                     || path.endsWith("/build") || path.endsWith("/buildWithParameters")
                     || path.startsWith("/cli") || path.contains("/crumbIssuer")
-                    || path.contains("/createItem") || path.contains("/doDelete")
-                    || path.contains("/scriptText") || path.contains("/script")) {
+                    || path.contains("/createItem") || path.contains("/doDelete")) {
                 return "api-token";
             }
         } catch (Exception ignored) {}

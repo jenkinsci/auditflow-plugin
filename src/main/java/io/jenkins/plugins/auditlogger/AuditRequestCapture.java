@@ -6,18 +6,30 @@ import hudson.init.Initializer;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.FilterConfig;
+import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletRequestEvent;
 import jakarta.servlet.ServletRequestListener;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpSession;
 import jenkins.model.Jenkins;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.lang.reflect.Method;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import net.sf.json.JSONArray;
+import net.sf.json.JSONObject;
 
 /**
  * Registers a ServletRequestListener to capture HTTP requests in ThreadLocal.
@@ -30,6 +42,7 @@ import java.util.logging.Logger;
 @Extension
 public class AuditRequestCapture {
     private static final Logger LOGGER = Logger.getLogger(AuditRequestCapture.class.getName());
+    private static final String CACHED_REQUEST_BODY_ATTR = AuditRequestCapture.class.getName() + ".cachedRequestBody";
     private static volatile boolean registered = false;
 
     @Initializer(after = InitMilestone.STARTED)
@@ -78,33 +91,35 @@ public class AuditRequestCapture {
                 public void doFilter(ServletRequest req, ServletResponse res,
                                      FilterChain chain)
                         throws java.io.IOException, ServletException {
+                    HttpServletRequest effectiveReq = null;
                     if (req instanceof HttpServletRequest) {
                         HttpServletRequest httpReq = (HttpServletRequest) req;
-                        RequestHolder.set(httpReq);
+                        effectiveReq = cacheRequestBody(httpReq);
+                        RequestHolder.set(effectiveReq);
                         // Capture the authenticated username BEFORE chain.doFilter() —
                         // Jenkins may impersonate SYSTEM during save operations,
                         // but at this point the real user is still in the SecurityContext.
-                        String preChainUser = resolveUsername(httpReq);
+                        String preChainUser = resolveUsername(effectiveReq);
                         if (preChainUser != null) {
                             RequestHolder.setAuthenticatedUser(preChainUser);
                         }
                     }
                     try {
-                        chain.doFilter(req, res);
+                        chain.doFilter(effectiveReq != null ? effectiveReq : req, res);
                     } finally {
                         // Enrich AFTER chain — security chain has already run by the
                         // time PluginServletFilter is invoked, so SecurityContext is
                         // populated and we can resolve the username for pending entries.
-                        if (req instanceof HttpServletRequest) {
+                        if (effectiveReq != null) {
                             // Re-capture username in case it wasn't resolved before chain
                             if (RequestHolder.getAuthenticatedUser() == null) {
-                                String postChainUser = resolveUsername((HttpServletRequest) req);
+                                String postChainUser = resolveUsername(effectiveReq);
                                 if (postChainUser != null) {
                                     RequestHolder.setAuthenticatedUser(postChainUser);
                                 }
                             }
-                            enrichPendingAuthEntry((HttpServletRequest) req);
-                            detectAdminAction((HttpServletRequest) req);
+                            enrichPendingAuthEntry(effectiveReq);
+                            detectAdminAction(effectiveReq);
                         }
                         RequestHolder.clear();
                     }
@@ -129,12 +144,11 @@ public class AuditRequestCapture {
      * - Detects script console access (critical security event)
      * - Validates URI structure before classification
      * 
-     * Covers: Safe Restart, Plugin Operations, Security Config, Script Console.
+    * Covers: Safe Restart, Plugin Operations, Security Config.
      */
     private static void detectAdminAction(HttpServletRequest req) {
         try {
             String method = req.getMethod();
-            // Also check GET for script console access (some endpoints are GET)
             if (!("POST".equalsIgnoreCase(method) || "GET".equalsIgnoreCase(method))) {
                 return;
             }
@@ -169,28 +183,16 @@ public class AuditRequestCapture {
                 details = (isSafe ? "Safe" : "Immediate") + " restart initiated by " + username;
                 severity = "CRITICAL";
             }
-            // ===== SCRIPT CONSOLE ACCESS (NEW - CRITICAL SECURITY) =====
-            // Detects script console/scriptText access regardless of URL structure.
-            // Record a single audit row here so one request does not fan out into duplicates.
-            else if (systemConfigEventsEnabled && RouteAwareUrlMatcher.isScriptConsoleAccess(uri)) {
-                action = "SCRIPT_CONSOLE_ACCESS";
-                target = "ScriptConsole";
-                String scriptContent = req.getParameter("script");
-                if (scriptContent != null && !scriptContent.isEmpty()) {
-                    String preview = scriptContent.substring(0, Math.min(50, scriptContent.length()));
-                    details = "Script console access: " + preview + "... | Source: " + uri + " | User: " + username;
-                } else {
-                    details = "Script console access: N/A | Source: " + uri + " | User: " + username;
-                }
-                severity = "CRITICAL";
-            }
             // ===== PLUGIN OPERATIONS (route-aware matching) =====
-            else if (pluginEventsEnabled && "POST".equalsIgnoreCase(method) && RouteAwareUrlMatcher.isPluginManagerAction(uri)) {
+            if (pluginEventsEnabled && "POST".equalsIgnoreCase(method) && RouteAwareUrlMatcher.isPluginManagerAction(uri)) {
                 String pluginAction = classifyPluginAction(uri);
                 if ("PLUGIN_INSTALLED".equals(pluginAction)) {
-                    action = "PLUGIN_INSTALLED";
-                    target = extractPluginTarget(req, uri);
-                    details = "Plugin installed: " + target + " by " + username;
+                    String pluginTarget = extractPluginTarget(req, uri);
+                    if (pluginTarget != null) {
+                        action = "PLUGIN_INSTALLED";
+                        target = pluginTarget;
+                        details = "Plugin installed: " + target + " by " + username;
+                    }
                 } else if ("PLUGIN_REMOVED".equals(pluginAction)) {
                     action = "PLUGIN_REMOVED";
                     target = RouteAwareUrlMatcher.extractPluginName(uri);
@@ -198,9 +200,12 @@ public class AuditRequestCapture {
                     details = "Plugin removed: " + target + " by " + username;
                     severity = "CRITICAL";
                 } else if ("PLUGIN_UPDATED".equals(pluginAction)) {
-                    action = "PLUGIN_UPDATED";
-                    target = extractPluginTarget(req, uri);
-                    details = "Plugin updated: " + target + " by " + username;
+                    String pluginTarget = extractPluginTarget(req, uri);
+                    if (pluginTarget != null) {
+                        action = "PLUGIN_UPDATED";
+                        target = pluginTarget;
+                        details = "Plugin updated: " + target + " by " + username;
+                    }
                 } else if ("PLUGIN_ENABLED".equals(pluginAction) || "PLUGIN_DISABLED".equals(pluginAction)) {
                     action = pluginAction;
                     boolean enable = "PLUGIN_ENABLED".equals(pluginAction);
@@ -241,9 +246,14 @@ public class AuditRequestCapture {
         try {
             // For /pluginManager/installNecessaryPlugins, plugin names in body
             // For /pluginManager/install, check 'pluginName' or 'name' parameter
+            // For /pluginManager/installPlugins, plugins are sent as a JSON array body
             String name = req.getParameter("pluginName");
             if (name == null) name = req.getParameter("name");
             if (name != null) return name;
+
+            String pluginsFromBody = extractPluginTargetFromJsonBody((String) req.getAttribute(CACHED_REQUEST_BODY_ATTR));
+            if (pluginsFromBody != null) return pluginsFromBody;
+
             // Jenkins sends plugin selections as plugin.{name}.default=on
             java.util.Enumeration<String> paramNames = req.getParameterNames();
             if (paramNames != null) {
@@ -262,42 +272,64 @@ public class AuditRequestCapture {
             // For upload: filename from multipart
             if (uri.contains("upload")) return "uploaded-plugin";
         } catch (Exception ignored) {}
-        return "plugin(s)";
+        return null;
+    }
+
+    static String extractPluginTargetFromJsonBody(String requestBody) {
+        if (requestBody == null || requestBody.isBlank()) {
+            return null;
+        }
+
+        try {
+            JSONObject json = JSONObject.fromObject(requestBody);
+            Object pluginsValue = json.get("plugins");
+            if (!(pluginsValue instanceof JSONArray plugins) || plugins.isEmpty()) {
+                return null;
+            }
+
+            StringBuilder names = new StringBuilder();
+            for (Object plugin : plugins) {
+                if (plugin == null) {
+                    continue;
+                }
+                String name = plugin.toString();
+                if (name.isBlank()) {
+                    continue;
+                }
+                if (names.length() > 0) {
+                    names.append(", ");
+                }
+                names.append(name);
+            }
+
+            return names.length() > 0 ? names.toString() : null;
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Failed to parse plugin install request body", e);
+            return null;
+        }
     }
 
     static boolean isPluginInstallUri(String uri) {
-        // Use route-aware matching instead of naive contains()
-        // Prevents false positives like /job/myplugins/...
-        return RouteAwareUrlMatcher.isPluginManagerAction(uri) &&
-               (uri.contains("/install") || uri.contains("/uploadPlugin"));
+        return RouteAwareUrlMatcher.isPluginInstallAction(uri);
     }
 
     static boolean isPluginUpdateUri(String uri) {
-        // Route-aware matching for plugin update endpoints
-        return RouteAwareUrlMatcher.isPluginManagerAction(uri) &&
-               uri.matches(".*/pluginManager/(deploy|update)$");
+        return RouteAwareUrlMatcher.isPluginUpdateAction(uri);
     }
 
     static String classifyPluginAction(String uri) {
         if (uri == null || !RouteAwareUrlMatcher.isPluginManagerAction(uri)) {
             return null;
         }
-        
-        // Route-aware classification of plugin actions
-        if ((uri.contains("/pluginManager/plugin/") || uri.contains("/plugin/")) && 
-            (uri.contains("/uninstall") || uri.endsWith("/doUninstall"))) {
-            return "PLUGIN_REMOVED";
+
+        String lifecycleAction = RouteAwareUrlMatcher.classifyPluginLifecycleAction(uri);
+        if (lifecycleAction != null) {
+            return lifecycleAction;
         }
-        if ((uri.contains("/pluginManager/plugin/") || uri.contains("/plugin/")) && 
-            (uri.contains("/makeEnabled") || uri.contains("/enable"))) {
-            return "PLUGIN_ENABLED";
+        if (isPluginUpdateUri(uri)) {
+            return "PLUGIN_UPDATED";
         }
-        if ((uri.contains("/pluginManager/plugin/") || uri.contains("/plugin/")) && 
-            (uri.contains("/makeDisabled") || uri.contains("/disable"))) {
-            return "PLUGIN_DISABLED";
-        }
-        if (uri.contains("/pluginManager/") && 
-            (uri.contains("/install") || uri.contains("/deploy") || uri.contains("/update"))) {
+        if (isPluginInstallUri(uri)) {
             return "PLUGIN_INSTALLED";
         }
         return null;
@@ -397,6 +429,66 @@ public class AuditRequestCapture {
             return auth.getName();
         }
         return null;
+    }
+
+    private static HttpServletRequest cacheRequestBody(HttpServletRequest request) throws IOException {
+        String method = request.getMethod();
+        String contentType = request.getContentType();
+        if (!"POST".equalsIgnoreCase(method) || contentType == null
+                || !contentType.toLowerCase(Locale.ROOT).contains("application/json")) {
+            return request;
+        }
+
+        BufferedRequestWrapper wrapped = new BufferedRequestWrapper(request);
+        wrapped.setAttribute(CACHED_REQUEST_BODY_ATTR, wrapped.getCachedBody());
+        return wrapped;
+    }
+
+    private static final class BufferedRequestWrapper extends HttpServletRequestWrapper {
+        private final byte[] body;
+        private final Charset charset;
+
+        BufferedRequestWrapper(HttpServletRequest request) throws IOException {
+            super(request);
+            this.body = request.getInputStream().readAllBytes();
+            String encoding = request.getCharacterEncoding();
+            this.charset = encoding != null ? Charset.forName(encoding) : StandardCharsets.UTF_8;
+        }
+
+        String getCachedBody() {
+            return new String(body, charset);
+        }
+
+        @Override
+        public ServletInputStream getInputStream() {
+            ByteArrayInputStream input = new ByteArrayInputStream(body);
+            return new ServletInputStream() {
+                @Override
+                public int read() {
+                    return input.read();
+                }
+
+                @Override
+                public boolean isFinished() {
+                    return input.available() == 0;
+                }
+
+                @Override
+                public boolean isReady() {
+                    return true;
+                }
+
+                @Override
+                public void setReadListener(ReadListener readListener) {
+                    // Synchronous wrapper; async callbacks are not needed here.
+                }
+            };
+        }
+
+        @Override
+        public BufferedReader getReader() {
+            return new BufferedReader(new InputStreamReader(getInputStream(), charset));
+        }
     }
 
     private static String shorten(String s) {

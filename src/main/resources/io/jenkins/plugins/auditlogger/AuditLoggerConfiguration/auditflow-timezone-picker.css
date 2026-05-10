@@ -1,0 +1,150 @@
+.auditflow-timezone-picker {
+    position: relative;
+    max-width: 30rem;
+}
+
+.auditflow-timezone-picker__trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    border: var(--jenkins-border);
+    border-radius: var(--form-input-border-radius);
+    background: var(--card-background);
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+.auditflow-timezone-picker__trigger:hover,
+.auditflow-timezone-picker__trigger:focus {
+    border-color: var(--link-color);
+    outline: none;
+}
+
+.auditflow-timezone-picker__trigger-value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.auditflow-timezone-picker__trigger-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-color-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.auditflow-timezone-picker__trigger-caret {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid currentColor;
+}
+
+.auditflow-timezone-picker__popup {
+    position: absolute;
+    top: calc(100% + 0.45rem);
+    left: 0;
+    z-index: 50;
+    width: min(30rem, calc(100vw - 4rem));
+    max-height: min(28rem, 70vh);
+    overflow: auto;
+    padding: 0.9rem;
+    border: var(--jenkins-border);
+    border-radius: var(--form-input-border-radius);
+    background: var(--card-background);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.16);
+}
+
+.auditflow-timezone-picker__search {
+    width: 100%;
+}
+
+.auditflow-timezone-picker__section {
+    margin-top: 0.9rem;
+}
+
+.auditflow-timezone-picker__section-title {
+    margin-bottom: 0.45rem;
+    color: var(--text-color-secondary);
+    font-size: 0.75rem;
+    font-weight: var(--font-bold-weight);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.auditflow-timezone-picker__option-list {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.auditflow-timezone-picker__option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid transparent;
+    border-radius: calc(var(--form-input-border-radius) - 2px);
+    background: transparent;
+    color: var(--text-color);
+    cursor: pointer;
+    text-align: left;
+}
+
+.auditflow-timezone-picker__option:hover,
+.auditflow-timezone-picker__option:focus {
+    background: color-mix(in srgb, var(--link-color) 8%, var(--card-background));
+    border-color: color-mix(in srgb, var(--link-color) 30%, transparent);
+    outline: none;
+}
+
+.auditflow-timezone-picker__option--selected {
+    background: color-mix(in srgb, var(--link-color) 10%, var(--card-background));
+    border-color: var(--link-color);
+}
+
+.auditflow-timezone-picker__option-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.auditflow-timezone-picker__option-meta,
+.auditflow-timezone-picker__empty {
+    color: var(--text-color-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.auditflow-timezone-picker__empty {
+    margin-top: 0.9rem;
+}
+
+@media (max-width: 900px) {
+    .auditflow-timezone-picker {
+        max-width: none;
+    }
+
+    .auditflow-timezone-picker__popup {
+        width: min(100%, calc(100vw - 2rem));
+        max-height: 60vh;
+    }
+
+    .auditflow-timezone-picker__trigger {
+        align-items: flex-start;
+    }
+
+    .auditflow-timezone-picker__trigger-tools {
+        margin-top: 0.1rem;
+    }
+}

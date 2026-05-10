@@ -2,17 +2,16 @@ package io.jenkins.plugins.auditlogger;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import org.junit.Test;
-
 import java.lang.reflect.Method;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class AuditLogStorageTimestampRegressionTest {
+class AuditLogStorageTimestampRegressionTest {
 
     @Test
-    public void parseJsonLinePreservesOriginalTimestampAndReadableValue() throws Exception {
+    void parseJsonLinePreservesOriginalTimestampAndReadableValue() throws Exception {
         long expectedTimestamp = 1_725_652_800_123L;
         AuditLogEntry original = new AuditLogEntry(
                 "regression-user",
