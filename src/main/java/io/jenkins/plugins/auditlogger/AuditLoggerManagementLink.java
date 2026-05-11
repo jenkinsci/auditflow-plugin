@@ -30,7 +30,7 @@ import java.util.logging.Logger;
 @Extension
 public class AuditLoggerManagementLink extends ManagementLink {
     private static final Logger LOGGER = Logger.getLogger(AuditLoggerManagementLink.class.getName());
-    private static final String PLUGIN_SHORT_NAME = "auditflow";
+    private static final String DISPLAY_VERSION = "v1.0.0";
     private static final int DEFAULT_PAGE_SIZE = 100;
     private static final int MAX_PAGE_SIZE = 5_000;
     private static final int MAX_EXPORT_ROWS = 100_000;
@@ -55,15 +55,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
     }
 
     public String getPluginVersion() {
-        var plugin = Jenkins.get().getPluginManager().getPlugin(PLUGIN_SHORT_NAME);
-        if (plugin != null && plugin.getVersion() != null && !plugin.getVersion().isBlank()) {
-            return sanitizePluginVersion(plugin.getVersion());
-        }
-        Package pkg = AuditLoggerManagementLink.class.getPackage();
-        String implementationVersion = pkg != null ? pkg.getImplementationVersion() : null;
-        return implementationVersion != null && !implementationVersion.isBlank()
-                ? sanitizePluginVersion(implementationVersion)
-                : "dev";
+        return DISPLAY_VERSION;
     }
 
     @Override
@@ -810,13 +802,6 @@ public class AuditLoggerManagementLink extends ManagementLink {
         } catch (Exception ignored) {
             return null;
         }
-    }
-
-    static String sanitizePluginVersion(String version) {
-        if (version == null || version.isBlank()) {
-            return "dev";
-        }
-        return version.replaceFirst("\\s+\\(.*\\)$", "").trim();
     }
 
     static String computeDefaultDatePreset() {

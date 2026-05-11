@@ -1,6 +1,11 @@
 .audit-container {
     max-width: 100%;
     padding: 10px 0;
+    --audit-toolbar-surface: color-mix(in srgb, var(--card-background) 92%, white 8%);
+    --audit-toolbar-muted: color-mix(in srgb, var(--text-color-secondary) 8%, var(--card-background));
+    --audit-toolbar-border: color-mix(in srgb, var(--text-color-secondary) 16%, transparent);
+    --audit-toolbar-accent-soft: color-mix(in srgb, var(--link-color) 8%, var(--card-background));
+    --audit-toolbar-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
 }
 
 .audit-container h1 {
@@ -10,37 +15,78 @@
 .toolbar {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.9rem;
     margin-bottom: var(--section-padding);
-    padding: 0.9rem 1rem;
-    border: var(--jenkins-border);
-    border-radius: var(--form-input-border-radius);
-    background: var(--card-background);
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--audit-toolbar-border);
+    border-radius: 18px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--audit-toolbar-surface) 92%, white 8%), var(--audit-toolbar-surface));
+    box-shadow: var(--audit-toolbar-shadow);
 }
 
 .toolbar-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.6rem;
+    gap: 0.75rem;
     align-items: center;
 }
 
 .toolbar-row--primary {
+    align-items: stretch;
     justify-content: space-between;
 }
 
+.toolbar-row--filters {
+    justify-content: flex-start;
+}
+
 .toolbar-row + .toolbar-row {
-    padding-top: 0.65rem;
-    border-top: var(--jenkins-border);
+    padding-top: 0.8rem;
+    border-top: 1px solid color-mix(in srgb, var(--text-color-secondary) 12%, transparent);
+}
+
+.toolbar-search-shell {
+    flex: 1 1 40rem;
+    min-width: min(100%, 18rem);
+}
+
+.toolbar-primary-side {
+    display: inline-flex;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 .search-group {
     display: flex;
-    flex: 1 1 24rem;
-    flex-wrap: nowrap;
-    gap: 0.5rem;
     align-items: center;
+    gap: 0.5rem;
     min-width: 0;
+}
+
+.search-group--hero {
+    flex-wrap: nowrap;
+    gap: 0.45rem;
+    padding: 0.35rem;
+    border: 1px solid color-mix(in srgb, var(--link-color) 18%, var(--audit-toolbar-border));
+    border-radius: 16px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--link-color) 6%, var(--card-background)), var(--card-background));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.search-group__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 0.25rem;
+    color: var(--text-color-secondary);
+}
+
+.search-group__icon .icon-md,
+.search-group__icon svg {
+    width: 1rem;
+    height: 1rem;
 }
 
 .audit-select {
@@ -48,23 +94,46 @@
 }
 
 .audit-select--column {
-    min-width: 8.5rem;
-    max-width: 10rem;
+    min-width: 10rem;
+    max-width: 11rem;
 }
 
 .audit-select--action {
-    min-width: 11rem;
-    max-width: 13rem;
+    min-width: 11.5rem;
+    max-width: 12.5rem;
 }
 
 .audit-select--compact {
-    min-width: 8.75rem;
-    max-width: 10rem;
+    min-width: 10rem;
+    max-width: 11rem;
+}
+
+.audit-select--range {
+    min-width: 10.75rem;
+    max-width: 11.5rem;
+}
+
+.audit-select--meta {
+    min-width: 8rem;
+    max-width: 8.75rem;
 }
 
 .audit-search-input {
-    flex: 1 1 12rem;
+    flex: 1 1 16rem;
     min-width: 0;
+}
+
+.search-group--hero .audit-search-input {
+    min-height: 2.75rem;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0 0.15rem;
+    font-size: 1rem;
+}
+
+.search-group--hero .audit-search-input:focus {
+    outline: none;
 }
 
 .audit-date-input {
@@ -79,30 +148,185 @@
     flex-wrap: nowrap;
 }
 
+.toolbar-date-cluster {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid var(--audit-toolbar-border);
+    border-radius: 16px;
+    background: var(--audit-toolbar-muted);
+    min-height: 3.45rem;
+}
+
+.toolbar-cluster-label,
+.table-meta__label,
+.toolbar-filter-chip__label {
+    color: var(--text-color-secondary);
+    font-size: 0.72rem;
+    font-weight: var(--font-bold-weight);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
 .audit-toggle-group {
     display: inline-flex;
     align-items: center;
-    gap: 0.9rem;
+    gap: 0.25rem;
     flex-wrap: nowrap;
 }
 
 .audit-view-toggle {
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    color: var(--text-color);
-    font-size: var(--font-size-sm);
 }
 
 .audit-view-toggle input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
     margin: 0;
+}
+
+.audit-view-toggle span {
+    min-height: 2.35rem;
+    padding: 0 0.85rem;
+    border-radius: 999px;
+    color: var(--text-color-secondary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.audit-view-toggle:hover span {
+    color: var(--text-color);
+    background: color-mix(in srgb, var(--text-color-secondary) 8%, transparent);
+}
+
+.audit-view-toggle input:checked + span {
+    color: var(--text-color);
+    background: var(--card-background);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--link-color) 16%, var(--audit-toolbar-border));
 }
 
 .toolbar-actions {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.45rem;
     flex-wrap: nowrap;
+    padding: 0.35rem;
+    border: 1px solid var(--audit-toolbar-border);
+    border-radius: 16px;
+    background: var(--audit-toolbar-muted);
+    min-height: 3.45rem;
+}
+
+.toolbar-filter-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+}
+
+.toolbar-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    padding: 0.3rem 0.45rem;
+    border: 1px solid color-mix(in srgb, var(--text-color-secondary) 10%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--text-color-secondary) 6%, var(--card-background));
+}
+
+.toolbar-filter-chip--toggle {
+    padding-right: 0.3rem;
+}
+
+.toolbar .jenkins-button,
+.toolbar .jenkins-select__input,
+.toolbar .jenkins-input,
+.table-meta .jenkins-select__input {
+    min-height: 2.75rem;
+}
+
+.toolbar-filter-chip .jenkins-select__input,
+.toolbar-date-cluster .jenkins-select__input,
+.table-meta .jenkins-select__input {
+    border-radius: 12px;
+}
+
+.toolbar-filter-chip .jenkins-select__input {
+    min-height: 2.35rem;
+}
+
+.toolbar-actions > .jenkins-button,
+.search-group--hero > .jenkins-button {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.toolbar-actions > .jenkins-button {
+    padding-inline: 0.8rem;
+}
+
+.toolbar-actions > .jenkins-button:not(#toggleInsightsButton) {
+    border-color: color-mix(in srgb, var(--text-color-secondary) 14%, transparent);
+    background: color-mix(in srgb, var(--card-background) 78%, white 22%);
+    box-shadow: none;
+}
+
+.toolbar-actions > .jenkins-button:not(#toggleInsightsButton):hover {
+    background: var(--card-background);
+}
+
+#applySearchButton {
+    border-color: color-mix(in srgb, var(--text-color) 16%, transparent);
+    background: color-mix(in srgb, var(--text-color) 88%, white 12%);
+    color: #fff;
+}
+
+#applySearchButton:hover {
+    background: color-mix(in srgb, var(--text-color) 92%, white 8%);
+}
+
+#clearAllButton {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+}
+
+#clearAllButton:hover {
+    background: color-mix(in srgb, var(--text-color-secondary) 8%, transparent);
+}
+
+#toggleInsightsButton {
+    border-color: color-mix(in srgb, var(--link-color) 28%, transparent);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--link-color) 84%, white 16%), var(--link-color));
+    color: #fff;
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--link-color) 28%, transparent);
+}
+
+#toggleInsightsButton:hover {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--link-color) 76%, white 24%), color-mix(in srgb, var(--link-color) 92%, black 8%));
+}
+
+.table-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.65rem;
+}
+
+.table-meta__summary,
+.table-meta__controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
 }
 
 .toolbar-actions__label,
@@ -115,6 +339,7 @@
 
 .result-count {
     white-space: nowrap;
+    font-weight: 600;
 }
 
 .audit-icon {
@@ -129,7 +354,7 @@
 
 .audit-logs-table {
     width: 100%;
-    margin-top: var(--section-padding);
+    margin-top: 0;
 }
 
 .audit-logs-table th[data-sort-field] {
@@ -301,13 +526,21 @@
 .insights-panel {
     margin-top: var(--section-padding);
     margin-bottom: var(--section-padding);
-    padding: 1rem;
-    border-left: 4px solid var(--link-color);
+    padding: 1rem 1.1rem;
+    border: 1px solid color-mix(in srgb, var(--link-color) 16%, var(--audit-toolbar-border));
+    border-left: 0;
+    border-radius: 16px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--link-color) 6%, var(--card-background)), var(--card-background));
 }
 
 .insights-panel--top {
     margin-top: 0;
     margin-bottom: var(--section-padding);
+}
+
+.insights-panel--inline {
+    margin-top: 0;
+    margin-bottom: 0;
 }
 
 .insights-panel__header {
@@ -463,9 +696,98 @@
     gap: 0.5rem;
     flex-wrap: wrap;
     margin-top: var(--section-padding);
+    justify-content: flex-end;
 }
 
-@media (max-width: 900px) {
+@media (min-width: 821px) and (max-width: 960px) {
+    .toolbar-row--primary {
+        flex-wrap: nowrap;
+    }
+
+    .toolbar-search-shell {
+        flex-basis: 0;
+        min-width: 15.5rem;
+    }
+
+    .toolbar-primary-side {
+        flex: 0 1 auto;
+        flex-wrap: nowrap;
+        min-width: 0;
+    }
+
+    .audit-select--range {
+        min-width: 9.5rem;
+        max-width: 10rem;
+    }
+
+    .toolbar-filter-strip {
+        gap: 0.45rem;
+    }
+
+    .toolbar-filter-chip {
+        padding: 0.25rem 0.35rem;
+    }
+
+    .audit-select--column {
+        min-width: 9.25rem;
+        max-width: 10rem;
+    }
+
+    .audit-select--action {
+        min-width: 10.75rem;
+        max-width: 11.5rem;
+    }
+
+    .audit-select--compact {
+        min-width: 9.5rem;
+        max-width: 10rem;
+    }
+
+    .toolbar-actions > #refreshLogsButton,
+    .toolbar-actions > .jenkins-button[data-dropdown="true"] {
+        min-width: 2.75rem;
+        padding-inline: 0.7rem;
+        font-size: 0;
+    }
+
+    .toolbar-actions > #refreshLogsButton svg,
+    .toolbar-actions > .jenkins-button[data-dropdown="true"] svg {
+        margin: 0;
+    }
+
+    .audit-view-toggle span {
+        padding: 0 0.7rem;
+    }
+}
+
+@media (max-width: 820px) {
+    .toolbar-primary-side {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+@media (max-width: 960px) {
+    .toolbar-primary-side {
+        gap: 0.5rem;
+    }
+
+    .toolbar-date-cluster {
+        gap: 0.35rem;
+        padding: 0.3rem 0.35rem;
+    }
+
+    .toolbar-actions {
+        gap: 0.3rem;
+        padding: 0.25rem;
+    }
+
+    .toolbar-date-cluster .toolbar-cluster-label {
+        display: none;
+    }
+}
+
+@media (max-width: 720px) {
     .toolbar {
         padding: 1rem;
     }
@@ -480,10 +802,24 @@
         flex-wrap: wrap;
     }
 
+    .toolbar-search-shell,
+    .toolbar-primary-side,
+    .toolbar-date-cluster,
+    .toolbar-actions,
+    .toolbar-filter-strip,
+    .toolbar-filter-chip,
+    .table-meta,
+    .table-meta__controls,
+    .table-meta__summary {
+        width: 100%;
+    }
+
     .audit-select,
     .audit-select--column,
     .audit-select--action,
     .audit-select--compact,
+    .audit-select--range,
+    .audit-select--meta,
     .audit-search-input,
     .audit-date-input,
     .audit-date-range {
@@ -492,12 +828,18 @@
     }
 
     .audit-toggle-group,
-    .toolbar-actions {
+    .toolbar-actions,
+    .toolbar-primary-side {
         flex-wrap: wrap;
     }
 
     .audit-date-range {
         flex-wrap: wrap;
+    }
+
+    .table-meta {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .insights-panel__header {

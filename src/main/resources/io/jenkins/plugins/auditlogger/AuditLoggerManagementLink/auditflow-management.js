@@ -88,6 +88,8 @@
         if (dateTo) {
             dateTo.value = defaultDateTo;
         }
+
+        updateDateRangeVisibility();
     }
 
     function loadLogs(resetPage) {
@@ -178,11 +180,20 @@
             label.textContent = '0 events';
             return;
         }
-        if (pageSize <= 0) {
+        if (pageSize <= 0 || allLogs.length >= totalLogs) {
             label.textContent = totalLogs + ' events';
             return;
         }
         label.textContent = 'Showing ' + allLogs.length + ' of ' + totalLogs + ' events';
+    }
+
+    function updateDateRangeVisibility() {
+        var fields = document.getElementById('dateRangeFields');
+        var datePreset = document.getElementById('datePreset');
+        if (!fields || !datePreset) {
+            return;
+        }
+        setHidden(fields, !!datePreset.value);
     }
 
     function updateTimeZoneLabel() {
@@ -442,8 +453,7 @@
     function applyDatePreset() {
         var preset = document.getElementById('datePreset').value;
         if (!preset) {
-            document.getElementById('dateFrom').value = '';
-            document.getElementById('dateTo').value = '';
+            updateDateRangeVisibility();
             loadLogs(true);
             return;
         }
@@ -461,11 +471,13 @@
         }
         document.getElementById('dateFrom').value = formatDateForInput(fromDate);
         document.getElementById('dateTo').value = to;
+        updateDateRangeVisibility();
         loadLogs(true);
     }
 
     function onDateManualChange() {
         document.getElementById('datePreset').value = '';
+        updateDateRangeVisibility();
         loadLogs(true);
     }
 

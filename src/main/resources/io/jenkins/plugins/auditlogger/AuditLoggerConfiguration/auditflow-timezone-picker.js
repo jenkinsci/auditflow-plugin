@@ -1,6 +1,4 @@
 (function() {
-    var RECENT_STORAGE_KEY = 'auditflow-display-timezone-recents';
-
     function parseOptions(id) {
         var script = document.getElementById(id);
         if (!script) {
@@ -13,20 +11,6 @@
         } catch (ignored) {
             return [];
         }
-    }
-
-    function uniqueValues(values) {
-        var seen = {};
-        var result = [];
-        for (var i = 0; i < values.length; i++) {
-            var value = values[i];
-            if (!value || seen[value]) {
-                continue;
-            }
-            seen[value] = true;
-            result.push(value);
-        }
-        return result;
     }
 
     function setHidden(element, hidden) {
@@ -42,76 +26,100 @@
         }
         picker.dataset.initialized = 'true';
 
-        var input = document.getElementById('auditflowDisplayTimeZoneId');
-        var trigger = document.getElementById('auditflowTimezoneTrigger');
-        var valueNode = document.getElementById('auditflowTimezoneValue');
-        var popup = document.getElementById('auditflowTimezonePopup');
-        var search = document.getElementById('auditflowTimezoneSearch');
-        var recentSection = document.getElementById('auditflowTimezoneRecentSection');
-        var recentList = document.getElementById('auditflowTimezoneRecentList');
-        var popularSection = document.getElementById('auditflowTimezonePopularSection');
-        var popularList = document.getElementById('auditflowTimezonePopularList');
-        var resultsSection = document.getElementById('auditflowTimezoneResultsSection');
-        var resultsList = document.getElementById('auditflowTimezoneResultsList');
+        var hiddenInput = document.getElementById('auditflowDisplayTimeZoneId');
+        var textInput = document.getElementById('auditflowTimezoneInput');
+        var toggle = document.getElementById('auditflowTimezoneToggle');
+        var menu = document.getElementById('auditflowTimezoneMenu');
+        var listbox = document.getElementById('auditflowTimezoneListbox');
         var emptyState = document.getElementById('auditflowTimezoneEmpty');
         var availableOptions = parseOptions('auditflowTimezoneOptions');
-        var popularOptions = parseOptions('auditflowTimezonePopularOptions');
         var optionsById = {};
+        var filteredOptions = availableOptions.slice();
+        var highlightedIndex = -1;
 
         for (var i = 0; i < availableOptions.length; i++) {
             optionsById[availableOptions[i].id] = availableOptions[i];
         }
 
         function getSelectedValue() {
-            return input && input.value ? input.value : 'UTC';
+            return hiddenInput && hiddenInput.value ? hiddenInput.value : 'UTC';
         }
 
         function getOption(value) {
-            return optionsById[value] || optionsById.UTC || availableOptions[0] || { id: 'UTC', label: 'UTC' };
+            return optionsById[value] || optionsById.UTC || availableOptions[0] || {
+                id: 'UTC',
+                label: 'UTC',
+                offset: 'UTC+00:00'
+            };
         }
 
-        function readRecentValues() {
-            var stored = [];
-            try {
-                stored = JSON.parse(localStorage.getItem(RECENT_STORAGE_KEY) || '[]');
-            } catch (ignored) {
-                stored = [];
+        function getNormalizedQuery() {
+            return (textInput.value || '').trim().toLowerCase();
+        }
+
+        function filterOptions(query) {
+            if (!query) {
+                return availableOptions.slice();
             }
 
-            if (!Array.isArray(stored)) {
-                stored = [];
+            return availableOptions.filter(function(option) {
+                var id = (option.id || '').toLowerCase();
+                var offset = (option.offset || '').toLowerCase();
+                return id.indexOf(query) !== -1 || offset.indexOf(query) !== -1;
+            });
+        }
+
+        function getHighlightedOptionId(index) {
+            return 'auditflowTimezoneOption-' + index;
+        }
+
+        function syncSelectedText() {
+            textInput.value = getOption(getSelectedValue()).label;
+        }
+
+        function updateActiveDescendant() {
+            if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+                textInput.setAttribute('aria-activedescendant', getHighlightedOptionId(highlightedIndex));
+                return;
             }
 
-            var defaults = [getSelectedValue(), 'UTC'];
-            var values = uniqueValues(stored.concat(defaults));
-            var valid = [];
-            for (var i = 0; i < values.length; i++) {
-                if (optionsById[values[i]]) {
-                    valid.push(values[i]);
+            textInput.removeAttribute('aria-activedescendant');
+        }
+
+        function ensureHighlightedIndex() {
+            if (!filteredOptions.length) {
+                highlightedIndex = -1;
+                return;
+            }
+
+            if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+                return;
+            }
+
+            var selectedValue = getSelectedValue();
+            highlightedIndex = 0;
+            for (var i = 0; i < filteredOptions.length; i++) {
+                if (filteredOptions[i].id === selectedValue) {
+                    highlightedIndex = i;
+                    break;
                 }
             }
-            return valid.slice(0, 4);
         }
 
-        function writeRecentValue(value) {
-            var recents = readRecentValues();
-            recents.unshift(value);
-            recents = uniqueValues(recents).slice(0, 4);
-            try {
-                localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(recents));
-            } catch (ignored) {
-                // Ignore localStorage availability issues.
-            }
-        }
-
-        function createOptionButton(option) {
+        function createOptionButton(option, index) {
             var button = document.createElement('button');
             button.type = 'button';
             button.className = 'auditflow-timezone-picker__option';
             button.dataset.value = option.id;
-            button.dataset.label = option.label;
+            button.id = getHighlightedOptionId(index);
+            button.setAttribute('role', 'option');
+            button.setAttribute('aria-selected', option.id === getSelectedValue() ? 'true' : 'false');
+
             if (option.id === getSelectedValue()) {
                 button.classList.add('auditflow-timezone-picker__option--selected');
+            }
+            if (index === highlightedIndex) {
+                button.classList.add('auditflow-timezone-picker__option--active');
             }
 
             var label = document.createElement('span');
@@ -119,124 +127,153 @@
             label.textContent = option.label;
             button.appendChild(label);
 
-            if (option.id === getSelectedValue()) {
-                var badge = document.createElement('span');
-                badge.className = 'auditflow-timezone-picker__option-meta';
-                badge.textContent = 'Selected';
-                button.appendChild(badge);
-            }
+            var offset = document.createElement('span');
+            offset.className = 'auditflow-timezone-picker__option-offset';
+            offset.textContent = option.offset || '';
+            button.appendChild(offset);
 
             return button;
         }
 
-        function renderOptionList(container, options) {
-            container.innerHTML = '';
-            for (var i = 0; i < options.length; i++) {
-                container.appendChild(createOptionButton(options[i]));
-            }
-        }
+        function renderOptions() {
+            listbox.innerHTML = '';
+            ensureHighlightedIndex();
 
-        function renderRecentOptions() {
-            var recentValues = readRecentValues();
-            var options = [];
-            for (var i = 0; i < recentValues.length; i++) {
-                if (optionsById[recentValues[i]]) {
-                    options.push(optionsById[recentValues[i]]);
-                }
-            }
-            renderOptionList(recentList, options);
-            setHidden(recentSection, options.length === 0);
-        }
-
-        function renderPopularOptions() {
-            var options = [];
-            for (var i = 0; i < popularOptions.length; i++) {
-                if (optionsById[popularOptions[i].id]) {
-                    options.push(optionsById[popularOptions[i].id]);
-                }
-            }
-            renderOptionList(popularList, options);
-            setHidden(popularSection, options.length === 0);
-        }
-
-        function sortMatches(left, right, query) {
-            var leftLabel = left.label.toLowerCase();
-            var rightLabel = right.label.toLowerCase();
-            var leftStarts = leftLabel.indexOf(query) === 0;
-            var rightStarts = rightLabel.indexOf(query) === 0;
-            if (leftStarts !== rightStarts) {
-                return leftStarts ? -1 : 1;
-            }
-            return leftLabel.localeCompare(rightLabel);
-        }
-
-        function renderSearchResults(query) {
-            var trimmed = query ? query.trim().toLowerCase() : '';
-            if (!trimmed) {
-                resultsList.innerHTML = '';
-                setHidden(resultsSection, true);
-                setHidden(recentSection, false);
-                setHidden(popularSection, false);
-                emptyState.textContent = 'Type to search all time zones.';
+            if (!filteredOptions.length) {
+                setHidden(emptyState, false);
+                updateActiveDescendant();
                 return;
             }
 
-            var matches = [];
-            for (var i = 0; i < availableOptions.length; i++) {
-                var option = availableOptions[i];
-                var label = (option.label || '').toLowerCase();
-                var id = (option.id || '').toLowerCase();
-                if (label.indexOf(trimmed) !== -1 || id.indexOf(trimmed) !== -1) {
-                    matches.push(option);
-                }
+            setHidden(emptyState, true);
+            for (var i = 0; i < filteredOptions.length; i++) {
+                listbox.appendChild(createOptionButton(filteredOptions[i], i));
             }
 
-            matches.sort(function(left, right) {
-                return sortMatches(left, right, trimmed);
-            });
-
-            matches = matches.slice(0, 12);
-            renderOptionList(resultsList, matches);
-            setHidden(resultsSection, matches.length === 0);
-            setHidden(recentSection, true);
-            setHidden(popularSection, true);
-            emptyState.textContent = matches.length === 0
-                ? 'No matching time zones.'
-                : 'Showing ' + matches.length + ' matching time zone' + (matches.length === 1 ? '' : 's') + '.';
+            updateActiveDescendant();
+            scrollHighlightedOptionIntoView();
         }
 
-        function closePopup() {
-            setHidden(popup, true);
-            trigger.setAttribute('aria-expanded', 'false');
+        function scrollHighlightedOptionIntoView() {
+            if (highlightedIndex < 0) {
+                return;
+            }
+
+            var activeOption = document.getElementById(getHighlightedOptionId(highlightedIndex));
+            if (activeOption && activeOption.scrollIntoView) {
+                activeOption.scrollIntoView({ block: 'nearest' });
+            }
         }
 
-        function openPopup() {
-            setHidden(popup, false);
-            trigger.setAttribute('aria-expanded', 'true');
-            search.focus();
-            search.select();
+        function refreshOptions() {
+            filteredOptions = filterOptions(getNormalizedQuery());
+            highlightedIndex = filteredOptions.length ? 0 : -1;
+            renderOptions();
+        }
+
+        function closeMenu(restoreSelection) {
+            setHidden(menu, true);
+            textInput.setAttribute('aria-expanded', 'false');
+            if (restoreSelection !== false) {
+                syncSelectedText();
+            }
+            updateActiveDescendant();
+        }
+
+        function openMenu() {
+            setHidden(menu, false);
+            textInput.setAttribute('aria-expanded', 'true');
+            filteredOptions = filterOptions(getNormalizedQuery());
+            highlightedIndex = -1;
+            renderOptions();
         }
 
         function updateSelectedValue(value) {
             var option = getOption(value);
-            input.value = option.id;
-            valueNode.textContent = option.label;
-            writeRecentValue(option.id);
-            renderRecentOptions();
-            renderPopularOptions();
-            renderSearchResults(search.value || '');
-            closePopup();
+            hiddenInput.value = option.id;
+            syncSelectedText();
+            closeMenu(false);
         }
 
-        trigger.addEventListener('click', function() {
-            if (popup.classList.contains('jenkins-hidden')) {
-                openPopup();
+        function moveHighlight(step) {
+            if (!filteredOptions.length) {
                 return;
             }
-            closePopup();
+
+            if (menu.classList.contains('jenkins-hidden')) {
+                openMenu();
+            }
+
+            if (highlightedIndex < 0) {
+                highlightedIndex = 0;
+            } else {
+                highlightedIndex = Math.max(0, Math.min(highlightedIndex + step, filteredOptions.length - 1));
+            }
+
+            renderOptions();
+        }
+
+        textInput.addEventListener('focus', function() {
+            openMenu();
         });
 
-        popup.addEventListener('click', function(event) {
+        textInput.addEventListener('input', function() {
+            if (menu.classList.contains('jenkins-hidden')) {
+                openMenu();
+            }
+            refreshOptions();
+        });
+
+        textInput.addEventListener('keydown', function(event) {
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                moveHighlight(1);
+                return;
+            }
+
+            if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                moveHighlight(-1);
+                return;
+            }
+
+            if (event.key === 'Enter' && !menu.classList.contains('jenkins-hidden')) {
+                if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+                    event.preventDefault();
+                    updateSelectedValue(filteredOptions[highlightedIndex].id);
+                }
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeMenu(true);
+                textInput.blur();
+                return;
+            }
+
+            if (event.key === 'Tab') {
+                closeMenu(true);
+            }
+        });
+
+        toggle.addEventListener('click', function() {
+            if (menu.classList.contains('jenkins-hidden')) {
+                openMenu();
+                textInput.focus();
+                textInput.select();
+                return;
+            }
+
+            closeMenu(true);
+            textInput.focus();
+        });
+
+        listbox.addEventListener('mousedown', function(event) {
+            event.preventDefault();
+        });
+
+        listbox.addEventListener('click', function(event) {
             var button = event.target.closest('button[data-value]');
             if (!button) {
                 return;
@@ -244,27 +281,23 @@
             updateSelectedValue(button.dataset.value);
         });
 
-        search.addEventListener('input', function() {
-            renderSearchResults(search.value || '');
+        picker.addEventListener('focusout', function() {
+            window.setTimeout(function() {
+                if (!picker.contains(document.activeElement)) {
+                    closeMenu(true);
+                }
+            }, 0);
         });
 
-        search.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                closePopup();
-                trigger.focus();
-            }
-        });
-
-        document.addEventListener('click', function(event) {
+        document.addEventListener('mousedown', function(event) {
             if (!picker.contains(event.target)) {
-                closePopup();
+                closeMenu(true);
             }
         });
 
-        renderRecentOptions();
-        renderPopularOptions();
-        renderSearchResults('');
-        valueNode.textContent = getOption(getSelectedValue()).label;
+        syncSelectedText();
+        renderOptions();
+        closeMenu(false);
     }
 
     window.addEventListener('load', initTimezonePicker);

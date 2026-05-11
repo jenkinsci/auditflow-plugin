@@ -63,10 +63,11 @@ class AuditLoggerManagementLinkPaginationRegressionTest {
     }
 
     @Test
-    void pageHeadingVersionOmitsPrivateBuildSuffix() {
-        assertEquals("999999-SNAPSHOT", AuditLoggerManagementLink.sanitizePluginVersion("999999-SNAPSHOT (private-1ef53db0-harip)"));
-        assertEquals("999999-SNAPSHOT", AuditLoggerManagementLink.sanitizePluginVersion("999999-SNAPSHOT"));
-        assertEquals("dev", AuditLoggerManagementLink.sanitizePluginVersion(""));
+    void pageHeadingUsesFixedDisplayVersion() {
+        AuditLoggerManagementLink link = new AuditLoggerManagementLink();
+
+        assertEquals("v1.0.0", link.getPluginVersion());
+        assertEquals("AuditFlow - v1.0.0", link.getPageHeading());
     }
 
     private static AuditLogEntry entry(String user, String action, long timestamp) {

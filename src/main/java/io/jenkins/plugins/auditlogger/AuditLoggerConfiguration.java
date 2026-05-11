@@ -11,10 +11,11 @@ import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.StaplerRequest2;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.time.Instant;
 import java.time.DateTimeException;
 import java.time.ZoneId;
-import java.util.Comparator;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,20 +28,12 @@ import java.util.logging.Logger;
 @Extension
 public class AuditLoggerConfiguration extends GlobalConfiguration {
     private static final Logger LOGGER = Logger.getLogger(AuditLoggerConfiguration.class.getName());
-    private static final List<String> PREFERRED_DISPLAY_TIME_ZONES = List.of(
-            "UTC",
+    private static final String DEFAULT_DISPLAY_TIME_ZONE = "UTC";
+    private static final List<String> AVAILABLE_DISPLAY_TIME_ZONES = List.of(
             "Asia/Kolkata",
-            "America/New_York",
-            "America/Chicago",
-            "America/Los_Angeles",
             "Europe/London",
-            "Europe/Berlin",
-            "Europe/Paris",
-            "Asia/Tokyo",
-            "Asia/Shanghai",
-            "Asia/Singapore",
-            "Australia/Sydney");
-    private static final List<String> AVAILABLE_DISPLAY_TIME_ZONES = buildAvailableDisplayTimeZones();
+        "America/New_York",
+        DEFAULT_DISPLAY_TIME_ZONE);
 
     // Event Categories
     private boolean enableAuthenticationEvents = true;
@@ -138,6 +131,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
 
     public AuditLoggerConfiguration() {
         load();
+        displayTimeZoneId = sanitizeTimeZoneId(displayTimeZoneId);
     }
 
     public static AuditLoggerConfiguration get() {
@@ -162,28 +156,6 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
             LOGGER.warning("Failed to save AuditFlow configuration: " + e.getMessage());
             return false;
         }
-    }
-
-    private static List<String> buildAvailableDisplayTimeZones() {
-        List<String> zones = new ArrayList<>();
-        zones.add("SYSTEM");
-        zones.add("UTC");
-
-        for (String preferredZone : PREFERRED_DISPLAY_TIME_ZONES) {
-            if (!zones.contains(preferredZone) && ZoneId.getAvailableZoneIds().contains(preferredZone)) {
-                zones.add(preferredZone);
-            }
-        }
-
-        List<String> remainingZones = new ArrayList<>(ZoneId.getAvailableZoneIds());
-        remainingZones.sort(Comparator.naturalOrder());
-        for (String zoneId : remainingZones) {
-            if (!zones.contains(zoneId)) {
-                zones.add(zoneId);
-            }
-        }
-
-        return List.copyOf(zones);
     }
 
     private void applyJsonConfiguration(JSONObject json) {
@@ -230,18 +202,17 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
 
     private static String sanitizeTimeZoneId(String value) {
         if (value == null || value.trim().isEmpty()) {
-            return "UTC";
+            return DEFAULT_DISPLAY_TIME_ZONE;
         }
 
         String candidate = value.trim();
-        if ("SYSTEM".equalsIgnoreCase(candidate)) {
-            return "SYSTEM";
-        }
-
         try {
-            return ZoneId.of(candidate).getId();
+            String normalized = ZoneId.of(candidate).getId();
+            return AVAILABLE_DISPLAY_TIME_ZONES.contains(normalized)
+                    ? normalized
+                    : DEFAULT_DISPLAY_TIME_ZONE;
         } catch (DateTimeException ignored) {
-            return "UTC";
+            return DEFAULT_DISPLAY_TIME_ZONE;
         }
     }
 
@@ -474,30 +445,28 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isEnableDashboardMetrics() { return enableDashboardMetrics; }
     public boolean isEnableDashboardStats() { return enableDashboardStats; }
     public boolean isEnableAnomalyRow() { return false; }
-    public String getDisplayTimeZoneId() { return displayTimeZoneId; }
+    public String getDisplayTimeZoneId() { return sanitizeTimeZoneId(displayTimeZoneId); }
     public String getDisplayTimeZoneDisplayName() {
-        return toDisplayTimeZoneLabel(displayTimeZoneId);
+        return getDisplayTimeZoneId();
     }
     public ZoneId getDisplayTimeZone() {
-        return "SYSTEM".equalsIgnoreCase(displayTimeZoneId)
-                ? ZoneId.systemDefault()
-                : ZoneId.of(displayTimeZoneId);
+        return ZoneId.of(getDisplayTimeZoneId());
     }
     public List<String> getAvailableDisplayTimeZoneIds() {
         return AVAILABLE_DISPLAY_TIME_ZONES;
     }
     public List<String> getPopularDisplayTimeZoneIds() {
-        return PREFERRED_DISPLAY_TIME_ZONES;
+        return AVAILABLE_DISPLAY_TIME_ZONES;
     }
     public String getAvailableDisplayTimeZonesJson() {
         return new com.google.gson.Gson().toJson(toDisplayTimeZoneOptions(AVAILABLE_DISPLAY_TIME_ZONES));
     }
     public String getPopularDisplayTimeZonesJson() {
-        return new com.google.gson.Gson().toJson(toDisplayTimeZoneOptions(PREFERRED_DISPLAY_TIME_ZONES));
+        return getAvailableDisplayTimeZonesJson();
     }
     public ListBoxModel doFillDisplayTimeZoneIdItems() {
         ListBoxModel items = new ListBoxModel();
-        String selectedTimeZone = sanitizeTimeZoneId(displayTimeZoneId);
+        String selectedTimeZone = getDisplayTimeZoneId();
         for (String timeZoneId : AVAILABLE_DISPLAY_TIME_ZONES) {
             items.add(new ListBoxModel.Option(
                     toDisplayTimeZoneLabel(timeZoneId),
@@ -533,22 +502,36 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     }
 
     private static String toDisplayTimeZoneLabel(String timeZoneId) {
-        String sanitized = sanitizeTimeZoneId(timeZoneId);
-        if ("SYSTEM".equals(sanitized)) {
-            return "System default (" + ZoneId.systemDefault().getId() + ")";
-        }
-        return sanitized;
+        return sanitizeTimeZoneId(timeZoneId);
     }
 
     private static List<Map<String, String>> toDisplayTimeZoneOptions(List<String> zoneIds) {
         List<Map<String, String>> options = new ArrayList<>();
         for (String zoneId : zoneIds) {
             Map<String, String> option = new LinkedHashMap<>();
-            option.put("id", zoneId);
-            option.put("label", toDisplayTimeZoneLabel(zoneId));
+            String sanitized = sanitizeTimeZoneId(zoneId);
+            option.put("id", sanitized);
+            option.put("label", sanitized);
+            option.put("offset", toDisplayTimeZoneOffset(sanitized));
             options.add(option);
         }
         return options;
+    }
+
+    private static String toDisplayTimeZoneOffset(String timeZoneId) {
+        ZoneOffset offset = ZoneId.of(sanitizeTimeZoneId(timeZoneId))
+                .getRules()
+                .getOffset(Instant.now());
+        return formatUtcOffset(offset);
+    }
+
+    private static String formatUtcOffset(ZoneOffset offset) {
+        int totalSeconds = offset.getTotalSeconds();
+        int totalMinutes = Math.abs(totalSeconds / 60);
+        int hours = totalMinutes / 60;
+        int minutes = totalMinutes % 60;
+        char sign = totalSeconds >= 0 ? '+' : '-';
+        return String.format("UTC%c%02d:%02d", sign, hours, minutes);
     }
 
     private static String escapeJsonString(String s) {

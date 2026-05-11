@@ -49,42 +49,33 @@
                      description="Stored timestamps stay unchanged. This only controls how AuditFlow renders dates in the UI and exports.">
                 <div class="auditflow-timezone-picker" id="auditflowTimezonePicker">
                     <input type="hidden" name="displayTimeZoneId" id="auditflowDisplayTimeZoneId" value="${descriptor.displayTimeZoneId}"/>
-                    <button type="button"
-                            class="auditflow-timezone-picker__trigger"
-                            id="auditflowTimezoneTrigger"
-                            aria-haspopup="dialog"
-                            aria-expanded="false">
-                        <span class="auditflow-timezone-picker__trigger-value" id="auditflowTimezoneValue">${descriptor.displayTimeZoneDisplayName}</span>
-                        <span class="auditflow-timezone-picker__trigger-tools">
-                            <span class="auditflow-timezone-picker__trigger-search">Search</span>
-                            <span class="auditflow-timezone-picker__trigger-caret" aria-hidden="true"></span>
-                        </span>
-                    </button>
-                    <div class="auditflow-timezone-picker__popup jenkins-hidden"
-                         id="auditflowTimezonePopup"
-                         role="dialog"
-                         aria-label="Select display time zone">
-                        <input type="search"
-                               class="jenkins-input auditflow-timezone-picker__search"
-                               id="auditflowTimezoneSearch"
-                               placeholder="Search timezone..."
-                               autocomplete="off"/>
-                        <div class="auditflow-timezone-picker__section" id="auditflowTimezoneRecentSection">
-                            <div class="auditflow-timezone-picker__section-title">Recent</div>
-                            <div class="auditflow-timezone-picker__option-list" id="auditflowTimezoneRecentList"></div>
-                        </div>
-                        <div class="auditflow-timezone-picker__section" id="auditflowTimezonePopularSection">
-                            <div class="auditflow-timezone-picker__section-title">Popular</div>
-                            <div class="auditflow-timezone-picker__option-list" id="auditflowTimezonePopularList"></div>
-                        </div>
-                        <div class="auditflow-timezone-picker__section jenkins-hidden" id="auditflowTimezoneResultsSection">
-                            <div class="auditflow-timezone-picker__section-title">Results</div>
-                            <div class="auditflow-timezone-picker__option-list" id="auditflowTimezoneResultsList"></div>
-                        </div>
-                        <div class="auditflow-timezone-picker__empty" id="auditflowTimezoneEmpty">Type to search all time zones.</div>
+                    <div class="auditflow-timezone-picker__combobox">
+                        <input type="text"
+                               class="jenkins-input auditflow-timezone-picker__input"
+                               id="auditflowTimezoneInput"
+                               value="${descriptor.displayTimeZoneDisplayName}"
+                               placeholder="Search time zone"
+                               autocomplete="off"
+                               spellcheck="false"
+                               role="combobox"
+                               aria-autocomplete="list"
+                               aria-expanded="false"
+                               aria-controls="auditflowTimezoneListbox"/>
+                        <button type="button"
+                                class="jenkins-button auditflow-timezone-picker__toggle"
+                                id="auditflowTimezoneToggle"
+                                aria-label="Show time zones">
+                            <span class="auditflow-timezone-picker__toggle-caret" aria-hidden="true"></span>
+                        </button>
+                    </div>
+                    <div class="auditflow-timezone-picker__menu jenkins-hidden" id="auditflowTimezoneMenu">
+                        <div class="auditflow-timezone-picker__list"
+                             id="auditflowTimezoneListbox"
+                             role="listbox"
+                             aria-label="Display time zone options"></div>
+                        <div class="auditflow-timezone-picker__empty jenkins-hidden" id="auditflowTimezoneEmpty">No matching time zones.</div>
                     </div>
                     <script type="application/json" id="auditflowTimezoneOptions">${descriptor.availableDisplayTimeZonesJson}</script>
-                    <script type="application/json" id="auditflowTimezonePopularOptions">${descriptor.popularDisplayTimeZonesJson}</script>
                 </div>
             </f:entry>
         </f:block>
