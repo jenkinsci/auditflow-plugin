@@ -11,6 +11,18 @@
                   data-default-date-preset="${it.defaultDatePreset}"
                   data-default-date-from="${it.defaultDateFrom}"
                   data-default-date-to="${it.defaultDateTo}">
+                                <template id="auditflow-icons">
+                                        <span data-auditflow-icon="warning"><l:icon src="symbol-warning-outline plugin-ionicons-api" /></span>
+                                        <span data-auditflow-icon="alert"><l:icon src="symbol-alert-circle-outline plugin-ionicons-api" /></span>
+                                        <span data-auditflow-icon="key"><l:icon src="symbol-key-outline plugin-ionicons-api" /></span>
+                                        <span data-auditflow-icon="shield"><l:icon src="symbol-shield-checkmark-outline plugin-ionicons-api" /></span>
+                                        <span data-auditflow-icon="settings"><l:icon src="symbol-settings-outline plugin-ionicons-api" /></span>
+                                        <span data-auditflow-icon="document"><l:icon src="symbol-document-text-outline plugin-ionicons-api" /></span>
+                                        <span data-auditflow-icon="cube"><l:icon src="symbol-cube-outline plugin-ionicons-api" /></span>
+                                        <span data-auditflow-icon="trash"><l:icon src="symbol-trash-outline plugin-ionicons-api" /></span>
+                                        <span data-auditflow-icon="person"><l:icon src="symbol-person-outline plugin-ionicons-api" /></span>
+                                        <span data-auditflow-icon="checkmark"><l:icon src="symbol-checkmark-circle-outline plugin-ionicons-api" /></span>
+                                </template>
                 <h1>${it.pageHeading}</h1>
 
                 <j:set var="firstRun" value="${it.firstRun}"/>
@@ -158,7 +170,7 @@
                                         </j:if>
                                     </l:overflowButton>
                                 </j:if>
-                                <button type="button" class="jenkins-button" id="toggleInsightsButton">
+                                <button type="button" class="jenkins-button jenkins-button--primary" id="toggleInsightsButton">
                                     <l:icon src="symbol-stats-chart-outline plugin-ionicons-api" />
                                     Insights
                                 </button>

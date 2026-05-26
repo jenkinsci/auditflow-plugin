@@ -643,7 +643,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
 
         List<Map<String, Object>> insights = new ArrayList<>();
         if (failedLogins > 0) {
-            insights.add(insight("warning.svg",
+            insights.add(insight("warning",
                     failedLogins >= failedLoginThreshold ? "Failed login spike" : "Failed login activity",
                     failedLogins,
                     failedLogins >= failedLoginThreshold ? "critical" : "medium"));
@@ -653,7 +653,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
         failedBuildEntries.sort((left, right) -> Integer.compare(right.getValue(), left.getValue()));
         for (int index = 0; index < Math.min(failedBuildEntries.size(), 3); index++) {
             Map.Entry<String, Integer> build = failedBuildEntries.get(index);
-            insights.add(insight("error.svg",
+            insights.add(insight("alert",
                     build.getValue() + " failed build" + (build.getValue() > 1 ? "s" : "") + " (" + build.getKey() + ")",
                     build.getValue(),
                     build.getValue() >= buildFailuresThreshold ? "high" : "medium"));
@@ -665,30 +665,30 @@ public class AuditLoggerManagementLink extends ManagementLink {
             if (credCreates > 0) credentialParts.add(credCreates + " created");
             if (credUpdates > 0) credentialParts.add(credUpdates + " updated");
             if (credDeletes > 0) credentialParts.add(credDeletes + " deleted");
-            insights.add(insight("keys.svg",
+            insights.add(insight("key",
                     "Credential changes: " + String.join(", ", credentialParts),
                     totalCreds,
                     totalCreds >= credentialChangesThreshold ? "high" : "medium"));
         }
 
         if (secCfg > 0) {
-            insights.add(insight("shield.svg", "Security config changes", secCfg,
+            insights.add(insight("shield", "Security config changes", secCfg,
                     secCfg >= securityConfigChangesThreshold ? "critical" : "high"));
         }
         if (globalCfg > 0) {
-            insights.add(insight("gear.svg", "Global config changes", globalCfg,
+            insights.add(insight("settings", "Global config changes", globalCfg,
                     globalCfg >= globalConfigChangesThreshold ? "high" : "low"));
         }
         if (jobCfg > 0) {
-            insights.add(insight("document-properties.svg", "Job config changes", jobCfg,
+            insights.add(insight("document", "Job config changes", jobCfg,
                     jobCfg >= jobConfigChangesThreshold ? "high" : "medium"));
         }
         if (pluginChanges > 0) {
-            insights.add(insight("plugin.svg", "Plugin changes", pluginChanges,
+            insights.add(insight("cube", "Plugin changes", pluginChanges,
                     pluginChanges >= pluginChangesThreshold ? "high" : "medium"));
         }
         if (jobDeletes > 0) {
-            insights.add(insight("delete-document.svg", "Jobs deleted", jobDeletes,
+            insights.add(insight("trash", "Jobs deleted", jobDeletes,
                     jobDeletes >= 3 ? "critical" : "high"));
         }
 
@@ -701,10 +701,10 @@ public class AuditLoggerManagementLink extends ManagementLink {
             }
         }
         if (topUser != null) {
-            insights.add(insight("person.svg", "Most active: " + topUser, topCount, "low"));
+            insights.add(insight("person", "Most active: " + topUser, topCount, "low"));
         }
         if (logins > 0) {
-            insights.add(insight("accept.svg", "Successful logins", logins, "low"));
+            insights.add(insight("checkmark", "Successful logins", logins, "low"));
         }
 
         insights.sort((left, right) -> {

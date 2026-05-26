@@ -1,6 +1,5 @@
 package io.jenkins.plugins.auditlogger;
 
-import hudson.Extension;
 import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import jenkins.model.Jenkins;
@@ -12,7 +11,6 @@ import java.util.logging.Logger;
  * Uses @Initializer instead of implementing ServletContextListener
  * (which doesn't work as a Jenkins @Extension).
  */
-@Extension
 public class AuditSessionListenerInitializer {
     private static final Logger LOGGER = Logger.getLogger(AuditSessionListenerInitializer.class.getName());
     private static volatile boolean registered = false;
@@ -23,7 +21,8 @@ public class AuditSessionListenerInitializer {
         try {
             Jenkins jenkins = Jenkins.getInstanceOrNull();
             if (jenkins == null) return;
-            var ctx = jenkins.servletContext;
+            var ctx = jenkins.getServletContext();
+            if (ctx == null) return;
             ctx.addListener(new AuditSessionListener());
             registered = true;
             LOGGER.info("Audit Session Listener registered with servlet context");

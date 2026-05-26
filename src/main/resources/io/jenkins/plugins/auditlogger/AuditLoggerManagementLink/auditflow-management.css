@@ -295,6 +295,10 @@
 .toolbar-actions > .jenkins-button {
     margin: 0;
     white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
 }
 
 .toolbar-actions > .jenkins-button {
@@ -302,13 +306,13 @@
     border-radius: 8px;
 }
 
-.toolbar-actions > .jenkins-button:not(#toggleInsightsButton) {
+.toolbar-actions > .jenkins-button:not(.jenkins-button--primary) {
     border-color: color-mix(in srgb, var(--text-color-secondary) 10%, transparent);
     background: color-mix(in srgb, var(--card-background) 92%, white 8%);
     box-shadow: none;
 }
 
-.toolbar-actions > .jenkins-button:not(#toggleInsightsButton):hover {
+.toolbar-actions > .jenkins-button:not(.jenkins-button--primary):hover {
     background: color-mix(in srgb, var(--card-background) 86%, white 14%);
 }
 
@@ -343,17 +347,6 @@
 .toolbar-reset-button .audit-icon,
 .toolbar-reset-button svg {
     margin-right: 0.28rem;
-}
-
-#toggleInsightsButton {
-    border-color: color-mix(in srgb, var(--link-color) 28%, transparent);
-    background: linear-gradient(180deg, color-mix(in srgb, var(--link-color) 84%, white 16%), var(--link-color));
-    color: #fff;
-    box-shadow: 0 4px 10px color-mix(in srgb, var(--link-color) 16%, transparent);
-}
-
-#toggleInsightsButton:hover {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--link-color) 76%, white 24%), color-mix(in srgb, var(--link-color) 92%, black 8%));
 }
 
 .table-meta {
@@ -589,7 +582,7 @@
     display: flex;
     justify-content: space-between;
     gap: 1rem;
-    align-items: start;
+    align-items: center;
     margin-bottom: 0.75rem;
 }
 
@@ -627,9 +620,17 @@
 }
 
 .insights-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 1rem;
     height: 1rem;
     flex: none;
+}
+
+.insights-icon svg {
+    width: 1rem;
+    height: 1rem;
 }
 
 .insights-icon--placeholder {

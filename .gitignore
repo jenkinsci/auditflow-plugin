@@ -29,16 +29,3 @@ work/
 # Build
 *.hpi
 *.jar
-
-# Maven/Tools
-maven/
-*.zip
-apache-maven-*.tar.gz
-apache-maven-*.tar.xz
-
-# Binary files
-*.exe
-*.dll
-*.so
-*.dylib
-*.class

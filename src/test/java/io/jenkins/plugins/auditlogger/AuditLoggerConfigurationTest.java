@@ -11,6 +11,8 @@ import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.stapler.verb.GET;
 
+import java.time.ZoneId;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -38,7 +40,7 @@ class AuditLoggerConfigurationTest {
         assertEquals("UTC", configuration.getDisplayTimeZoneId());
 
         configuration.setDisplayTimeZoneId("Europe/Berlin");
-        assertEquals("UTC", configuration.getDisplayTimeZoneId());
+        assertEquals("Europe/Berlin", configuration.getDisplayTimeZoneId());
 
         configuration.setDisplayTimeZoneId("America/New_York");
         assertEquals("America/New_York", configuration.getDisplayTimeZoneId());
@@ -47,31 +49,38 @@ class AuditLoggerConfigurationTest {
     @Test
     void timezoneOptionsMatchSupportedIanaValues(JenkinsRule j) {
         AuditLoggerConfiguration configuration = AuditLoggerConfiguration.get();
+        String systemTimeZoneId = ZoneId.systemDefault().getId();
 
         ListBoxModel items = configuration.doFillDisplayTimeZoneIdItems();
 
-        assertEquals(4, items.size());
-        assertEquals("Asia/Kolkata", items.get(0).value);
-        assertEquals("Europe/London", items.get(1).value);
-        assertEquals("America/New_York", items.get(2).value);
-        assertEquals("UTC", items.get(3).value);
+        assertTrue(items.size() > 100);
+        assertEquals(systemTimeZoneId, items.get(0).value);
+        if (!"UTC".equals(systemTimeZoneId)) {
+            assertEquals("UTC", items.get(1).value);
+        }
+        assertTrue(items.stream().anyMatch(option -> "Europe/Berlin".equals(option.value)));
     }
 
     @Test
     void timezoneOptionsJsonIncludesOffsetMetadata(JenkinsRule j) {
         AuditLoggerConfiguration configuration = AuditLoggerConfiguration.get();
+        String systemTimeZoneId = ZoneId.systemDefault().getId();
         JSONArray options = JSONArray.fromObject(configuration.getAvailableDisplayTimeZonesJson());
 
-        assertEquals(4, options.size());
+        assertTrue(options.size() > 100);
 
         JSONObject first = options.getJSONObject(0);
-        assertEquals("Asia/Kolkata", first.getString("id"));
-        assertEquals("Asia/Kolkata", first.getString("label"));
-        assertTrue(first.getString("offset").startsWith("UTC+"));
+        assertEquals(systemTimeZoneId, first.getString("id"));
+        assertTrue(first.getString("label").contains(systemTimeZoneId));
+        assertFalse(first.getString("offset").isBlank());
 
-        JSONObject utc = options.getJSONObject(3);
+        JSONObject utc = findOption(options, "UTC");
         assertEquals("UTC", utc.getString("id"));
         assertFalse(utc.getString("offset").isBlank());
+
+        JSONObject berlin = findOption(options, "Europe/Berlin");
+        assertEquals("Europe/Berlin", berlin.getString("id"));
+        assertEquals("Europe/Berlin", berlin.getString("label"));
     }
 
     @Test
@@ -96,5 +105,15 @@ class AuditLoggerConfigurationTest {
                         "application/json"));
 
         assertEquals(403, failure.getStatusCode());
+    }
+
+    private static JSONObject findOption(JSONArray options, String id) {
+        for (int index = 0; index < options.size(); index++) {
+            JSONObject option = options.getJSONObject(index);
+            if (id.equals(option.getString("id"))) {
+                return option;
+            }
+        }
+        throw new AssertionError("Missing time zone option: " + id);
     }
 }

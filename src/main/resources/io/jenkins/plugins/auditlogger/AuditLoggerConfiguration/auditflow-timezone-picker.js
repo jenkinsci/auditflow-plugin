@@ -64,8 +64,9 @@
 
             return availableOptions.filter(function(option) {
                 var id = (option.id || '').toLowerCase();
+                var label = (option.label || '').toLowerCase();
                 var offset = (option.offset || '').toLowerCase();
-                return id.indexOf(query) !== -1 || offset.indexOf(query) !== -1;
+                return id.indexOf(query) !== -1 || label.indexOf(query) !== -1 || offset.indexOf(query) !== -1;
             });
         }
 

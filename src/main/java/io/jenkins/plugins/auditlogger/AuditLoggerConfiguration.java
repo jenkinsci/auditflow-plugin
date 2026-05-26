@@ -30,11 +30,7 @@ import java.util.logging.Logger;
 public class AuditLoggerConfiguration extends GlobalConfiguration {
     private static final Logger LOGGER = Logger.getLogger(AuditLoggerConfiguration.class.getName());
     private static final String DEFAULT_DISPLAY_TIME_ZONE = "UTC";
-    private static final List<String> AVAILABLE_DISPLAY_TIME_ZONES = List.of(
-            "Asia/Kolkata",
-            "Europe/London",
-        "America/New_York",
-        DEFAULT_DISPLAY_TIME_ZONE);
+    private static final List<String> AVAILABLE_DISPLAY_TIME_ZONES = buildAvailableDisplayTimeZoneIds();
 
     // Event Categories
     private boolean enableAuthenticationEvents = true;
@@ -199,6 +195,22 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static List<String> buildAvailableDisplayTimeZoneIds() {
+        String systemTimeZoneId = ZoneId.systemDefault().getId();
+        List<String> availableTimeZones = new ArrayList<>(ZoneId.getAvailableZoneIds());
+        availableTimeZones.sort(String::compareTo);
+        availableTimeZones.remove(systemTimeZoneId);
+        availableTimeZones.remove(DEFAULT_DISPLAY_TIME_ZONE);
+
+        List<String> orderedTimeZones = new ArrayList<>();
+        orderedTimeZones.add(systemTimeZoneId);
+        if (!DEFAULT_DISPLAY_TIME_ZONE.equals(systemTimeZoneId)) {
+            orderedTimeZones.add(DEFAULT_DISPLAY_TIME_ZONE);
+        }
+        orderedTimeZones.addAll(availableTimeZones);
+        return List.copyOf(orderedTimeZones);
     }
 
     private static String sanitizeTimeZoneId(String value) {
@@ -448,7 +460,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isEnableAnomalyRow() { return false; }
     public String getDisplayTimeZoneId() { return sanitizeTimeZoneId(displayTimeZoneId); }
     public String getDisplayTimeZoneDisplayName() {
-        return getDisplayTimeZoneId();
+        return toDisplayTimeZoneLabel(getDisplayTimeZoneId());
     }
     public ZoneId getDisplayTimeZone() {
         return ZoneId.of(getDisplayTimeZoneId());
@@ -506,7 +518,11 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     }
 
     private static String toDisplayTimeZoneLabel(String timeZoneId) {
-        return sanitizeTimeZoneId(timeZoneId);
+        String sanitized = sanitizeTimeZoneId(timeZoneId);
+        if (sanitized.equals(ZoneId.systemDefault().getId())) {
+            return "System Default (" + sanitized + ")";
+        }
+        return sanitized;
     }
 
     private static List<Map<String, String>> toDisplayTimeZoneOptions(List<String> zoneIds) {

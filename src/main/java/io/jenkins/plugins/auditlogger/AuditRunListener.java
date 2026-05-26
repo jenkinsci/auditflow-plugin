@@ -228,16 +228,24 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
                         String.format("Build history purged: %d+ builds (#%d - #%d) deleted by %s",
                                 tracker.count, tracker.minBuild, tracker.maxBuild, user));
                 AuditLogStorage.getInstance().addEntry(entry);
-                LOGGER.log(Level.INFO, "BUILDS_PURGED: job={0} count={1} by user={2}",
-                        new Object[]{jobName, tracker.count, user});
+                int purgeCount = tracker.count;
+                LOGGER.log(Level.INFO, () -> String.format(
+                        "BUILDS_PURGED: job=%s count=%d by user=%s",
+                        jobName,
+                        purgeCount,
+                        user));
             } else if (tracker.count < PURGE_THRESHOLD) {
                 // Below threshold — log individual delete (may be upgraded to purge later)
                 // Schedule a flush to emit individual deletes if threshold not reached
                 scheduleFlush(key, now);
             } else {
                 // Already logged purge, update count
-                LOGGER.log(Level.FINE, "Build #{0} added to purge batch for {1} (count={2})",
-                        new Object[]{buildNum, jobName, tracker.count});
+                int purgeCount = tracker.count;
+                LOGGER.log(Level.FINE, () -> String.format(
+                        "Build #%d added to purge batch for %s (count=%d)",
+                        buildNum,
+                        jobName,
+                        purgeCount));
             }
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error recording build deletion", e);
@@ -276,16 +284,20 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
 
             Set<String> credentialIds = new LinkedHashSet<>();
             extractScmCredentials(run, credentialIds);
+            int buildNumber = run.getNumber();
 
             for (String credId : credentialIds) {
                 String details = String.format("Credential '%s' bound for SCM checkout in job '%s' (Build #%d, triggered by %s)",
-                        credId, jobName, run.getNumber(), user);
+                credId, jobName, buildNumber, user);
                 AuditLogEntry entry = new AuditLogEntry(user, "CREDENTIAL_ACCESSED",
                         "Credentials/" + credId, details);
                 entry.setSeverity("HIGH");
                 AuditLogStorage.getInstance().addEntry(entry);
-                LOGGER.log(Level.FINE, "CREDENTIAL_ACCESSED (SCM, build start): cred={0} job={1} build=#{2}",
-                        new Object[]{credId, jobName, run.getNumber()});
+            LOGGER.log(Level.FINE, () -> String.format(
+                "CREDENTIAL_ACCESSED (SCM, build start): cred=%s job=%s build=#%d",
+                credId,
+                jobName,
+                buildNumber));
             }
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error checking SCM credential usage for {0}: {1}",
@@ -325,16 +337,20 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
 
             // Only log creds NOT already covered by SCM
             runtimeCreds.removeAll(scmCreds);
+                int buildNumber = run.getNumber();
 
             for (String credId : runtimeCreds) {
                 String details = String.format("Credential '%s' used at runtime by job '%s' (Build #%d, triggered by %s)",
-                        credId, jobName, run.getNumber(), user);
+                    credId, jobName, buildNumber, user);
                 AuditLogEntry entry = new AuditLogEntry(user, "CREDENTIAL_ACCESSED",
                         "Credentials/" + credId, details);
                 entry.setSeverity("HIGH");
                 AuditLogStorage.getInstance().addEntry(entry);
-                LOGGER.log(Level.FINE, "CREDENTIAL_ACCESSED (runtime): cred={0} job={1} build=#{2}",
-                        new Object[]{credId, jobName, run.getNumber()});
+                LOGGER.log(Level.FINE, () -> String.format(
+                    "CREDENTIAL_ACCESSED (runtime): cred=%s job=%s build=#%d",
+                    credId,
+                    jobName,
+                    buildNumber));
             }
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error checking runtime credential usage for {0}: {1}",

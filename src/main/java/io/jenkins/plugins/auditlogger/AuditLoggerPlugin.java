@@ -63,10 +63,11 @@ public class AuditLoggerPlugin extends Plugin {
     public static void installAuthFailureHandler() {
         try {
             jenkins.model.Jenkins j = jenkins.model.Jenkins.get();
+            var servletContext = j.getServletContext();
 
             // Get HudsonFilter -> ChainedServletFilter2 -> filters array
-            if (j.servletContext == null) { LOGGER.warning("ServletContext not available"); return; }
-            Object hf = j.servletContext.getAttribute("hudson.security.HudsonFilter");
+            if (servletContext == null) { LOGGER.warning("ServletContext not available"); return; }
+            Object hf = servletContext.getAttribute("hudson.security.HudsonFilter");
             if (hf == null) { LOGGER.warning("HudsonFilter not found"); return; }
 
             java.lang.reflect.Field filterField = hudson.security.HudsonFilter.class.getDeclaredField("filter");

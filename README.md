@@ -264,5 +264,19 @@ MIT License
 
 ## Version History
 
+### 1.1.1
+- Refined Insights to summarize current-day activity while honoring the active filters
+- Kept anomaly detection and the anomaly row disabled while still using thresholds for Insights prioritization
+- Preserved non-visible configuration values across Configure System save cycles
+- Validated config round-trips and log rotation behavior live on Jenkins 2.541.3
+
+### 1.1.0
+- Verified plugin build compatibility against Jenkins 2.440
+- Live regression validation completed for credentials, plugin lifecycle events, authentication events, and build outcomes
+- Fixed timestamp reload drift so persisted events keep their original audit time after restart
+- Fixed credential mutation detection on the first post-startup change
+- Fixed plugin manager route handling for modern `/plugin/{name}/...` endpoints
+- Removed runtime anomaly detection work from the audit hot path to keep write latency predictable under load
+
 ### 1.0.0
 - Initial public release

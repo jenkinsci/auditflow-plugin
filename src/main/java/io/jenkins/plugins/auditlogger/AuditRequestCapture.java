@@ -1,6 +1,5 @@
 package io.jenkins.plugins.auditlogger;
 
-import hudson.Extension;
 import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import jakarta.servlet.Filter;
@@ -39,7 +38,6 @@ import net.sf.json.JSONObject;
  * Falls back to PluginServletFilter if listener registration fails
  * (common when Jetty context is already fully initialized).
  */
-@Extension
 public class AuditRequestCapture {
     private static final Logger LOGGER = Logger.getLogger(AuditRequestCapture.class.getName());
     private static final String CACHED_REQUEST_BODY_ATTR = AuditRequestCapture.class.getName() + ".cachedRequestBody";
@@ -51,7 +49,11 @@ public class AuditRequestCapture {
         try {
             Jenkins jenkins = Jenkins.getInstanceOrNull();
             if (jenkins == null) return;
-            var ctx = jenkins.servletContext;
+            var ctx = jenkins.getServletContext();
+            if (ctx == null) {
+                registerFallbackFilter();
+                return;
+            }
             ctx.addListener(new ServletRequestListener() {
                 @Override
                 public void requestInitialized(ServletRequestEvent sre) {

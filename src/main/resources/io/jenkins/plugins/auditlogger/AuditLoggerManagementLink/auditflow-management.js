@@ -532,6 +532,23 @@
             .replace(/>/g, '&gt;');
     }
 
+    function generateSVGIcon(iconName) {
+        var icons = document.getElementById('auditflow-icons');
+        if (!icons || !icons.content) {
+            return null;
+        }
+
+        var templateIcon = icons.content.querySelector('[data-auditflow-icon="' + iconName + '"]');
+        if (!templateIcon || !templateIcon.firstElementChild) {
+            return null;
+        }
+
+        var icon = templateIcon.firstElementChild.cloneNode(true);
+        icon.classList.add('insights-icon');
+        icon.setAttribute('aria-hidden', 'true');
+        return icon;
+    }
+
     function refreshInsightsIfVisible() {
         var panel = document.getElementById('insightsPanel');
         if (panel && !panel.classList.contains('jenkins-hidden')) {
@@ -567,7 +584,8 @@
             return;
         }
 
-        var html = '';
+        list.innerHTML = '';
+        var fragment = document.createDocumentFragment();
         for (var i = 0; i < insights.length; i++) {
             var insight = insights[i];
             var severityClass = insight.severity === 'critical'
@@ -577,17 +595,31 @@
                     : insight.severity === 'medium'
                         ? 'badge-medium'
                         : 'badge-low';
-            var iconUrl = insight.icon ? escAttr(getRootUrl() + '/images/svgs/' + insight.icon) : '';
-            var iconHtml = iconUrl
-                ? '<img class="insights-icon" src="' + iconUrl + '" alt="" />'
-                : '<span class="insights-icon insights-icon--placeholder"></span>';
-            html += '<li>'
-                + iconHtml
-                + '<span class="insights-text">' + esc(insight.text) + '</span>'
-                + '<span class="badge insights-badge ' + severityClass + '">' + insight.count + '</span>'
-                + '</li>';
+
+            var item = document.createElement('li');
+            var icon = insight.icon ? generateSVGIcon(insight.icon) : null;
+            if (icon) {
+                item.appendChild(icon);
+            } else {
+                var placeholder = document.createElement('span');
+                placeholder.className = 'insights-icon insights-icon--placeholder';
+                placeholder.setAttribute('aria-hidden', 'true');
+                item.appendChild(placeholder);
+            }
+
+            var text = document.createElement('span');
+            text.className = 'insights-text';
+            text.textContent = insight.text || '';
+            item.appendChild(text);
+
+            var badge = document.createElement('span');
+            badge.className = 'badge insights-badge ' + severityClass;
+            badge.textContent = String(insight.count || 0);
+            item.appendChild(badge);
+
+            fragment.appendChild(item);
         }
-        list.innerHTML = html;
+        list.appendChild(fragment);
     }
 
     function bindExportAction(button) {
