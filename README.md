@@ -255,7 +255,7 @@ src/main/java/io/jenkins/plugins/auditlogger/
 
 ## License
 
-MIT License
+MIT License.
 
 ## Support
 
