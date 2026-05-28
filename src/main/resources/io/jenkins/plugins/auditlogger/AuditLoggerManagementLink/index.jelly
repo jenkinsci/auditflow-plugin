@@ -29,9 +29,11 @@
                 <div class="onboarding-banner" id="onboardingBanner">
                     <h2>Welcome to AuditFlow</h2>
                     <p>
-                        AuditFlow is now tracking authentication, builds, and configuration changes.
-                        Events will appear here as they occur. You can customize what gets tracked in
-                        <a href="${rootURL}/manage/configure">Manage Jenkins &gt; System</a>.
+                        AuditFlow tracks authentication events, builds, and configuration changes.
+                        For centralized monitoring and compliance retention, forward logs to Splunk, Amazon Web Services CloudWatch, or your SIEM platform.
+                    </p>
+                    <p>
+                        Configure tracking in <a href="${rootURL}/manage/configure">Manage Jenkins &gt; System</a>.
                     </p>
                     <button type="button" class="jenkins-button onboarding-banner__dismiss" id="dismissOnboardingButton">Got it</button>
                 </div>
