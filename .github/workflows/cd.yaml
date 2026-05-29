@@ -1,3 +1,6 @@
+# Note: additional setup is required, see
+# https://www.jenkins.io/redirect/continuous-delivery-of-plugins
+
 name: cd
 
 on:
@@ -10,9 +13,6 @@ on:
           Run validation with release drafter only
           -> Skip the release job
         default: false
-  check_run:
-    types:
-      - completed
 
 permissions:
   checks: read
