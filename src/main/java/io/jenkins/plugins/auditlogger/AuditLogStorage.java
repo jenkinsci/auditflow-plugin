@@ -121,7 +121,7 @@ public class AuditLogStorage {
 
     /**
      * Record an audit event. Non-blocking — entry is queued for async disk write.
-     * Returns immediately; typical latency < 1 microsecond.
+     * Returns immediately; typical latency &lt; 1 microsecond.
      */
     public void addEntry(AuditLogEntry entry) {
         if (entry == null || shuttingDown) return;
