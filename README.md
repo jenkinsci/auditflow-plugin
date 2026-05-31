@@ -35,48 +35,6 @@ AuditFlow turns raw Jenkins audit logs into actionable visibility. Instead of se
 - **Dashboard Customization** – Configure time zones, display metrics, and visible counters
 - **Non-blocking Performance** – Async batch writes with configurable batch size and flush intervals
 
-## Requirements
-
-- **Jenkins baseline:** 2.541 or later
-- **Java:** 11 or later
-
-## Plugin Dependencies
-
-AuditFlow depends on the following Jenkins plugins:
-
-| Plugin | Group ID | Artifact ID | Purpose |
-|--------|----------|-------------|---------|
-| **GSON API** | io.jenkins.plugins | gson-api | JSON serialization and deserialization |
-| **Credentials Binding** | org.jenkins-ci.plugins | credentials-binding | Credential management integration |
-| **Git Plugin** | org.jenkins-ci.plugins | git | Git operations auditing |
-| **Workflow: Job** | org.jenkins-ci.plugins.workflow | workflow-job | Jenkins Pipeline job auditing |
-| **Workflow: CPS** | org.jenkins-ci.plugins.workflow | workflow-cps | Pipeline execution auditing |
-| **Ionicons API** | io.jenkins.plugins | ionicons-api | Dashboard UI icons |
-
-These dependencies are automatically installed when you install AuditFlow through the Jenkins Plugin Manager. If installing manually, ensure all dependencies are available in your Jenkins instance.
-
-## Installation
-
-### From Jenkins Plugin Library (Recommended)
-
-1. Go to **Manage Jenkins** → **Plugins** → **Available plugins**
-2. Search for **AuditFlow**
-3. Click **Install** and select "Restart Jenkins when installation is complete"
-4. Jenkins will restart and AuditFlow will be activated
-
-**Dependencies are automatically resolved and installed** by Jenkins Plugin Manager during this process. No manual steps required.
-
-### Manual Installation
-
-If you prefer to upload the plugin directly:
-
-1. Ensure all [plugin dependencies](#plugin-dependencies) are already installed in your Jenkins instance
-2. Go to **Manage Jenkins** → **Plugins** → **Advanced** → **Upload Plugin**
-3. Upload the `.hpi` file
-4. Restart Jenkins
-
-**Note:** When installing manually, you must install dependencies first. The Plugin Manager cannot resolve dependencies during manual uploads.
-
 ## Configuration
 
 Access configuration at: **Manage Jenkins** → **System** → **AuditFlow Configuration**
@@ -362,8 +320,6 @@ src/main/java/io/jenkins/plugins/auditlogger/
 
 ## Compatibility
 
-- **Jenkins:** 2.361.4 or later, with `verify` passing against 2.440 and live regression validation completed on 2.541.3
-- **Java:** 11 or later
 - **Deployment:** Standalone, Docker, Kubernetes, Cloud-managed Jenkins
 
 ## License
