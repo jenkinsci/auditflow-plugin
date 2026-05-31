@@ -86,7 +86,15 @@ public class AnomalyDetector {
        
 
     public List<AnomalyAlert> getAlerts(int limit) {
-        return Collections.emptyList();
+        if (activeAlerts.isEmpty()) {
+            return Collections.emptyList();
+        }
+        int max = Math.min(limit, activeAlerts.size());
+        List<AnomalyAlert> result = new ArrayList<>(max);
+        for (int i = 0; i < max; i++) {
+            result.add(activeAlerts.get(i));
+        }
+        return result;
     }
 
     public void cleanupOldAlerts() {
