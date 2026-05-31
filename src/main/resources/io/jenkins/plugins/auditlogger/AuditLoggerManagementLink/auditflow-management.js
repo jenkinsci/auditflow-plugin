@@ -122,10 +122,17 @@
                 currentPage = data.page || currentPage;
                 displayTimeZone = data.displayTimeZone || 'UTC';
                 displayToday = data.displayToday || '';
+                
+                // hey! grabbing our new alerts from Phase 2
+                var serverAnomalies = data.anomalies || [];
 
                 renderStats(currentSummary);
                 computeRiskPanel(currentSummary);
-                computeAnomalies(allLogs);
+                computeAnomalies(allLogs); // (this was the old client-side stuff)
+                
+                // show our new backend anomalies!
+                renderServerAnomalies(serverAnomalies);
+                
                 scaleStatsGrid();
                 renderTable(allLogs);
                 updateResultCount();
@@ -342,8 +349,29 @@
         }
     }
 
+    // old client-side anomaly detection. probably unused now
     function computeAnomalies() {
         anomalyActions = [];
+    }
+
+    // displays our real backend anomalies
+    function renderServerAnomalies(anomalies) {
+        var box = document.getElementById('anomalyBox');
+        var status = document.getElementById('anomalyStatus');
+        
+        if (!box || !status) return;
+
+        if (anomalies.length > 0) {
+            // grab the latest one
+            var latest = anomalies[anomalies.length - 1];
+            box.classList.remove('jenkins-hidden');
+            box.style.border = '2px solid red'; // make it pop!
+            status.innerHTML = '<strong>' + latest.type + '</strong>: ' + latest.details;
+            status.style.color = '#cc0000';
+        } else {
+            // leave it hidden if there's nothing wrong
+            // box.classList.add('jenkins-hidden'); 
+        }
     }
 
     function parsePatterns(str) {

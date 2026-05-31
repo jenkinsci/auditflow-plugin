@@ -148,6 +148,13 @@ public class AuditLogStorage {
             bufferLock.writeLock().unlock();
         }
 
+        // run anomaly detection on every new event - this is what actually triggers our alerts!
+        try {
+            anomalyDetector.analyze(entry);
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Anomaly detection failed for entry", e);
+        }
+
         // Queue for async disk write (lock-free)
         writeQueue.offer(entry);
         int queueLen = writeQueueSize.incrementAndGet();

@@ -99,9 +99,24 @@ public class AuditLogRestApi implements RootAction {
                 jsonArray.add(json);
             }
 
+            // hey, grabbing our new anomalies from the detector!
+            AnomalyDetector detector = AuditLogStorage.getInstance().getAnomalyDetector();
+            List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(10);
+            JSONArray anomalyArray = new JSONArray();
+            for (AnomalyDetector.AnomalyAlert alert : alerts) {
+                JSONObject json = new JSONObject();
+                json.put("type", alert.type.name());
+                json.put("user", alert.user);
+                json.put("details", alert.details);
+                json.put("timestamp", alert.timestamp);
+                json.put("severity", alert.severity);
+                anomalyArray.add(json);
+            }
+
             resp.setContentType("application/json; charset=UTF-8");
             resp.getWriter().write("{\"status\": \"success\", \"count\": " + jsonArray.size()
-                    + ", \"logs\": " + jsonArray.toString() + "}");
+                    + ", \"logs\": " + jsonArray.toString() 
+                    + ", \"anomalies\": " + anomalyArray.toString() + "}");
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error in audit API", e);
             resp.setStatus(500);
