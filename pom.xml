@@ -40,7 +40,7 @@
         <gitHubRepo>jenkinsci/auditflow-plugin</gitHubRepo>
         <hpi.bundledArtifacts />
         <hpi.strictBundledArtifacts>true</hpi.strictBundledArtifacts>
-        <jenkins.baseline>2.541</jenkins.baseline>
+        <jenkins.baseline>2.528</jenkins.baseline>
         <jenkins.version>${jenkins.baseline}.3</jenkins.version>
         <ban-deprecated-stapler.skip>false</ban-deprecated-stapler.skip>
         <ban-commons-lang-2.skip>false</ban-commons-lang-2.skip>
