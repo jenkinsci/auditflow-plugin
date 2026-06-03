@@ -31,7 +31,7 @@ import java.util.logging.Logger;
 @Extension
 public class AuditLoggerManagementLink extends ManagementLink {
     private static final Logger LOGGER = Logger.getLogger(AuditLoggerManagementLink.class.getName());
-    private static final String DISPLAY_VERSION = "v1.0.1";
+    private static final String DISPLAY_VERSION = "v1.0.0";
     private static final int DEFAULT_PAGE_SIZE = 100;
     private static final int MAX_PAGE_SIZE = 5_000;
     private static final int MAX_EXPORT_ROWS = 100_000;
