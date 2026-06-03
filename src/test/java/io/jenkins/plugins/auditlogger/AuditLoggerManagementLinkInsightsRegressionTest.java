@@ -31,8 +31,11 @@ class AuditLoggerManagementLinkInsightsRegressionTest {
 
     @Test
     void bulkPluginUpdateShouldCountEachPluginSeparately() {
-        long now = System.currentTimeMillis();
-
+        long todayStart = java.time.LocalDate.now(ZoneOffset.UTC)
+                .atStartOfDay(ZoneOffset.UTC)
+                .toInstant()
+                .toEpochMilli();
+        long now = todayStart + 1;
         // simulate a single plugin update and a bulk update with multiple plugins
         AuditLogEntry singleUpdate = new AuditLogEntry("admin", "PLUGIN_UPDATED", "git", "", now);
         AuditLogEntry bulkUpdate = new AuditLogEntry("admin", "PLUGIN_UPDATED", "matrix-auth,role-strategy,credentials", "", now);
@@ -51,4 +54,4 @@ class AuditLoggerManagementLinkInsightsRegressionTest {
         // 1 + 3 + 2 = 6 total plugins across all entries
         assertEquals(6, pluginInsight.get("count"));
     }
-}
+}
