@@ -362,11 +362,8 @@ public class AuditRequestCapture {
             String ua = req.getHeader("User-Agent");
             if (ua != null) {
                 entry.setUserAgent(ua);
-                // Update the details string to include the actual UA
                 String details = entry.getDetails();
-                if (details != null && details.contains("UA: N/A")) {
-                    entry.setDetails(details.replace("UA: N/A", "UA: " + ua));
-}
+                entry.setDetails(AuditUserAgentFormatter.replaceMissingInDetails(details, ua));
             }
 
             // Re-detect auth method from actual request headers (more accurate than thread name)
@@ -491,12 +488,6 @@ public class AuditRequestCapture {
         public BufferedReader getReader() {
             return new BufferedReader(new InputStreamReader(getInputStream(), charset));
         }
-    }
-
-    private static String shorten(String s) {
-        if (s == null) return "N/A";
-        String clean = s.replaceAll("[\\r\\n\\t]", " ");
-        return clean.length() > 80 ? clean.substring(0, 80) + "..." : clean;
     }
 
     /**

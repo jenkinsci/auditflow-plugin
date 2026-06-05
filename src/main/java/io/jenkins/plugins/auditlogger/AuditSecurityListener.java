@@ -47,6 +47,7 @@ public class AuditSecurityListener extends jenkins.security.SecurityListener {
             String authMethod = detectAuthMethod();
             String userAgent = extractUserAgent();
             boolean isApiAuth = isApiAuthentication(authMethod);
+            boolean isSsoAuth = isSsoAuthentication(authMethod);
             boolean hasRequest = !"N/A".equals(userAgent);
 
             // Only dedup API/token auth to prevent log flooding from CI tools.
@@ -60,17 +61,15 @@ public class AuditSecurityListener extends jenkins.security.SecurityListener {
             }
 
             String action;
-            String detail;
             if (isApiAuth) {
                 action = "API_AUTH";
-                detail = String.format("API authentication via %s (UA: %s)", authMethod, shorten(userAgent));
-            } else if (isSsoAuthentication(authMethod)) {
+            } else if (isSsoAuth) {
                 action = "SSO_LOGIN";
-                detail = String.format("SSO login via %s (UA: %s)", authMethod, shorten(userAgent));
             } else {
                 action = "LOGIN";
-                detail = String.format("Authenticated (method: %s, UA: %s)", authMethod, shorten(userAgent));
             }
+
+            String detail = buildAuthenticationDetail(authMethod, userAgent, isApiAuth, isSsoAuth);
 
             AuditLogEntry entry = AuditLogEntry.withAuth(username, action, "Jenkins", detail, ip, authMethod);
             RequestHolder.cacheUserIp(username, ip);
@@ -583,10 +582,15 @@ public class AuditSecurityListener extends jenkins.security.SecurityListener {
                 && !"system".equalsIgnoreCase(username);
     }
 
-    private static String shorten(String s) {
-        if (s == null) return "N/A";
-        // Strip control chars to prevent log injection
-        String clean = s.replaceAll("[\\r\\n\\t]", " ");
-        return clean.length() > 80 ? clean.substring(0, 80) + "..." : clean;
+    static String buildAuthenticationDetail(String authMethod, String userAgent,
+                                            boolean isApiAuth, boolean isSsoAuth) {
+        String normalizedUserAgent = AuditUserAgentFormatter.normalizeForDetails(userAgent);
+        if (isApiAuth) {
+            return String.format("API authentication via %s (UA: %s)", authMethod, normalizedUserAgent);
+        }
+        if (isSsoAuth) {
+            return String.format("SSO login via %s (UA: %s)", authMethod, normalizedUserAgent);
+        }
+        return String.format("Authenticated (method: %s, UA: %s)", authMethod, normalizedUserAgent);
     }
 }
