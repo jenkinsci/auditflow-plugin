@@ -1,5 +1,16 @@
 package io.jenkins.plugins.auditlogger;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.security.Principal;
+import java.util.Locale;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import jakarta.servlet.Filter;
@@ -16,17 +27,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpSession;
 import jenkins.model.Jenkins;
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.lang.reflect.Method;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.security.Principal;
-import java.util.Locale;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 
@@ -365,8 +365,8 @@ public class AuditRequestCapture {
                 // Update the details string to include the actual UA
                 String details = entry.getDetails();
                 if (details != null && details.contains("UA: N/A")) {
-                    entry.setDetails(details.replace("UA: N/A", "UA: " + shorten(ua)));
-                }
+                    entry.setDetails(details.replace("UA: N/A", "UA: " + ua));
+}
             }
 
             // Re-detect auth method from actual request headers (more accurate than thread name)
