@@ -48,7 +48,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
     }
 
     public String getPageTitle() {
-        return "AuditFlow - " + getPluginVersion();
+        return "AuditFlow";
     }
 
     public String getPageHeading() {
