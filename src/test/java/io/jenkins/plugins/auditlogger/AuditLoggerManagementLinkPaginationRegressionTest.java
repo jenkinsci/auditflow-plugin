@@ -63,11 +63,11 @@ class AuditLoggerManagementLinkPaginationRegressionTest {
     }
 
     @Test
-    void pageHeadingUsesFixedDisplayVersion() {
+    void pageHeadingOmitsDisplayVersion() {
         AuditLoggerManagementLink link = new AuditLoggerManagementLink();
 
         assertEquals("v1.0.0", link.getPluginVersion());
-        assertEquals("AuditFlow - v1.0.0", link.getPageHeading());
+        assertEquals("AuditFlow", link.getPageHeading());
     }
 
     @Test

@@ -48,7 +48,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
     }
 
     public String getPageTitle() {
-        return "AuditFlow - " + getPluginVersion();
+        return "AuditFlow";
     }
 
     public String getPageHeading() {
@@ -635,7 +635,18 @@ public class AuditLoggerManagementLink extends ManagementLink {
             if ("CREDENTIAL_UPDATED".equals(action)) credUpdates++;
             if ("CREDENTIAL_CREATED".equals(action)) credCreates++;
             if ("CREDENTIAL_DELETED".equals(action)) credDeletes++;
-            if (action.startsWith("PLUGIN")) pluginChanges++;
+            if (action.startsWith("PLUGIN")) {
+                String target = entry.getTarget();
+                int count = 1;
+                if (target != null) {
+                    for (int i = 0; i < target.length(); i++) {
+                        if (target.charAt(i) == ',') {
+                            count++;
+                        }
+                    }
+                }
+                pluginChanges += count;
+            }
             if ("JOB_DELETED".equals(action)) jobDeletes++;
             if ("GLOBAL_CONFIG_UPDATED".equals(action) || "SYS_CONFIG_UPDATED".equals(action)) globalCfg++;
             if ("JOB_CONFIG_UPDATED".equals(action)) jobCfg++;

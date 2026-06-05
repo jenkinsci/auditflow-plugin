@@ -164,10 +164,6 @@ Issues reported will be reviewed and fixed in upcoming releases. Community contr
 
 **License:** MIT
 
-**Baseline Jenkins Version:** 2.541+
-
-**Java Requirement:** 11+
-
 ### Event Categories
 
 | Category | Events |
