@@ -61,15 +61,16 @@ public class AuditSecurityListener extends jenkins.security.SecurityListener {
 
             String action;
             String detail;
+            String normalizedUserAgent = userAgent == null ? "N/A" : userAgent.replaceAll("[\\r\\n\\t]", " ");
             if (isApiAuth) {
                 action = "API_AUTH";
-                detail = String.format("API authentication via %s (UA: %s)", authMethod, shorten(userAgent));
+                detail = String.format("API authentication via %s (UA: %s)", authMethod, normalizedUserAgent);
             } else if (isSsoAuthentication(authMethod)) {
                 action = "SSO_LOGIN";
-                detail = String.format("SSO login via %s (UA: %s)", authMethod, shorten(userAgent));
+                detail = String.format("SSO login via %s (UA: %s)", authMethod, normalizedUserAgent);
             } else {
                 action = "LOGIN";
-                detail = String.format("Authenticated (method: %s, UA: %s)", authMethod, shorten(userAgent));
+                detail = String.format("Authenticated (method: %s, UA: %s)", authMethod, normalizedUserAgent);
             }
 
             AuditLogEntry entry = AuditLogEntry.withAuth(username, action, "Jenkins", detail, ip, authMethod);
