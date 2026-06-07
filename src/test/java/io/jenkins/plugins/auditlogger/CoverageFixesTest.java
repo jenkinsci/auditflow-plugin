@@ -1,5 +1,6 @@
 package io.jenkins.plugins.auditlogger;
 
+import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +14,7 @@ class CoverageFixesTest {
      * Create a test configuration with anomaly detection enabled.
      */
     private AuditLoggerConfiguration createTestConfigWithAnomalyDetectionEnabled() {
-        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
         config.setAnomalyFailedLogins(true);
         config.setAnomalyFailedLoginsThreshold(5);
         config.setAnomalyFailedLoginsWindowMinutes(15);
@@ -22,7 +23,7 @@ class CoverageFixesTest {
 
     @Test
     @WithJenkins
-    void testAnomalyDetectorBruteForce() {
+    void testAnomalyDetectorBruteForce(JenkinsRule j) {
         AnomalyDetector detector = new AnomalyDetector();
         AuditLoggerConfiguration config = createTestConfigWithAnomalyDetectionEnabled();
         
@@ -41,16 +42,16 @@ class CoverageFixesTest {
 
     @Test
     @WithJenkins
-    void testAnomalyDetectorOldLoginsIgnored() {
+    void testAnomalyDetectorOldLoginsIgnored(JenkinsRule j) {
         AnomalyDetector detector = new AnomalyDetector();
         AuditLoggerConfiguration config = createTestConfigWithAnomalyDetectionEnabled();
         
         long now = 2_000_000L;
-        long twoMinutesAgo = now - 120_000;
+        long sixteenMinutesAgo = now - (16 * 60_000L);
         
         // Trigger 4 failures that are old (outside 15-minute window)
         for (int i = 0; i < 4; i++) {
-            detector.analyze(new AuditLogEntry("old_user", "FAILED_LOGIN", "target", "details", twoMinutesAgo + i), config);
+            detector.analyze(new AuditLogEntry("old_user", "FAILED_LOGIN", "target", "details", sixteenMinutesAgo + i), config);
         }
         
         // Trigger 1 failure now
@@ -62,7 +63,7 @@ class CoverageFixesTest {
 
     @Test
     @WithJenkins
-    void testAnomalyDetectorReturnsLatestAlertsWhenLimited() {
+    void testAnomalyDetectorReturnsLatestAlertsWhenLimited(JenkinsRule j) {
         AnomalyDetector detector = new AnomalyDetector();
         AuditLoggerConfiguration config = createTestConfigWithAnomalyDetectionEnabled();
 
@@ -83,7 +84,7 @@ class CoverageFixesTest {
 
     @Test
     @WithJenkins
-    void testAuditLogStorageExceptionCaught() throws Exception {
+    void testAuditLogStorageExceptionCaught(JenkinsRule j) throws Exception {
         // Inject an anonymous anomaly detector that throws an exception
         AnomalyDetector mockDetector = new AnomalyDetector() {
             @Override
