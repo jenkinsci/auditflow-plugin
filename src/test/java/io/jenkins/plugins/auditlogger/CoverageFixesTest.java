@@ -21,6 +21,7 @@ class CoverageFixesTest {
     }
 
     @Test
+    @WithJenkins
     void testAnomalyDetectorBruteForce() {
         AnomalyDetector detector = new AnomalyDetector();
         AuditLoggerConfiguration config = createTestConfigWithAnomalyDetectionEnabled();
@@ -39,6 +40,7 @@ class CoverageFixesTest {
     }
 
     @Test
+    @WithJenkins
     void testAnomalyDetectorOldLoginsIgnored() {
         AnomalyDetector detector = new AnomalyDetector();
         AuditLoggerConfiguration config = createTestConfigWithAnomalyDetectionEnabled();
@@ -59,6 +61,7 @@ class CoverageFixesTest {
     }
 
     @Test
+    @WithJenkins
     void testAnomalyDetectorReturnsLatestAlertsWhenLimited() {
         AnomalyDetector detector = new AnomalyDetector();
         AuditLoggerConfiguration config = createTestConfigWithAnomalyDetectionEnabled();
@@ -79,6 +82,7 @@ class CoverageFixesTest {
 
 
     @Test
+    @WithJenkins
     void testAuditLogStorageExceptionCaught() throws Exception {
         // Inject an anonymous anomaly detector that throws an exception
         AnomalyDetector mockDetector = new AnomalyDetector() {
