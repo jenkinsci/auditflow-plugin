@@ -426,6 +426,7 @@ public class AuditLogStorage {
             currentLogDate = null;
             currentLogSizeBytes = 0L;
         }
+        instance = null; // Reset singleton for test restarts
         LOGGER.info("Audit log storage shut down. No pending writes.");
     }
 
