@@ -25,7 +25,7 @@ class AuditScriptListenerTest {
     @BeforeEach
     void setUp(JenkinsRule j) throws Exception {
         this.j = j;
-        AuditLoggerConfiguration configuration = AuditLoggerConfiguration.get();
+        AuditLoggerConfiguration configuration = j.getInstance().getExtensionList(AuditLoggerConfiguration.class).get(0);
         JSONObject json = new JSONObject();
         json.put("enableSystemConfigEvents", true);
         configuration.configure((org.kohsuke.stapler.StaplerRequest2) null, json);

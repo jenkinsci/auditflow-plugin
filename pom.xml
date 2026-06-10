@@ -84,6 +84,14 @@
             <groupId>io.jenkins.plugins</groupId>
             <artifactId>ionicons-api</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.jenkins-ci.plugins</groupId>
+            <artifactId>mailer</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.jenkins.plugins</groupId>
+            <artifactId>jakarta-mail-api</artifactId>
+        </dependency>
     </dependencies>
 
     <repositories>

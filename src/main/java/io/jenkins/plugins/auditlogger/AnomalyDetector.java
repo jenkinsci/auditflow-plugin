@@ -9,6 +9,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import hudson.tasks.Mailer;
+import jakarta.mail.Message;
+import jakarta.mail.Transport;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
 
 /**
  * Lightweight anomaly detection for dashboard alerts.
@@ -24,6 +32,8 @@ public class AnomalyDetector {
     private static final int MAX_ALERTS = 1_000;
     private static final long ALERT_RETENTION_MS = 24L * 60L * 60L * 1000L;
     private static final long CLEANUP_INTERVAL_MS = 60L * 1000L;
+
+    private static final Logger LOGGER = Logger.getLogger(AnomalyDetector.class.getName());
 
     public enum AnomalyType {
         BRUTE_FORCE_LOGIN, UNUSUAL_IP, MASS_CHANGES,
@@ -110,6 +120,10 @@ public class AnomalyDetector {
                 activeAlerts.add(alert);
                 trimAlerts();
                 window.timestamps.clear();
+
+                if (config != null && config.isEnableEmailAlerts()) {
+                    sendEmailNotification(alert, config.getAlertEmailAddresses());
+                }
             }
         }
 
@@ -188,5 +202,49 @@ public class AnomalyDetector {
         while (activeAlerts.size() > MAX_ALERTS) {
             activeAlerts.remove(0);
         }
+    }
+
+    private void sendEmailNotification(AnomalyAlert alert, String emailAddresses) {
+        if (emailAddresses == null || emailAddresses.trim().isEmpty()) {
+            return;
+        }
+        try {
+            Mailer.DescriptorImpl mailerDescriptor = Mailer.descriptor();
+            if (mailerDescriptor == null) {
+                LOGGER.warning("Mailer plugin is not available. Cannot send anomaly email.");
+                return;
+            }
+            
+            // Note: Mailer.descriptor().createSession() uses the Jenkins global SMTP config
+            MimeMessage msg = new MimeMessage(mailerDescriptor.createSession());
+            msg.setSubject("Jenkins AuditFlow Anomaly Alert: " + alert.type);
+            msg.setText("Anomaly Detected in Jenkins AuditFlow:\n\n" +
+                    "Type: " + alert.type + "\n" +
+                    "Severity: " + alert.severity + "\n" +
+                    "User: " + alert.user + "\n" +
+                    "Details: " + alert.details + "\n");
+            
+            String adminAddress = mailerDescriptor.getAdminAddress();
+            if (adminAddress != null && !adminAddress.trim().isEmpty()) {
+                msg.setFrom(new InternetAddress(adminAddress));
+            } else {
+                msg.setFrom(new InternetAddress("auditflow@localhost"));
+            }
+
+            for (String to : emailAddresses.split(",")) {
+                if (!to.trim().isEmpty()) {
+                    msg.addRecipient(Message.RecipientType.TO, new InternetAddress(to.trim()));
+                }
+            }
+            sendEmail(msg);
+            LOGGER.info("Successfully sent anomaly email alert to " + emailAddresses);
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Failed to send anomaly email alert", e);
+        }
+    }
+
+    /** Protected for testing */
+    protected void sendEmail(MimeMessage msg) throws Exception {
+        Transport.send(msg);
     }
 }
