@@ -426,8 +426,12 @@ public class AuditLogStorage {
             currentLogDate = null;
             currentLogSizeBytes = 0L;
         }
-        instance = null; // Reset singleton for test restarts
         LOGGER.info("Audit log storage shut down. No pending writes.");
+    }
+
+    /** Package-private static reset for testing to avoid SpotBugs ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD */
+    static void resetForTest() {
+        instance = null;
     }
 
     // --- File helpers ---

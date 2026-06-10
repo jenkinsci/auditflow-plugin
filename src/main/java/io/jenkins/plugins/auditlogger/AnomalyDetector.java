@@ -236,10 +236,15 @@ public class AnomalyDetector {
                     msg.addRecipient(Message.RecipientType.TO, new InternetAddress(to.trim()));
                 }
             }
-            Transport.send(msg);
+            sendEmail(msg);
             LOGGER.info("Successfully sent anomaly email alert to " + emailAddresses);
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Failed to send anomaly email alert", e);
         }
+    }
+
+    /** Protected for testing */
+    protected void sendEmail(MimeMessage msg) throws Exception {
+        Transport.send(msg);
     }
 }

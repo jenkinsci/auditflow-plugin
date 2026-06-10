@@ -134,4 +134,17 @@ class CoverageFixesTest {
             detectorField.set(storage, original);
         }
     }
+
+    @Test
+    void testAuditLoggerConfigurationCoverage(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        
+        // Coverage for setEnableAlertEngine
+        config.setEnableAlertEngine(true);
+        assertTrue(config.isEnableAlertEngine());
+        
+        // Coverage for getAlertEmailAddresses null branch
+        config.setAlertEmailAddresses(null);
+        assertEquals("", config.getAlertEmailAddresses());
+    }
 }
