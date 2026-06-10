@@ -170,6 +170,12 @@
                 <f:entry title="Window (minutes)">
                     <f:number name="anomalyFailedLoginsWindowMinutes" value="${descriptor.getAnomalyFailedLoginsWindowMinutes()}"/>
                 </f:entry>
+                <f:entry title="Enable email notifications for anomalies">
+                    <f:checkbox name="enableEmailAlerts" checked="${descriptor.isEnableEmailAlerts()}"/>
+                </f:entry>
+                <f:entry title="Alert email addresses" description="Comma-separated list of emails to receive high-risk anomaly alerts">
+                    <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
+                </f:entry>
             </f:block>
 
             <f:block>

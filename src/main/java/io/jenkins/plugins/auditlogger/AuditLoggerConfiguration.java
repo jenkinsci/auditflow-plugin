@@ -118,6 +118,8 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
 
     // Alerts
     private boolean enableAlertEngine = false;
+    private boolean enableEmailAlerts = false;
+    private String alertEmailAddresses = "";
     private boolean enableComplianceReports = false;
 
     // UI
@@ -395,6 +397,24 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     }
 
     @DataBoundSetter
+    public void setEnableAlertEngine(boolean enableAlertEngine) {
+        this.enableAlertEngine = enableAlertEngine;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableEmailAlerts(boolean enableEmailAlerts) {
+        this.enableEmailAlerts = enableEmailAlerts;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setAlertEmailAddresses(String alertEmailAddresses) {
+        this.alertEmailAddresses = alertEmailAddresses;
+        save();
+    }
+
+    @DataBoundSetter
     public void setLogRetentionDays(int logRetentionDays) {
         this.logRetentionDays = clamp(logRetentionDays, 0, 3650);
         save();
@@ -506,6 +526,8 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isMaskCreditCards() { return maskCreditCards; }
 
     public boolean isEnableAlertEngine() { return enableAlertEngine; }
+    public boolean isEnableEmailAlerts() { return enableEmailAlerts; }
+    public String getAlertEmailAddresses() { return alertEmailAddresses != null ? alertEmailAddresses : ""; }
     public boolean isEnableComplianceReports() { return enableComplianceReports; }
 
     public boolean isEnableRiskLevels() { return enableRiskLevels; }
