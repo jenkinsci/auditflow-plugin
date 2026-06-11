@@ -147,4 +147,27 @@ class CoverageFixesTest {
         config.setAlertEmailAddresses(null);
         assertEquals("", config.getAlertEmailAddresses());
     }
+
+    @Test
+    @WithJenkins
+    void testConfigureWebhookFieldsCoverage(JenkinsRule j) throws Exception {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+
+        // Exercise the configure() JSON path for webhook fields (lines 226-227)
+        net.sf.json.JSONObject json = new net.sf.json.JSONObject();
+        json.put("enableWebhookAlerts", true);
+        json.put("webhookUrl", "https://hooks.example.com/test");
+        config.configure((org.kohsuke.stapler.StaplerRequest2) null, json);
+
+        assertTrue(config.isEnableWebhookAlerts(), "enableWebhookAlerts should be true after configure");
+        assertEquals("https://hooks.example.com/test", config.getWebhookUrl(), "webhookUrl should be set after configure");
+    }
+
+    @Test
+    @WithJenkins
+    void testGetWebhookUrlNullBranch(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setWebhookUrl(null);
+        assertEquals("", config.getWebhookUrl(), "getWebhookUrl should return empty string when null");
+    }
 }
