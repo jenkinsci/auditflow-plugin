@@ -1,19 +1,8 @@
 package io.jenkins.plugins.auditlogger;
 
-import hudson.Extension;
-import hudson.BulkChange;
-import hudson.model.Descriptor;
-import hudson.util.ListBoxModel;
-import jenkins.model.GlobalConfiguration;
-import jenkins.model.Jenkins;
-import net.sf.json.JSONObject;
-import org.kohsuke.stapler.DataBoundSetter;
-import org.kohsuke.stapler.StaplerRequest2;
-import org.kohsuke.stapler.verb.GET;
-
 import java.io.IOException;
-import java.time.Instant;
 import java.time.DateTimeException;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -24,6 +13,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.logging.Logger;
+
+import org.kohsuke.stapler.DataBoundSetter;
+import org.kohsuke.stapler.StaplerRequest2;
+import org.kohsuke.stapler.verb.GET;
+
+import hudson.BulkChange;
+import hudson.Extension;
+import hudson.model.Descriptor;
+import hudson.util.ListBoxModel;
+import jenkins.model.GlobalConfiguration;
+import jenkins.model.Jenkins;
+import net.sf.json.JSONObject;
 
 /**
  * Global configuration for Jenkins Audit Logger plugin.
@@ -121,6 +122,9 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private boolean enableEmailAlerts = false;
     private String alertEmailAddresses = "";
     private boolean enableComplianceReports = false;
+    //add
+    private boolean enableWebhookAlerts = false;
+    private String webhookUrl = "";
 
     // UI
     private boolean enableRiskLevels = true;
@@ -218,6 +222,9 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         if (json.has("maskTokens")) setMaskTokens(json.optBoolean("maskTokens", maskTokens));
         if (json.has("maskEmailAddresses")) setMaskEmailAddresses(json.optBoolean("maskEmailAddresses", maskEmailAddresses));
         if (json.has("maskCreditCards")) setMaskCreditCards(json.optBoolean("maskCreditCards", maskCreditCards));
+
+        if (json.has("enableWebhookAlerts")) setEnableWebhookAlerts(json.optBoolean("enableWebhookAlerts", enableWebhookAlerts));
+        if (json.has("webhookUrl")) setWebhookUrl(json.optString("webhookUrl", webhookUrl));
     }
 
     private static int clamp(int value, int min, int max) {
@@ -407,10 +414,22 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         this.enableEmailAlerts = enableEmailAlerts;
         save();
     }
+    //add
+    @DataBoundSetter
+    public void setEnableWebhookAlerts(boolean enableWebhookAlerts) {
+        this.enableWebhookAlerts = enableWebhookAlerts;
+        save();
+    }
 
     @DataBoundSetter
     public void setAlertEmailAddresses(String alertEmailAddresses) {
         this.alertEmailAddresses = alertEmailAddresses;
+        save();
+    }
+    //add
+    @DataBoundSetter
+    public void setWebhookUrl(String webhookUrl) {
+        this.webhookUrl = webhookUrl;
         save();
     }
 
@@ -529,6 +548,8 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isEnableEmailAlerts() { return enableEmailAlerts; }
     public String getAlertEmailAddresses() { return alertEmailAddresses != null ? alertEmailAddresses : ""; }
     public boolean isEnableComplianceReports() { return enableComplianceReports; }
+    public boolean isEnableWebhookAlerts() { return enableWebhookAlerts; }
+    public String getWebhookUrl() { return webhookUrl != null ? webhookUrl : ""; }
 
     public boolean isEnableRiskLevels() { return enableRiskLevels; }
     public boolean isEnableEventCategories() { return enableEventCategories; }
