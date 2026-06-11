@@ -245,15 +245,12 @@ class AnomalyDetectorTest {
 
     @Test
     void testWebhookNotificationCoversJenkinsUrlBranches(JenkinsRule j) {
-        // This test uses a detector that does NOT override sendWebhookNotification,
-        // but DOES override sendWebhook so no real HTTP call is made.
-        // This lets the real sendWebhookNotification code run (lines 259-287),
-        // covering the Jenkins.getInstanceOrNull() != null and getRootUrl() != null branches.
+        
         final List<String[]> captured = new ArrayList<>();
         AnomalyDetector realPathDetector = new AnomalyDetector() {
             @Override
             protected void sendEmail(jakarta.mail.internet.MimeMessage msg) throws Exception {
-                // no-op
+               
             }
 
             @Override
@@ -278,7 +275,7 @@ class AnomalyDetectorTest {
         assertTrue(json.contains("\"jenkinsUrl\""), "JSON should contain jenkinsUrl field");
     }
 
-    // ── Coverage: real sendWebhook method body (lines 291-310) ───────
+   
 
     @Test
     void testRealSendWebhookMethodIsCovered(JenkinsRule j) throws Exception {
@@ -288,7 +285,7 @@ class AnomalyDetectorTest {
         AnomalyDetector realDetector = new AnomalyDetector();
         // Use a non-routable address so it fails fast but still exercises the code
         realDetector.sendWebhook("http://192.0.2.1:1/test", "{\"test\":true}");
-        // No assertion needed — we just need the lines executed without throwing
+        
         assertTrue(true, "sendWebhook should not throw (async)");
     }
 }
