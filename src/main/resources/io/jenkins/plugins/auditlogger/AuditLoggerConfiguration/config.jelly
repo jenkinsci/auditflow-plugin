@@ -176,6 +176,12 @@
                 <f:entry title="Alert email addresses" description="Comma-separated list of emails to receive high-risk anomaly alerts">
                     <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
                 </f:entry>
+                <f:entry title="Enable webhook notifications for anomalies">
+                    <f:checkbox name="enableWebhookAlerts" checked="${descriptor.isEnableWebhookAlerts()}"/>
+                </f:entry>
+                <f:entry title="Webhook URL" description="POST endpoint receiving JSON anomaly alerts (e.g. Slack incoming webhook, PagerDuty, custom SIEM)">
+                    <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
+                </f:entry>
             </f:block>
 
             <f:block>

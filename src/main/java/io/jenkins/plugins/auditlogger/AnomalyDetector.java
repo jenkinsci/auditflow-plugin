@@ -1,5 +1,10 @@
 package io.jenkins.plugins.auditlogger;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -124,6 +129,9 @@ public class AnomalyDetector {
                 if (config != null && config.isEnableEmailAlerts()) {
                     sendEmailNotification(alert, config.getAlertEmailAddresses());
                 }
+                if (config != null && config.isEnableWebhookAlerts()) {
+                    sendWebhookNotification(alert, config.getWebhookUrl());
+                }
             }
         }
 
@@ -246,5 +254,63 @@ public class AnomalyDetector {
     /** Protected for testing */
     protected void sendEmail(MimeMessage msg) throws Exception {
         Transport.send(msg);
+    }
+
+    private void sendWebhookNotification(AnomalyAlert alert, String webhookUrl) {
+        if (webhookUrl == null || webhookUrl.trim().isEmpty()) {
+            return;
+        }
+        try {
+            String jenkinsUrl = "";
+            jenkins.model.Jenkins instance = jenkins.model.Jenkins.getInstanceOrNull();
+            if (instance != null) {
+                String rootUrl = instance.getRootUrl();
+                if (rootUrl != null) {
+                    jenkinsUrl = rootUrl;
+                }
+            }
+
+            String json = "{" +
+                    "\"type\":\"" + escapeJson(alert.type.name()) + "\"," +
+                    "\"severity\":\"" + escapeJson(alert.severity) + "\"," +
+                    "\"user\":\"" + escapeJson(alert.user) + "\"," +
+                    "\"details\":\"" + escapeJson(alert.details) + "\"," +
+                    "\"timestamp\":" + alert.timestamp + "," +
+                    "\"jenkinsUrl\":\"" + escapeJson(jenkinsUrl) + "\"" +
+                    "}";
+
+            sendWebhook(webhookUrl.trim(), json);
+            LOGGER.info("Successfully sent anomaly webhook alert to " + webhookUrl);
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Failed to send anomaly webhook alert", e);
+        }
+    }
+
+    /** Protected for testing */
+    protected void sendWebhook(String url, String json) throws Exception {
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(30))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+        client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenAccept(resp -> {
+                    if (resp.statusCode() >= 400) {
+                        LOGGER.warning("Webhook returned HTTP " + resp.statusCode() + " for " + url);
+                    }
+                })
+                .exceptionally(ex -> {
+                    LOGGER.log(Level.WARNING, "Webhook async request failed for " + url, ex);
+                    return null;
+                });
+    }
+
+    private static String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
     }
 }
