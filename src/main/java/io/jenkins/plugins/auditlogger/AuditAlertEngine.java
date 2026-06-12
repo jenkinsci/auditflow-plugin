@@ -126,14 +126,53 @@ public class AuditAlertEngine {
             channel = channel.trim();
             try {
                 switch (channel) {
-                    case "email":   LOGGER.fine("Email alert to: " + rule.recipients); break;
-                    case "slack":   LOGGER.fine("Slack alert: " + alert.ruleId); break;
-                    case "webhook": LOGGER.fine("Webhook alert: " + rule.recipients); break;
-                    default:        LOGGER.fine("Unknown channel: " + channel);
+                    case "email":   
+                        LOGGER.fine("Email alert to: " + rule.recipients); 
+                        break;
+                    case "slack":   
+                        LOGGER.fine("Slack alert: " + alert.ruleId); 
+                        // slack needs this json format, hope it works
+                        String slackPayload = "{\"text\": \"" + alert.message.replace("\"", "\\\"") + "\"}";
+                        sendWebhook(rule.recipients, slackPayload);
+                        break;
+                    case "teams":
+                        LOGGER.fine("Teams alert: " + alert.ruleId);
+                        // teams uses the exact same json text as slack, yay less work
+                        String teamsPayload = "{\"text\": \"" + alert.message.replace("\"", "\\\"") + "\"}";
+                        sendWebhook(rule.recipients, teamsPayload);
+                        break;
+                    case "webhook": 
+                        LOGGER.fine("Webhook alert: " + rule.recipients); 
+                        break;
+                    default:        
+                        LOGGER.fine("Unknown channel: " + channel);
                 }
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, "Failed to send alert via " + channel, e);
             }
+        }
+    }
+
+    // sending it to the url here
+    protected void sendWebhook(String urlString, String jsonPayload) throws Exception {
+        if (urlString == null || urlString.isEmpty()) return;
+        
+        java.net.URL url = new java.net.URL(urlString);
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+        // setting the method to post
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setDoOutput(true); // gotta set this to true to send body
+
+        try (java.io.OutputStream os = conn.getOutputStream()) {
+            byte[] input = jsonPayload.getBytes("utf-8");
+            os.write(input, 0, input.length);
+        }
+
+        int responseCode = conn.getResponseCode();
+        // check if it failed lol
+        if (responseCode >= 400) {
+            LOGGER.warning("Webhook failed with response code: " + responseCode);
         }
     }
 

@@ -179,8 +179,20 @@
                 <f:entry title="Enable webhook notifications for anomalies">
                     <f:checkbox name="enableWebhookAlerts" checked="${descriptor.isEnableWebhookAlerts()}"/>
                 </f:entry>
-                <f:entry title="Webhook URL" description="POST endpoint receiving JSON anomaly alerts (e.g. Slack incoming webhook, PagerDuty, custom SIEM)">
+                <f:entry title="Generic Webhook URL" description="POST endpoint receiving raw JSON anomaly alerts">
                     <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
+                </f:entry>
+                <f:entry title="Enable Slack notifications for anomalies">
+                    <f:checkbox name="enableSlackAlerts" checked="${descriptor.isEnableSlackAlerts()}"/>
+                </f:entry>
+                <f:entry title="Slack Webhook URL" description="Slack Incoming Webhook URL">
+                    <f:textbox name="slackWebhookUrl" value="${descriptor.getSlackWebhookUrl()}"/>
+                </f:entry>
+                <f:entry title="Enable Microsoft Teams notifications for anomalies">
+                    <f:checkbox name="enableTeamsAlerts" checked="${descriptor.isEnableTeamsAlerts()}"/>
+                </f:entry>
+                <f:entry title="Microsoft Teams Webhook URL" description="Teams Incoming Webhook URL">
+                    <f:textbox name="teamsWebhookUrl" value="${descriptor.getTeamsWebhookUrl()}"/>
                 </f:entry>
             </f:block>
 
