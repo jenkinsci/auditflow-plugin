@@ -122,9 +122,14 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private boolean enableEmailAlerts = false;
     private String alertEmailAddresses = "";
     private boolean enableComplianceReports = false;
-    //add
     private boolean enableWebhookAlerts = false;
     private String webhookUrl = "";
+    
+    private boolean enableSlackAlerts = false;
+    private String slackWebhookUrl = "";
+
+    private boolean enableTeamsAlerts = false;
+    private String teamsWebhookUrl = "";
 
     // UI
     private boolean enableRiskLevels = true;
@@ -225,6 +230,10 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
 
         if (json.has("enableWebhookAlerts")) setEnableWebhookAlerts(json.optBoolean("enableWebhookAlerts", enableWebhookAlerts));
         if (json.has("webhookUrl")) setWebhookUrl(json.optString("webhookUrl", webhookUrl));
+        if (json.has("enableSlackAlerts")) setEnableSlackAlerts(json.optBoolean("enableSlackAlerts", enableSlackAlerts));
+        if (json.has("slackWebhookUrl")) setSlackWebhookUrl(json.optString("slackWebhookUrl", slackWebhookUrl));
+        if (json.has("enableTeamsAlerts")) setEnableTeamsAlerts(json.optBoolean("enableTeamsAlerts", enableTeamsAlerts));
+        if (json.has("teamsWebhookUrl")) setTeamsWebhookUrl(json.optString("teamsWebhookUrl", teamsWebhookUrl));
     }
 
     private static int clamp(int value, int min, int max) {
@@ -434,6 +443,30 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     }
 
     @DataBoundSetter
+    public void setEnableSlackAlerts(boolean enableSlackAlerts) {
+        this.enableSlackAlerts = enableSlackAlerts;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setSlackWebhookUrl(String slackWebhookUrl) {
+        this.slackWebhookUrl = slackWebhookUrl;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableTeamsAlerts(boolean enableTeamsAlerts) {
+        this.enableTeamsAlerts = enableTeamsAlerts;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setTeamsWebhookUrl(String teamsWebhookUrl) {
+        this.teamsWebhookUrl = teamsWebhookUrl;
+        save();
+    }
+
+    @DataBoundSetter
     public void setLogRetentionDays(int logRetentionDays) {
         this.logRetentionDays = clamp(logRetentionDays, 0, 3650);
         save();
@@ -550,6 +583,10 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isEnableComplianceReports() { return enableComplianceReports; }
     public boolean isEnableWebhookAlerts() { return enableWebhookAlerts; }
     public String getWebhookUrl() { return webhookUrl != null ? webhookUrl : ""; }
+    public boolean isEnableSlackAlerts() { return enableSlackAlerts; }
+    public String getSlackWebhookUrl() { return slackWebhookUrl != null ? slackWebhookUrl : ""; }
+    public boolean isEnableTeamsAlerts() { return enableTeamsAlerts; }
+    public String getTeamsWebhookUrl() { return teamsWebhookUrl != null ? teamsWebhookUrl : ""; }
 
     public boolean isEnableRiskLevels() { return enableRiskLevels; }
     public boolean isEnableEventCategories() { return enableEventCategories; }
