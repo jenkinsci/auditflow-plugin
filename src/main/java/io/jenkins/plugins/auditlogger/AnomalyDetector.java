@@ -54,6 +54,9 @@ public class AnomalyDetector {
         public final String details;
         public final long timestamp;
         public final String severity;
+        public final String alertId;
+
+        private volatile boolean dismissed;
 
         public AnomalyAlert(AnomalyType type, String user, String details, String severity) {
             this(type, user, details, severity, System.currentTimeMillis());
@@ -65,6 +68,20 @@ public class AnomalyDetector {
             this.details = details;
             this.timestamp = timestamp;
             this.severity = severity;
+            this.alertId = generateAlertId();
+            this.dismissed = false;
+        }
+
+        public boolean isDismissed() {
+            return dismissed;
+        }
+
+        public void dismiss() {
+            this.dismissed = true;
+        }
+
+        private String generateAlertId() {
+            return "auditflow-" + type.name() + "-" + user + "-" + timestamp;
         }
     }
 
@@ -118,37 +135,29 @@ public class AnomalyDetector {
             window.timestamps.addLast(eventTime);
             recentFailures = window.timestamps.size();
             if (recentFailures >= threshold) {
-                AnomalyAlert alert = new AnomalyAlert(
-                        AnomalyType.BRUTE_FORCE_LOGIN,
-                        user,
-                    "Multiple failed logins detected for \"" + user + "\" ("
-                        + recentFailures + " attempts in "
-                        + windowMinutes + " minute" + (windowMinutes == 1 ? "" : "s") + ").",
-                        "CRITICAL");
-                activeAlerts.add(alert);
-                trimAlerts();
-                window.timestamps.clear();
+                    if (!hasActiveOpenAlert(user, AnomalyType.BRUTE_FORCE_LOGIN)) {
+                        AnomalyAlert alert = new AnomalyAlert(
+                                AnomalyType.BRUTE_FORCE_LOGIN,
+                                user,
+                            "Multiple failed logins detected for \"" + user + "\" ("
+                                + recentFailures + " attempts in "
+                                + windowMinutes + " minute" + (windowMinutes == 1 ? "" : "s") + ").",
+                                "CRITICAL");
+                        activeAlerts.add(alert);
+                        trimAlerts();
 
-                if (config != null && config.isEnableEmailAlerts()) {
-                    sendEmailNotification(alert, config.getAlertEmailAddresses());
-                }
-                if (config != null && config.isEnableWebhookAlerts()) {
-                    sendWebhookNotification(alert, config.getWebhookUrl());
-                }
-                if (config != null && config.isEnableSlackAlerts()) {
-                    sendSlackNotification(alert, config.getSlackWebhookUrl());
-                }
-                if (config != null && config.isEnableTeamsAlerts()) {
-                    sendTeamsNotification(alert, config.getTeamsWebhookUrl());
-                }
-            }
-        }
-
-        maybeCleanup(eventTime, windowMinutes);
-    }
-
-    public List<AnomalyAlert> getAlerts(int limit) {
-        if (limit <= 0 || activeAlerts.isEmpty()) {
+                        if (config != null && config.isEnableEmailAlerts()) {
+                            sendEmailNotification(alert, config.getAlertEmailAddresses());
+                        }
+                        if (config != null && config.isEnableWebhookAlerts()) {
+                            sendWebhookNotification(alert, config.getWebhookUrl());
+                        }
+                        if (config != null && config.isEnableSlackAlerts()) {
+                            sendSlackNotification(alert, config.getSlackWebhookUrl());
+                        }
+                        if (config != null && config.isEnableTeamsAlerts()) {
+                            sendTeamsNotification(alert, config.getTeamsWebhookUrl());
+                        }
             return Collections.emptyList();
         }
 
@@ -159,6 +168,31 @@ public class AnomalyDetector {
             result.add(activeAlerts.get(i));
         }
         return result;
+    }
+
+    private boolean hasActiveOpenAlert(String user, AnomalyType type) {
+        for (AnomalyAlert alert : activeAlerts) {
+            if (!alert.isDismissed() && alert.type == type && alert.user.equals(user)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean dismissAlert(String alertId) {
+        if (alertId == null || alertId.trim().isEmpty()) {
+            return false;
+        }
+
+        for (AnomalyAlert alert : activeAlerts) {
+            if (alert.alertId.equals(alertId)) {
+                if (!alert.isDismissed()) {
+                    alert.dismiss();
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     public void cleanupOldAlerts() {
@@ -437,21 +471,11 @@ public class AnomalyDetector {
         json.append("\"timestamp\":\"").append(isoTimestamp).append("\",");
         json.append("\"timestampMs\":").append(alert.timestamp).append(",");
         json.append("\"jenkinsUrl\":\"").append(escapeJson(jenkinsUrl)).append("\",");
-        json.append("\"alertId\":\"").append(escapeJson(generateAlertId(alert))).append("\",");
+        json.append("\"alertId\":\"").append(escapeJson(alert.alertId)).append("\",");
         json.append("\"source\":\"Jenkins Audit Logger\",");
         json.append("\"version\":\"1.0\"");
         json.append("}");
         return json.toString();
-    }
-    
-    /**
-     * Generates a unique alert ID based on alert properties.
-     * @param alert the anomaly alert
-     * @return unique alert ID
-     */
-    private String generateAlertId(AnomalyAlert alert) {
-        return "auditflow-" + alert.type.name() + "-" + 
-               alert.user + "-" + alert.timestamp;
     }
     
     /**
