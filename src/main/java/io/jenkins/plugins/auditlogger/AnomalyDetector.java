@@ -248,13 +248,22 @@ public class AnomalyDetector {
             
             // Note: Mailer.descriptor().createSession() uses the Jenkins global SMTP config
             MimeMessage msg = new MimeMessage(mailerDescriptor.createSession());
-            msg.setSubject("Jenkins AuditFlow Anomaly Alert: " + alert.type);
+            msg.setSubject("Suspicious login attempts detected in Jenkins");
             
             // Format timestamp for readability
             String formattedTimestamp = formatTimestamp(alert.timestamp);
             
+            String jenkinsUrl = "";
+            jenkins.model.Jenkins instance = jenkins.model.Jenkins.getInstanceOrNull();
+            if (instance != null) {
+                String rootUrl = instance.getRootUrl();
+                if (rootUrl != null) {
+                    jenkinsUrl = rootUrl;
+                }
+            }
+            
             // Enhanced email body with professional formatting
-            String emailBody = formatAnomalyEmailBody(alert, formattedTimestamp);
+            String emailBody = formatAnomalyEmailBody(alert, formattedTimestamp, jenkinsUrl);
             msg.setText(emailBody);
             
             String adminAddress = mailerDescriptor.getAdminAddress();
@@ -387,24 +396,28 @@ public class AnomalyDetector {
      * Formats an anomaly alert into a professional email body.
      * @param alert the anomaly alert
      * @param formattedTimestamp the formatted timestamp string
+     * @param jenkinsUrl the Jenkins instance URL
      * @return formatted email body
      */
-    private String formatAnomalyEmailBody(AnomalyAlert alert, String formattedTimestamp) {
-    StringBuilder body = new StringBuilder();
+    private String formatAnomalyEmailBody(AnomalyAlert alert, String formattedTimestamp, String jenkinsUrl) {
+        StringBuilder body = new StringBuilder();
 
-    body.append("Anomaly Detected in Jenkins AuditFlow\n\n");
-    body.append("Type: ").append(getReadableAnomalyType(alert.type)).append("\n");
-    body.append("Severity: ").append(alert.severity).append("\n");
-    body.append("User: ").append(alert.user).append("\n");
-    body.append("Timestamp: ").append(formattedTimestamp).append("\n\n");
+        body.append("Anomaly Detected in Jenkins AuditFlow\n\n");
+        if (jenkinsUrl != null && !jenkinsUrl.trim().isEmpty()) {
+            body.append("Jenkins URL: ").append(jenkinsUrl).append("\n\n");
+        }
+        body.append("Type: ").append(getReadableAnomalyType(alert.type)).append("\n");
+        body.append("Severity: ").append(alert.severity).append("\n");
+        body.append("User: ").append(alert.user).append("\n");
+        body.append("Timestamp: ").append(formattedTimestamp).append("\n\n");
+        
+        body.append("Details:\n");
+        body.append(alert.details).append("\n\n");
 
-    body.append("Details:\n");
-    body.append(alert.details).append("\n\n");
+        body.append("Review the AuditFlow logs in Jenkins for additional details.\n");
 
-    body.append("Review the AuditFlow logs in Jenkins for additional details.\n");
-
-    return body.toString();
-}
+        return body.toString();
+    }
     
     /**
      * Builds a comprehensive webhook JSON payload.
