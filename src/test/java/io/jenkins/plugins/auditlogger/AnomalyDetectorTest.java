@@ -313,10 +313,9 @@ class AnomalyDetectorTest {
         assertTrue(content.contains("Anomaly Detected in Jenkins AuditFlow"), 
                 "Email should have title");
         assertTrue(content.contains("Timestamp:"), "Email should include timestamp");
-        assertTrue(content.contains("=================================================="), 
-                "Email should have formatted separators");
-        assertTrue(content.contains("Investigation:"), "Email should have investigation section");
-        assertTrue(content.contains("Action Required:"), "Email should have action section");
+        assertTrue(content.contains("Details:"), "Email should have details section");
+        assertTrue(content.contains("Review the AuditFlow logs"), 
+                "Email should have investigation prompt");
     }
 
     @Test
