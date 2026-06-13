@@ -176,10 +176,11 @@
                 <f:entry title="Alert email addresses" description="Comma-separated list of emails to receive high-risk anomaly alerts">
                     <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
                 </f:entry>
-                <f:entry title="Enable webhook notifications for anomalies">
+                <f:entry title="Enable webhook notifications for anomalies"
+                         description="When enabled, AuditFlow will POST a JSON payload to the URL below whenever an anomaly is detected — use this to integrate with Slack, PagerDuty, Datadog, or any service that accepts incoming webhooks.">
                     <f:checkbox name="enableWebhookAlerts" checked="${descriptor.isEnableWebhookAlerts()}"/>
                 </f:entry>
-                <f:entry title="Generic Webhook URL" description="POST endpoint receiving raw JSON anomaly alerts">
+                <f:entry title="Generic Webhook URL" description="Paste the full POST endpoint URL from your webhook provider (e.g. https://hooks.slack.com/services/...). AuditFlow sends raw JSON with type, severity, user, details, and timestamp fields.">
                     <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
                 </f:entry>
                 <f:entry title="Enable Slack notifications for anomalies">
