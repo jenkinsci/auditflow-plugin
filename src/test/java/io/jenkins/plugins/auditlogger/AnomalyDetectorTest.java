@@ -337,7 +337,7 @@ class AnomalyDetectorTest {
         jakarta.mail.internet.MimeMessage email = sentEmails.get(0);
         String content = (String) email.getContent();
         
-        assertTrue(content.contains("Brute Force Login Attempt"), 
+        assertTrue(content.contains("Suspicious Login Attempts (Brute Force)"), 
                 "Email should contain readable anomaly type");
     }
 
