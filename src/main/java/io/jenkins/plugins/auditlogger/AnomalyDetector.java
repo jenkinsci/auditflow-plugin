@@ -498,7 +498,7 @@ public class AnomalyDetector {
     private String getReadableAnomalyType(AnomalyType type) {
         switch (type) {
             case BRUTE_FORCE_LOGIN:
-                return "Brute Force Login Attempt";
+                return "Suspicious Login Attempts (Brute Force)";
             case UNUSUAL_IP:
                 return "Unusual IP Address";
             case MASS_CHANGES:
