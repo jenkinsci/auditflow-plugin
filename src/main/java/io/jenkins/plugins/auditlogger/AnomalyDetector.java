@@ -5,6 +5,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -222,6 +225,20 @@ public class AnomalyDetector {
         if (emailAddresses == null || emailAddresses.trim().isEmpty()) {
             return;
         }
+        
+        // Validate alert and email addresses
+        List<String> alertErrors = AnomalyAlertValidator.validateAlert(alert);
+        List<String> emailErrors = AnomalyAlertValidator.validateEmailAddresses(emailAddresses);
+        
+        List<String> criticalErrors = new ArrayList<>();
+        criticalErrors.addAll(AnomalyAlertValidator.getCriticalErrors(alertErrors));
+        criticalErrors.addAll(AnomalyAlertValidator.getCriticalErrors(emailErrors));
+        
+        if (!criticalErrors.isEmpty()) {
+            LOGGER.warning("Email validation failed: " + String.join("; ", criticalErrors));
+            return;
+        }
+        
         try {
             Mailer.DescriptorImpl mailerDescriptor = Mailer.descriptor();
             if (mailerDescriptor == null) {
@@ -232,11 +249,13 @@ public class AnomalyDetector {
             // Note: Mailer.descriptor().createSession() uses the Jenkins global SMTP config
             MimeMessage msg = new MimeMessage(mailerDescriptor.createSession());
             msg.setSubject("Jenkins AuditFlow Anomaly Alert: " + alert.type);
-            msg.setText("Anomaly Detected in Jenkins AuditFlow:\n\n" +
-                    "Type: " + alert.type + "\n" +
-                    "Severity: " + alert.severity + "\n" +
-                    "User: " + alert.user + "\n" +
-                    "Details: " + alert.details + "\n");
+            
+            // Format timestamp for readability
+            String formattedTimestamp = formatTimestamp(alert.timestamp);
+            
+            // Enhanced email body with professional formatting
+            String emailBody = formatAnomalyEmailBody(alert, formattedTimestamp);
+            msg.setText(emailBody);
             
             String adminAddress = mailerDescriptor.getAdminAddress();
             if (adminAddress != null && !adminAddress.trim().isEmpty()) {
@@ -266,6 +285,20 @@ public class AnomalyDetector {
         if (webhookUrl == null || webhookUrl.trim().isEmpty()) {
             return;
         }
+        
+        // Validate alert and webhook URL
+        List<String> alertErrors = AnomalyAlertValidator.validateAlert(alert);
+        List<String> urlErrors = AnomalyAlertValidator.validateWebhookUrl(webhookUrl);
+        
+        List<String> criticalErrors = new ArrayList<>();
+        criticalErrors.addAll(AnomalyAlertValidator.getCriticalErrors(alertErrors));
+        criticalErrors.addAll(AnomalyAlertValidator.getCriticalErrors(urlErrors));
+        
+        if (!criticalErrors.isEmpty()) {
+            LOGGER.warning("Webhook validation failed: " + String.join("; ", criticalErrors));
+            return;
+        }
+        
         try {
             String jenkinsUrl = "";
             jenkins.model.Jenkins instance = jenkins.model.Jenkins.getInstanceOrNull();
@@ -276,14 +309,20 @@ public class AnomalyDetector {
                 }
             }
 
-            String json = "{" +
-                    "\"type\":\"" + escapeJson(alert.type.name()) + "\"," +
-                    "\"severity\":\"" + escapeJson(alert.severity) + "\"," +
-                    "\"user\":\"" + escapeJson(alert.user) + "\"," +
-                    "\"details\":\"" + escapeJson(alert.details) + "\"," +
-                    "\"timestamp\":" + alert.timestamp + "," +
-                    "\"jenkinsUrl\":\"" + escapeJson(jenkinsUrl) + "\"" +
-                    "}";
+            // Format timestamp for webhook
+            String isoTimestamp = Instant.ofEpochMilli(alert.timestamp)
+                    .toString();
+            
+            // Build comprehensive JSON payload
+            String json = buildWebhookPayload(alert, jenkinsUrl, isoTimestamp);
+            
+            // Validate payload before sending
+            List<String> payloadErrors = AnomalyAlertValidator.validateWebhookPayload(json);
+            if (!AnomalyAlertValidator.getCriticalErrors(payloadErrors).isEmpty()) {
+                LOGGER.warning("Webhook payload validation failed: " + 
+                        String.join("; ", AnomalyAlertValidator.getCriticalErrors(payloadErrors)));
+                return;
+            }
 
             sendWebhook(webhookUrl.trim(), json);
             LOGGER.info("Successfully sent anomaly webhook alert to " + webhookUrl);
@@ -342,5 +381,108 @@ public class AnomalyDetector {
     private static String escapeJson(String s) {
         if (s == null) return "";
         return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+    }
+    
+    /**
+     * Formats an anomaly alert into a professional email body.
+     * @param alert the anomaly alert
+     * @param formattedTimestamp the formatted timestamp string
+     * @return formatted email body
+     */
+    private String formatAnomalyEmailBody(AnomalyAlert alert, String formattedTimestamp) {
+        StringBuilder body = new StringBuilder();
+        body.append("Anomaly Detected in Jenkins AuditFlow\n\n");
+        body.append("==================================================\n\n");
+        body.append("Type: ").append(getReadableAnomalyType(alert.type)).append("\n");
+        body.append("Severity: ").append(alert.severity).append("\n");
+        body.append("User: ").append(alert.user).append("\n");
+        body.append("Timestamp: ").append(formattedTimestamp).append("\n\n");
+        body.append("==================================================\n\n");
+        body.append("Details:\n").append(alert.details).append("\n\n");
+        body.append("==================================================\n\n");
+        body.append("Investigation:\n");
+        body.append("Please review the audit logs in Jenkins to investigate this anomaly.\n");
+        body.append("Visit: Manage Jenkins -> Audit Logger\n\n");
+        body.append("Action Required:\n");
+        body.append("- Review recent activity by user: ").append(alert.user).append("\n");
+        body.append("- Check for any unauthorized changes\n");
+        body.append("- Contact the user if suspicious activity is confirmed\n\n");
+        body.append("==================================================\n");
+        body.append("This is an automated alert from Jenkins Audit Logger.\n");
+        return body.toString();
+    }
+    
+    /**
+     * Builds a comprehensive webhook JSON payload.
+     * @param alert the anomaly alert
+     * @param jenkinsUrl the Jenkins instance URL
+     * @param isoTimestamp the ISO 8601 formatted timestamp
+     * @return JSON payload string
+     */
+    private String buildWebhookPayload(AnomalyAlert alert, String jenkinsUrl, String isoTimestamp) {
+        // Build JSON with proper escaping
+        StringBuilder json = new StringBuilder();
+        json.append("{");
+        json.append("\"type\":\"").append(escapeJson(alert.type.name())).append("\",");
+        json.append("\"severity\":\"").append(escapeJson(alert.severity)).append("\",");
+        json.append("\"user\":\"").append(escapeJson(alert.user)).append("\",");
+        json.append("\"details\":\"").append(escapeJson(alert.details)).append("\",");
+        json.append("\"timestamp\":\"").append(isoTimestamp).append("\",");
+        json.append("\"timestampMs\":").append(alert.timestamp).append(",");
+        json.append("\"jenkinsUrl\":\"").append(escapeJson(jenkinsUrl)).append("\",");
+        json.append("\"alertId\":\"").append(escapeJson(generateAlertId(alert))).append("\",");
+        json.append("\"source\":\"Jenkins Audit Logger\",");
+        json.append("\"version\":\"1.0\"");
+        json.append("}");
+        return json.toString();
+    }
+    
+    /**
+     * Generates a unique alert ID based on alert properties.
+     * @param alert the anomaly alert
+     * @return unique alert ID
+     */
+    private String generateAlertId(AnomalyAlert alert) {
+        return "auditflow-" + alert.type.name() + "-" + 
+               alert.user + "-" + alert.timestamp;
+    }
+    
+    /**
+     * Returns a human-readable description of an anomaly type.
+     * @param type the anomaly type
+     * @return readable description
+     */
+    private String getReadableAnomalyType(AnomalyType type) {
+        switch (type) {
+            case BRUTE_FORCE_LOGIN:
+                return "Brute Force Login Attempt";
+            case UNUSUAL_IP:
+                return "Unusual IP Address";
+            case MASS_CHANGES:
+                return "Mass Configuration Changes";
+            case AFTER_HOURS_ADMIN:
+                return "After-Hours Admin Activity";
+            case CREDENTIAL_EXPOSURE:
+                return "Credential Exposure Risk";
+            default:
+                return type.name();
+        }
+    }
+    
+    /**
+     * Formats a timestamp in milliseconds to ISO 8601 format with timezone.
+     * @param timestamp the timestamp in milliseconds since epoch
+     * @return formatted timestamp string
+     */
+    private String formatTimestamp(long timestamp) {
+        try {
+            Instant instant = Instant.ofEpochMilli(timestamp);
+            ZoneId zoneId = ZoneId.of("UTC");
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss Z")
+                    .withZone(zoneId);
+            return formatter.format(instant) + " UTC";
+        } catch (Exception e) {
+            return new java.util.Date(timestamp).toString();
+        }
     }
 }

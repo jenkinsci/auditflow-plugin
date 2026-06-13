@@ -288,4 +288,167 @@ class AnomalyDetectorTest {
         
         assertTrue(true, "sendWebhook should not throw (async)");
     }
+
+    // ── Enhanced email and webhook format tests ──────────────────────
+
+    @Test
+    void testEnhancedEmailFormatContainsTimestamp(JenkinsRule j) throws Exception {
+        hudson.tasks.Mailer.descriptor().setAdminAddress("admin@jenkins.local");
+        
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+        config.setEnableEmailAlerts(true);
+        config.setAlertEmailAddresses("alert@example.com");
+
+        long now = System.currentTimeMillis();
+        detector.analyze(new AuditLogEntry("emailuser", "FAILED_LOGIN", "jenkins", "", now), config);
+        detector.analyze(new AuditLogEntry("emailuser", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+
+        assertEquals(1, sentEmails.size(), "Email should be sent");
+        jakarta.mail.internet.MimeMessage email = sentEmails.get(0);
+        String content = (String) email.getContent();
+        
+        assertTrue(content.contains("Anomaly Detected in Jenkins AuditFlow"), 
+                "Email should have title");
+        assertTrue(content.contains("Timestamp:"), "Email should include timestamp");
+        assertTrue(content.contains("=================================================="), 
+                "Email should have formatted separators");
+        assertTrue(content.contains("Investigation:"), "Email should have investigation section");
+        assertTrue(content.contains("Action Required:"), "Email should have action section");
+    }
+
+    @Test
+    void testEnhancedEmailFormatIncludesReadableAnomalyType(JenkinsRule j) throws Exception {
+        hudson.tasks.Mailer.descriptor().setAdminAddress("admin@jenkins.local");
+        
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+        config.setEnableEmailAlerts(true);
+        config.setAlertEmailAddresses("alert@example.com");
+
+        long now = System.currentTimeMillis();
+        detector.analyze(new AuditLogEntry("emailuser2", "FAILED_LOGIN", "jenkins", "", now), config);
+        detector.analyze(new AuditLogEntry("emailuser2", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+
+        assertEquals(1, sentEmails.size(), "Email should be sent");
+        jakarta.mail.internet.MimeMessage email = sentEmails.get(0);
+        String content = (String) email.getContent();
+        
+        assertTrue(content.contains("Brute Force Login Attempt"), 
+                "Email should contain readable anomaly type");
+    }
+
+    @Test
+    void testEnhancedWebhookPayloadContainsAllRequiredFields(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+        config.setEnableWebhookAlerts(true);
+        config.setWebhookUrl("https://hooks.example.com/enhanced");
+
+        long now = System.currentTimeMillis();
+        detector.analyze(new AuditLogEntry("webhookuser", "FAILED_LOGIN", "jenkins", "", now), config);
+        detector.analyze(new AuditLogEntry("webhookuser", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+
+        assertEquals(1, sentWebhooks.size(), "Webhook should be sent");
+        String json = sentWebhooks.get(0)[1];
+        
+        assertTrue(json.contains("\"type\":\"BRUTE_FORCE_LOGIN\""), "Webhook should contain type");
+        assertTrue(json.contains("\"severity\":\"CRITICAL\""), "Webhook should contain severity");
+        assertTrue(json.contains("\"user\":\"webhookuser\""), "Webhook should contain user");
+        assertTrue(json.contains("\"details\":\""), "Webhook should contain details");
+        assertTrue(json.contains("\"timestamp\":\""), "Webhook should contain ISO timestamp");
+        assertTrue(json.contains("\"timestampMs\":"), "Webhook should contain millisecond timestamp");
+        assertTrue(json.contains("\"alertId\":\""), "Webhook should contain alertId");
+        assertTrue(json.contains("\"source\":\"Jenkins Audit Logger\""), 
+                "Webhook should contain source");
+        assertTrue(json.contains("\"version\":\"1.0\""), "Webhook should contain version");
+    }
+
+    @Test
+    void testWebhookPayloadIsoTimestampIsValid(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+        config.setEnableWebhookAlerts(true);
+        config.setWebhookUrl("https://hooks.example.com/timestamp");
+
+        long now = System.currentTimeMillis();
+        detector.analyze(new AuditLogEntry("timestampuser", "FAILED_LOGIN", "jenkins", "", now), config);
+        detector.analyze(new AuditLogEntry("timestampuser", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+
+        assertEquals(1, sentWebhooks.size(), "Webhook should be sent");
+        String json = sentWebhooks.get(0)[1];
+        
+        // Extract ISO timestamp from JSON
+        int startIdx = json.indexOf("\"timestamp\":\"") + 13;
+        int endIdx = json.indexOf("\"", startIdx);
+        String isoTimestamp = json.substring(startIdx, endIdx);
+        
+        // ISO 8601 format: YYYY-MM-DDTHH:MM:SS.SSSZ
+        assertTrue(isoTimestamp.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z"),
+                "Webhook timestamp should be ISO 8601 format");
+    }
+
+    @Test
+    void testWebhookPayloadAlertIdIsUnique(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+        config.setEnableWebhookAlerts(true);
+        config.setWebhookUrl("https://hooks.example.com/alertid");
+
+        long now = System.currentTimeMillis();
+        detector.analyze(new AuditLogEntry("alertiduser", "FAILED_LOGIN", "jenkins", "", now), config);
+        detector.analyze(new AuditLogEntry("alertiduser", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+
+        assertEquals(1, sentWebhooks.size(), "Webhook should be sent");
+        String json = sentWebhooks.get(0)[1];
+        
+        assertTrue(json.contains("\"alertId\":\"auditflow-BRUTE_FORCE_LOGIN-alertiduser-"), 
+                "Alert ID should follow pattern: auditflow-{type}-{user}-{timestamp}");
+    }
+
+    @Test
+    void testValidationFailsOnInvalidEmail(JenkinsRule j) throws Exception {
+        hudson.tasks.Mailer.descriptor().setAdminAddress("admin@jenkins.local");
+        
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+        config.setEnableEmailAlerts(true);
+        config.setAlertEmailAddresses("invalid-email-format");
+
+        long now = System.currentTimeMillis();
+        detector.analyze(new AuditLogEntry("validationuser", "FAILED_LOGIN", "jenkins", "", now), config);
+        detector.analyze(new AuditLogEntry("validationuser", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+
+        // Email should NOT be sent because validation failed
+        assertEquals(0, sentEmails.size(), "Email should not be sent for invalid email address");
+    }
+
+    @Test
+    void testValidationFailsOnInvalidWebhookUrl(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+        config.setEnableWebhookAlerts(true);
+        config.setWebhookUrl("not-a-valid-url");
+
+        long now = System.currentTimeMillis();
+        detector.analyze(new AuditLogEntry("validationuser2", "FAILED_LOGIN", "jenkins", "", now), config);
+        detector.analyze(new AuditLogEntry("validationuser2", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+
+        // Webhook should NOT be sent because validation failed
+        assertEquals(0, sentWebhooks.size(), "Webhook should not be sent for invalid URL");
+    }
 }
