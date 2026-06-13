@@ -390,27 +390,21 @@ public class AnomalyDetector {
      * @return formatted email body
      */
     private String formatAnomalyEmailBody(AnomalyAlert alert, String formattedTimestamp) {
-        StringBuilder body = new StringBuilder();
-        body.append("Anomaly Detected in Jenkins AuditFlow\n\n");
-        body.append("==================================================\n\n");
-        body.append("Type: ").append(getReadableAnomalyType(alert.type)).append("\n");
-        body.append("Severity: ").append(alert.severity).append("\n");
-        body.append("User: ").append(alert.user).append("\n");
-        body.append("Timestamp: ").append(formattedTimestamp).append("\n\n");
-        body.append("==================================================\n\n");
-        body.append("Details:\n").append(alert.details).append("\n\n");
-        body.append("==================================================\n\n");
-        body.append("Investigation:\n");
-        body.append("Please review the audit logs in Jenkins to investigate this anomaly.\n");
-        body.append("Visit: Manage Jenkins -> Audit Logger\n\n");
-        body.append("Action Required:\n");
-        body.append("- Review recent activity by user: ").append(alert.user).append("\n");
-        body.append("- Check for any unauthorized changes\n");
-        body.append("- Contact the user if suspicious activity is confirmed\n\n");
-        body.append("==================================================\n");
-        body.append("This is an automated alert from Jenkins Audit Logger.\n");
-        return body.toString();
-    }
+    StringBuilder body = new StringBuilder();
+
+    body.append("Anomaly Detected in Jenkins AuditFlow\n\n");
+    body.append("Type: ").append(getReadableAnomalyType(alert.type)).append("\n");
+    body.append("Severity: ").append(alert.severity).append("\n");
+    body.append("User: ").append(alert.user).append("\n");
+    body.append("Timestamp: ").append(formattedTimestamp).append("\n\n");
+
+    body.append("Details:\n");
+    body.append(alert.details).append("\n\n");
+
+    body.append("Review the AuditFlow logs in Jenkins for additional details.\n");
+
+    return body.toString();
+}
     
     /**
      * Builds a comprehensive webhook JSON payload.
