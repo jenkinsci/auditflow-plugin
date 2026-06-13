@@ -135,32 +135,30 @@ public class AnomalyDetector {
             window.timestamps.addLast(eventTime);
             recentFailures = window.timestamps.size();
             if (recentFailures >= threshold) {
-                AnomalyAlert alert = new AnomalyAlert(
-                        AnomalyType.BRUTE_FORCE_LOGIN,
-                        user,
-                        "Multiple failed logins detected for \"" + user + "\" ("
-                            + recentFailures + " attempts in "
-                            + windowMinutes + " minute" + (windowMinutes == 1 ? "" : "s") + ").",
-                        "CRITICAL");
-                activeAlerts.add(alert);
-                trimAlerts();
+                if (!hasActiveOpenAlert(user, AnomalyType.BRUTE_FORCE_LOGIN)) {
+                    AnomalyAlert alert = new AnomalyAlert(
+                            AnomalyType.BRUTE_FORCE_LOGIN,
+                            user,
+                            "Multiple failed logins detected for \"" + user + "\" ("
+                                + recentFailures + " attempts in "
+                                + windowMinutes + " minute" + (windowMinutes == 1 ? "" : "s") + ").",
+                            "CRITICAL");
+                    activeAlerts.add(alert);
+                    trimAlerts();
 
-                if (config != null && config.isEnableEmailAlerts()) {
-                    sendEmailNotification(alert, config.getAlertEmailAddresses());
+                    if (config != null && config.isEnableEmailAlerts()) {
+                        sendEmailNotification(alert, config.getAlertEmailAddresses());
+                    }
+                    if (config != null && config.isEnableWebhookAlerts()) {
+                        sendWebhookNotification(alert, config.getWebhookUrl());
+                    }
+                    if (config != null && config.isEnableSlackAlerts()) {
+                        sendSlackNotification(alert, config.getSlackWebhookUrl());
+                    }
+                    if (config != null && config.isEnableTeamsAlerts()) {
+                        sendTeamsNotification(alert, config.getTeamsWebhookUrl());
+                    }
                 }
-                if (config != null && config.isEnableWebhookAlerts()) {
-                    sendWebhookNotification(alert, config.getWebhookUrl());
-                }
-                if (config != null && config.isEnableSlackAlerts()) {
-                    sendSlackNotification(alert, config.getSlackWebhookUrl());
-                }
-                if (config != null && config.isEnableTeamsAlerts()) {
-                    sendTeamsNotification(alert, config.getTeamsWebhookUrl());
-                }
-
-                // Start a fresh counting window after each alert so a later burst
-                // can raise a new alert without spamming every subsequent failure.
-                window.timestamps.clear();
             }
         }
 
@@ -182,6 +180,15 @@ public class AnomalyDetector {
         }
         Collections.reverse(recentOpenAlerts);
         return recentOpenAlerts;
+    }
+
+    private boolean hasActiveOpenAlert(String user, AnomalyType type) {
+        for (AnomalyAlert alert : activeAlerts) {
+            if (!alert.isDismissed() && alert.type == type && alert.user.equals(user)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean dismissAlert(String alertId) {

@@ -86,7 +86,7 @@ class CoverageFixesTest {
 
     @Test
     @WithJenkins
-    void testAnomalyDetectorCanTriggerAgainForSameUser(JenkinsRule j) {
+    void testAnomalyDetectorSuppressesNewAlertsUntilDismissed(JenkinsRule j) {
         AnomalyDetector detector = new AnomalyDetector();
         AuditLoggerConfiguration config = createTestConfigWithAnomalyDetectionEnabled();
 
@@ -98,8 +98,29 @@ class CoverageFixesTest {
         }
 
         var alerts = detector.getAlerts(10);
-        assertEquals(2, alerts.size(), "Crossing the threshold again should generate another alert for the same user");
-        assertEquals("repeat-user", alerts.get(1).user, "The repeated alert should still identify the same user");
+        assertEquals(1, alerts.size(), "A second threshold breach should stay suppressed while the first alert is still open");
+        assertEquals("repeat-user", alerts.get(0).user, "The open alert should still identify the same user");
+    }
+
+    @Test
+    @WithJenkins
+    void testAnomalyDetectorCanTriggerAgainAfterDismiss(JenkinsRule j) {
+        AnomalyDetector detector = new AnomalyDetector();
+        AuditLoggerConfiguration config = createTestConfigWithAnomalyDetectionEnabled();
+
+        for (int i = 0; i < 5; i++) {
+            detector.analyze(new AuditLogEntry("repeat-user", "FAILED_LOGIN", "target", "details", 1_000L + i), config);
+        }
+
+        var firstAlerts = detector.getAlerts(10);
+        assertEquals(1, firstAlerts.size(), "Initial threshold breach should create one open alert");
+        assertTrue(detector.dismissAlert(firstAlerts.get(0).alertId), "Dismiss should succeed for the open alert");
+
+        detector.analyze(new AuditLogEntry("repeat-user", "FAILED_LOGIN", "target", "details", 2_000L), config);
+
+        var secondAlerts = detector.getAlerts(10);
+        assertEquals(1, secondAlerts.size(), "A later failed login after dismiss should be able to open a new alert");
+        assertEquals("repeat-user", secondAlerts.get(0).user, "The new open alert should still identify the same user");
     }
 
 
