@@ -16,7 +16,8 @@
     var defaultDateFrom = '';
     var defaultDateTo = '';
     var onboardingStorageKey = 'auditflow-onboarded';
-    var anomalyDismissedKey = 'auditflow-anomaly-dismissed-until';
+    var anomalyDismissedKey = 'auditflow-anomaly-dismissed-id';
+    var anomalyDismissedTimestampKey = 'auditflow-anomaly-dismissed-until';
     var anomalyDismissed = false;
     var latestAnomaly = null;
 
@@ -56,7 +57,13 @@
             return;
         }
 
-        var dismissedUntil = parseAnomalyTimestamp(sessionStorage.getItem(anomalyDismissedKey));
+        var dismissedId = sessionStorage.getItem(anomalyDismissedKey);
+        if (dismissedId && latestAnomaly.alertId && dismissedId === latestAnomaly.alertId) {
+            anomalyDismissed = true;
+            return;
+        }
+
+        var dismissedUntil = parseAnomalyTimestamp(sessionStorage.getItem(anomalyDismissedTimestampKey));
         anomalyDismissed = dismissedUntil > 0
             && parseAnomalyTimestamp(latestAnomaly.timestamp) <= dismissedUntil;
     }
@@ -468,8 +475,12 @@
 
     function dismissAnomaly() {
         anomalyDismissed = true;
-        if (latestAnomaly) {
-            sessionStorage.setItem(anomalyDismissedKey, String(parseAnomalyTimestamp(latestAnomaly.timestamp)));
+        if (latestAnomaly && latestAnomaly.alertId) {
+            sessionStorage.setItem(anomalyDismissedKey, latestAnomaly.alertId);
+            fetch('dismissAlert?alertId=' + encodeURIComponent(latestAnomaly.alertId))
+                .catch(function() {
+                    // Best-effort dismissal; UI state is preserved locally.
+                });
         }
         var box = document.getElementById('anomalyBox');
         var status = document.getElementById('anomalyStatus');

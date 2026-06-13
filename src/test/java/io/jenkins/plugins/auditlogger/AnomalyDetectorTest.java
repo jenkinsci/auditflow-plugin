@@ -450,4 +450,28 @@ class AnomalyDetectorTest {
         // Webhook should NOT be sent because validation failed
         assertEquals(0, sentWebhooks.size(), "Webhook should not be sent for invalid URL");
     }
+
+    @Test
+    void testDismissedAlertIsExcludedFromOpenAlerts(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+
+        long now = System.currentTimeMillis();
+        detector.analyze(new AuditLogEntry("dismissuser", "FAILED_LOGIN", "jenkins", "", now), config);
+        detector.analyze(new AuditLogEntry("dismissuser", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+
+        List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(10);
+        assertEquals(1, alerts.size(), "Alert should be present before dismissal");
+
+        String alertId = alerts.get(0).alertId;
+        assertTrue(detector.dismissAlert(alertId), "Dismiss should return true for existing alert");
+        assertEquals(0, detector.getAlerts(10).size(), "Dismissed alert should be excluded from open alerts");
+    }
+
+    @Test
+    void testDismissAlertReturnsFalseForUnknownId(JenkinsRule j) {
+        assertEquals(false, detector.dismissAlert("nonexistent-id"), "Dismiss should return false for unknown alert id");
+    }
 }

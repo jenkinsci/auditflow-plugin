@@ -135,39 +135,51 @@ public class AnomalyDetector {
             window.timestamps.addLast(eventTime);
             recentFailures = window.timestamps.size();
             if (recentFailures >= threshold) {
-                    if (!hasActiveOpenAlert(user, AnomalyType.BRUTE_FORCE_LOGIN)) {
-                        AnomalyAlert alert = new AnomalyAlert(
-                                AnomalyType.BRUTE_FORCE_LOGIN,
-                                user,
+                if (!hasActiveOpenAlert(user, AnomalyType.BRUTE_FORCE_LOGIN)) {
+                    AnomalyAlert alert = new AnomalyAlert(
+                            AnomalyType.BRUTE_FORCE_LOGIN,
+                            user,
                             "Multiple failed logins detected for \"" + user + "\" ("
                                 + recentFailures + " attempts in "
                                 + windowMinutes + " minute" + (windowMinutes == 1 ? "" : "s") + ").",
-                                "CRITICAL");
-                        activeAlerts.add(alert);
-                        trimAlerts();
+                            "CRITICAL");
+                    activeAlerts.add(alert);
+                    trimAlerts();
 
-                        if (config != null && config.isEnableEmailAlerts()) {
-                            sendEmailNotification(alert, config.getAlertEmailAddresses());
-                        }
-                        if (config != null && config.isEnableWebhookAlerts()) {
-                            sendWebhookNotification(alert, config.getWebhookUrl());
-                        }
-                        if (config != null && config.isEnableSlackAlerts()) {
-                            sendSlackNotification(alert, config.getSlackWebhookUrl());
-                        }
-                        if (config != null && config.isEnableTeamsAlerts()) {
-                            sendTeamsNotification(alert, config.getTeamsWebhookUrl());
-                        }
+                    if (config != null && config.isEnableEmailAlerts()) {
+                        sendEmailNotification(alert, config.getAlertEmailAddresses());
+                    }
+                    if (config != null && config.isEnableWebhookAlerts()) {
+                        sendWebhookNotification(alert, config.getWebhookUrl());
+                    }
+                    if (config != null && config.isEnableSlackAlerts()) {
+                        sendSlackNotification(alert, config.getSlackWebhookUrl());
+                    }
+                    if (config != null && config.isEnableTeamsAlerts()) {
+                        sendTeamsNotification(alert, config.getTeamsWebhookUrl());
+                    }
+                }
+            }
+        }
+
+        maybeCleanup(eventTime, windowMinutes);
+    }
+
+    public List<AnomalyAlert> getAlerts(int limit) {
+        if (limit <= 0 || activeAlerts.isEmpty()) {
             return Collections.emptyList();
         }
 
         int size = activeAlerts.size();
-        int start = Math.max(0, size - limit);
-        List<AnomalyAlert> result = new ArrayList<>(size - start);
-        for (int i = start; i < size; i++) {
-            result.add(activeAlerts.get(i));
+        List<AnomalyAlert> recentOpenAlerts = new ArrayList<>(Math.min(size, limit));
+        for (int i = size - 1; i >= 0 && recentOpenAlerts.size() < limit; i--) {
+            AnomalyAlert alert = activeAlerts.get(i);
+            if (!alert.isDismissed()) {
+                recentOpenAlerts.add(alert);
+            }
         }
-        return result;
+        Collections.reverse(recentOpenAlerts);
+        return recentOpenAlerts;
     }
 
     private boolean hasActiveOpenAlert(String user, AnomalyType type) {

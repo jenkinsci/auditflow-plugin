@@ -293,6 +293,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
             mappedAlert.put("details", alert.details);
             mappedAlert.put("severity", alert.severity);
             mappedAlert.put("timestamp", alert.timestamp);
+            mappedAlert.put("alertId", alert.alertId);
             mappedAlerts.add(mappedAlert);
         }
         return mappedAlerts;
@@ -975,5 +976,21 @@ public class AuditLoggerManagementLink extends ManagementLink {
             res.setContentType("application/json; charset=UTF-8");
             res.getWriter().write("{\"error\":\"Internal server error\",\"alerts\":[]}");
         }
+    }
+
+    @GET
+    public void doDismissAlert(StaplerRequest2 req, StaplerResponse2 res) throws IOException {
+        Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+        String alertId = req.getParameter("alertId");
+        boolean success = false;
+        if (alertId != null && !alertId.trim().isEmpty()) {
+            success = AuditLogStorage.getInstance().getAnomalyDetector().dismissAlert(alertId.trim());
+        }
+
+        res.setContentType("application/json; charset=UTF-8");
+        var gson = new com.google.gson.GsonBuilder().create();
+        var response = new LinkedHashMap<String, Object>();
+        response.put("success", success);
+        res.getWriter().write(gson.toJson(response));
     }
 }
