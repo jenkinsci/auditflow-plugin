@@ -58,7 +58,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private boolean enablePipelineEvents = true;
     private boolean enableCredentialEvents = true;
     private boolean enablePluginEvents = true;
-    private boolean enableSystemConfigEvents = false;
+    private boolean enableSystemConfigEvents = true;
     private boolean enableNodeEvents = false;
     private boolean enableApiEvents = false;
 
