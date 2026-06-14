@@ -189,13 +189,18 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
             return;
         }
 
-        if (json.has("enableAuthenticationEvents")) setEnableAuthenticationEvents(json.optBoolean("enableAuthenticationEvents", enableAuthenticationEvents));
-        if (json.has("enableBuildEvents")) setEnableBuildEvents(json.optBoolean("enableBuildEvents", enableBuildEvents));
-        if (json.has("enableJobConfigEvents")) setEnableJobConfigEvents(json.optBoolean("enableJobConfigEvents", enableJobConfigEvents));
-        if (json.has("enableCredentialEvents")) setEnableCredentialEvents(json.optBoolean("enableCredentialEvents", enableCredentialEvents));
-        if (json.has("enablePluginEvents")) setEnablePluginEvents(json.optBoolean("enablePluginEvents", enablePluginEvents));
-        if (json.has("enableSystemConfigEvents")) setEnableSystemConfigEvents(json.optBoolean("enableSystemConfigEvents", enableSystemConfigEvents));
-        if (json.has("anomalyFailedLogins")) setAnomalyFailedLogins(json.optBoolean("anomalyFailedLogins", anomalyFailedLogins));
+        // ── Event category toggles ──
+        // NOTE: Do NOT use json.has() for checkboxes — Jenkins f:checkbox omits
+        // the key entirely when unchecked, so json.has() returns false and the
+        // setter is never called.  optBoolean() already returns false for
+        // missing keys, which is the correct "unchecked" value.
+        setEnableAuthenticationEvents(json.optBoolean("enableAuthenticationEvents", false));
+        setEnableBuildEvents(json.optBoolean("enableBuildEvents", false));
+        setEnableJobConfigEvents(json.optBoolean("enableJobConfigEvents", false));
+        setEnableCredentialEvents(json.optBoolean("enableCredentialEvents", false));
+        setEnablePluginEvents(json.optBoolean("enablePluginEvents", false));
+        setEnableSystemConfigEvents(json.optBoolean("enableSystemConfigEvents", false));
+        setAnomalyFailedLogins(json.optBoolean("anomalyFailedLogins", false));
         if (json.has("anomalyFailedLoginsThreshold")) {
             setAnomalyFailedLoginsThreshold(json.optInt("anomalyFailedLoginsThreshold", anomalyFailedLoginsThreshold));
         }
@@ -203,36 +208,41 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
             setAnomalyFailedLoginsWindowMinutes(json.optInt("anomalyFailedLoginsWindowMinutes", anomalyFailedLoginsWindowMinutes));
         }
 
-        if (json.has("enableDashboardStats")) setEnableDashboardStats(json.optBoolean("enableDashboardStats", enableDashboardStats));
-        if (json.has("enableRiskLevels")) setEnableRiskLevels(json.optBoolean("enableRiskLevels", enableRiskLevels));
+        // ── Dashboard display toggles ──
+        setEnableDashboardStats(json.optBoolean("enableDashboardStats", false));
+        setEnableRiskLevels(json.optBoolean("enableRiskLevels", false));
         if (json.has("displayTimeZoneId")) setDisplayTimeZoneId(json.optString("displayTimeZoneId", displayTimeZoneId));
-        if (json.has("showMetricTotal")) setShowMetricTotal(json.optBoolean("showMetricTotal", showMetricTotal));
-        if (json.has("showMetricLogins")) setShowMetricLogins(json.optBoolean("showMetricLogins", showMetricLogins));
-        if (json.has("showMetricFailedLogins")) setShowMetricFailedLogins(json.optBoolean("showMetricFailedLogins", showMetricFailedLogins));
-        if (json.has("showMetricBuilds")) setShowMetricBuilds(json.optBoolean("showMetricBuilds", showMetricBuilds));
-        if (json.has("showMetricJobs")) setShowMetricJobs(json.optBoolean("showMetricJobs", showMetricJobs));
-        if (json.has("showMetricConfig")) setShowMetricConfig(json.optBoolean("showMetricConfig", showMetricConfig));
+        setShowMetricTotal(json.optBoolean("showMetricTotal", false));
+        setShowMetricLogins(json.optBoolean("showMetricLogins", false));
+        setShowMetricFailedLogins(json.optBoolean("showMetricFailedLogins", false));
+        setShowMetricBuilds(json.optBoolean("showMetricBuilds", false));
+        setShowMetricJobs(json.optBoolean("showMetricJobs", false));
+        setShowMetricConfig(json.optBoolean("showMetricConfig", false));
 
-        if (json.has("enableCsvExport")) setEnableCsvExport(json.optBoolean("enableCsvExport", enableCsvExport));
-        if (json.has("enableJsonExport")) setEnableJsonExport(json.optBoolean("enableJsonExport", enableJsonExport));
-        if (json.has("enableAuditApi")) setEnableAuditApi(json.optBoolean("enableAuditApi", enableAuditApi));
+        // ── Export toggles ──
+        setEnableCsvExport(json.optBoolean("enableCsvExport", false));
+        setEnableJsonExport(json.optBoolean("enableJsonExport", false));
+        setEnableAuditApi(json.optBoolean("enableAuditApi", false));
 
+        // ── Advanced (non-boolean fields keep json.has() guard) ──
         if (json.has("logRetentionDays")) setLogRetentionDays(json.optInt("logRetentionDays", logRetentionDays));
         if (json.has("maxLogFileSizeMB")) setMaxLogFileSizeMB(json.optInt("maxLogFileSizeMB", maxLogFileSizeMB));
-        if (json.has("enableLogRotation")) setEnableLogRotation(json.optBoolean("enableLogRotation", enableLogRotation));
+        setEnableLogRotation(json.optBoolean("enableLogRotation", false));
         if (json.has("startupGracePeriodSeconds")) setStartupGracePeriodSeconds(json.optInt("startupGracePeriodSeconds", startupGracePeriodSeconds));
         if (json.has("batchWriteSize")) setBatchWriteSize(json.optInt("batchWriteSize", batchWriteSize));
         if (json.has("batchFlushIntervalSeconds")) setBatchFlushIntervalSeconds(json.optInt("batchFlushIntervalSeconds", batchFlushIntervalSeconds));
 
-        if (json.has("maskTokens")) setMaskTokens(json.optBoolean("maskTokens", maskTokens));
-        if (json.has("maskEmailAddresses")) setMaskEmailAddresses(json.optBoolean("maskEmailAddresses", maskEmailAddresses));
-        if (json.has("maskCreditCards")) setMaskCreditCards(json.optBoolean("maskCreditCards", maskCreditCards));
+        // ── Privacy toggles ──
+        setMaskTokens(json.optBoolean("maskTokens", false));
+        setMaskEmailAddresses(json.optBoolean("maskEmailAddresses", false));
+        setMaskCreditCards(json.optBoolean("maskCreditCards", false));
 
-        if (json.has("enableWebhookAlerts")) setEnableWebhookAlerts(json.optBoolean("enableWebhookAlerts", enableWebhookAlerts));
+        // ── Notification toggles (same fix: no json.has() for checkboxes) ──
+        setEnableWebhookAlerts(json.optBoolean("enableWebhookAlerts", false));
         if (json.has("webhookUrl")) setWebhookUrl(json.optString("webhookUrl", webhookUrl));
-        if (json.has("enableSlackAlerts")) setEnableSlackAlerts(json.optBoolean("enableSlackAlerts", enableSlackAlerts));
+        setEnableSlackAlerts(json.optBoolean("enableSlackAlerts", false));
         if (json.has("slackWebhookUrl")) setSlackWebhookUrl(json.optString("slackWebhookUrl", slackWebhookUrl));
-        if (json.has("enableTeamsAlerts")) setEnableTeamsAlerts(json.optBoolean("enableTeamsAlerts", enableTeamsAlerts));
+        setEnableTeamsAlerts(json.optBoolean("enableTeamsAlerts", false));
         if (json.has("teamsWebhookUrl")) setTeamsWebhookUrl(json.optString("teamsWebhookUrl", teamsWebhookUrl));
     }
 
