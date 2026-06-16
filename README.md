@@ -329,5 +329,8 @@ MIT License.
 
 ## Version History
 
+### 79.v26fc29b_60494
+Introducing AD integration to Auditflow.
+
 ### 1.0.0
 - Initial public release
