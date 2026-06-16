@@ -551,12 +551,10 @@
     color: var(--text-color-secondary);
 }
 
-.btn-investigate,
 .btn-dismiss {
     display: none;
 }
 
-.anomaly-box.anomaly-alert .btn-investigate,
 .anomaly-box.anomaly-alert .btn-dismiss {
     display: inline-flex;
 }

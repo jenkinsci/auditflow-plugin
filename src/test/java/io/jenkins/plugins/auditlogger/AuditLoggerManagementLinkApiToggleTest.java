@@ -13,7 +13,7 @@ class AuditLoggerManagementLinkApiToggleTest {
 
     @Test
     void apiEndpointHonorsConfigurationToggle(JenkinsRule j) {
-        AuditLoggerConfiguration configuration = AuditLoggerConfiguration.get();
+        AuditLoggerConfiguration configuration = j.getInstance().getExtensionList(AuditLoggerConfiguration.class).get(0);
         configuration.setEnableAuditApi(false);
 
         JenkinsRule.WebClient webClient = j.createWebClient();

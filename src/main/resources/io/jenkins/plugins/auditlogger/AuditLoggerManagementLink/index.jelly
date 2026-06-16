@@ -88,7 +88,6 @@
                 <div class="${anomalyRowOn ? 'anomaly-box' : 'anomaly-box jenkins-hidden'}" id="anomalyBox">
                     <div class="anomaly-label">Anomaly Detection</div>
                     <div class="anomaly-status" id="anomalyStatus">No anomaly detected</div>
-                    <button type="button" class="jenkins-button btn-investigate" id="btnInvestigate">Investigate</button>
                     <button type="button" class="jenkins-button btn-dismiss" id="btnDismiss">Dismiss</button>
                 </div>
 

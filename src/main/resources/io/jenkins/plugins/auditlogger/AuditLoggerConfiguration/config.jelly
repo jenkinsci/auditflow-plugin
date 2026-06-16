@@ -141,7 +141,7 @@
             <f:block>
                 <h4>Performance</h4>
                 <div class="jenkins-section__description">
-                    Anomaly detection is temporarily disabled to keep writes predictable under load.
+                    Batch settings control write throughput. Failed-login detection is lightweight and configurable below.
                 </div>
                 <f:entry title="Startup grace period (seconds)"
                          description="Suppress config-reload noise during startup. Valid range: 5-300.">
@@ -152,6 +152,48 @@
                 </f:entry>
                 <f:entry title="Batch flush interval (seconds)">
                     <f:number name="batchFlushIntervalSeconds" value="${descriptor.getBatchFlushIntervalSeconds()}"/>
+                </f:entry>
+            </f:block>
+
+            <f:block>
+                <h4>Failed Login Detection</h4>
+                <div class="jenkins-section__description">
+                    Detect repeated failed logins for the same username and surface them in the AuditFlow dashboard.
+                </div>
+                <f:entry title="Enable failed login anomaly detection">
+                    <f:checkbox name="anomalyFailedLogins" checked="${descriptor.isAnomalyFailedLogins()}"/>
+                </f:entry>
+                <f:entry title="Alert threshold"
+                         description="Raise an alert after this many failed logins for the same user within the configured window.">
+                    <f:number name="anomalyFailedLoginsThreshold" value="${descriptor.getAnomalyFailedLoginsThreshold()}"/>
+                </f:entry>
+                <f:entry title="Window (minutes)">
+                    <f:number name="anomalyFailedLoginsWindowMinutes" value="${descriptor.getAnomalyFailedLoginsWindowMinutes()}"/>
+                </f:entry>
+                <f:entry title="Enable email notifications for anomalies">
+                    <f:checkbox name="enableEmailAlerts" checked="${descriptor.isEnableEmailAlerts()}"/>
+                </f:entry>
+                <f:entry title="Alert email addresses" description="Comma-separated list of emails to receive high-risk anomaly alerts">
+                    <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
+                </f:entry>
+                <f:entry title="Enable webhook notifications for anomalies"
+                         description="When enabled, AuditFlow will POST a JSON payload to the URL below whenever an anomaly is detected — use this to integrate with Slack, PagerDuty, Datadog, or any service that accepts incoming webhooks.">
+                    <f:checkbox name="enableWebhookAlerts" checked="${descriptor.isEnableWebhookAlerts()}"/>
+                </f:entry>
+                <f:entry title="Generic Webhook URL" description="Paste the full POST endpoint URL from your webhook provider (e.g. https://hooks.slack.com/services/...). AuditFlow sends raw JSON with type, severity, user, details, and timestamp fields.">
+                    <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
+                </f:entry>
+                <f:entry title="Enable Slack notifications for anomalies">
+                    <f:checkbox name="enableSlackAlerts" checked="${descriptor.isEnableSlackAlerts()}"/>
+                </f:entry>
+                <f:entry title="Slack Webhook URL" description="Slack Incoming Webhook URL">
+                    <f:textbox name="slackWebhookUrl" value="${descriptor.getSlackWebhookUrl()}"/>
+                </f:entry>
+                <f:entry title="Enable Microsoft Teams notifications for anomalies">
+                    <f:checkbox name="enableTeamsAlerts" checked="${descriptor.isEnableTeamsAlerts()}"/>
+                </f:entry>
+                <f:entry title="Microsoft Teams Webhook URL" description="Teams Incoming Webhook URL">
+                    <f:textbox name="teamsWebhookUrl" value="${descriptor.getTeamsWebhookUrl()}"/>
                 </f:entry>
             </f:block>
 

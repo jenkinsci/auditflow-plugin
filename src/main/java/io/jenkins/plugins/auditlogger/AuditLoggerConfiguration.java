@@ -1,19 +1,8 @@
 package io.jenkins.plugins.auditlogger;
 
-import hudson.Extension;
-import hudson.BulkChange;
-import hudson.model.Descriptor;
-import hudson.util.ListBoxModel;
-import jenkins.model.GlobalConfiguration;
-import jenkins.model.Jenkins;
-import net.sf.json.JSONObject;
-import org.kohsuke.stapler.DataBoundSetter;
-import org.kohsuke.stapler.StaplerRequest2;
-import org.kohsuke.stapler.verb.GET;
-
 import java.io.IOException;
-import java.time.Instant;
 import java.time.DateTimeException;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -24,6 +13,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.logging.Logger;
+
+import org.kohsuke.stapler.DataBoundSetter;
+import org.kohsuke.stapler.StaplerRequest2;
+import org.kohsuke.stapler.verb.GET;
+
+import hudson.BulkChange;
+import hudson.Extension;
+import hudson.model.Descriptor;
+import hudson.util.ListBoxModel;
+import jenkins.model.GlobalConfiguration;
+import jenkins.model.Jenkins;
+import net.sf.json.JSONObject;
 
 /**
  * Global configuration for Jenkins Audit Logger plugin.
@@ -57,7 +58,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private boolean enablePipelineEvents = true;
     private boolean enableCredentialEvents = true;
     private boolean enablePluginEvents = true;
-    private boolean enableSystemConfigEvents = false;
+    private boolean enableSystemConfigEvents = true;
     private boolean enableNodeEvents = false;
     private boolean enableApiEvents = false;
 
@@ -118,7 +119,17 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
 
     // Alerts
     private boolean enableAlertEngine = false;
+    private boolean enableEmailAlerts = false;
+    private String alertEmailAddresses = "";
     private boolean enableComplianceReports = false;
+    private boolean enableWebhookAlerts = false;
+    private String webhookUrl = "";
+    
+    private boolean enableSlackAlerts = false;
+    private String slackWebhookUrl = "";
+
+    private boolean enableTeamsAlerts = false;
+    private String teamsWebhookUrl = "";
 
     // UI
     private boolean enableRiskLevels = true;
@@ -178,37 +189,61 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
             return;
         }
 
-        if (json.has("enableAuthenticationEvents")) setEnableAuthenticationEvents(json.optBoolean("enableAuthenticationEvents", enableAuthenticationEvents));
-        if (json.has("enableBuildEvents")) setEnableBuildEvents(json.optBoolean("enableBuildEvents", enableBuildEvents));
-        if (json.has("enableJobConfigEvents")) setEnableJobConfigEvents(json.optBoolean("enableJobConfigEvents", enableJobConfigEvents));
-        if (json.has("enableCredentialEvents")) setEnableCredentialEvents(json.optBoolean("enableCredentialEvents", enableCredentialEvents));
-        if (json.has("enablePluginEvents")) setEnablePluginEvents(json.optBoolean("enablePluginEvents", enablePluginEvents));
-        if (json.has("enableSystemConfigEvents")) setEnableSystemConfigEvents(json.optBoolean("enableSystemConfigEvents", enableSystemConfigEvents));
+        // ── Event category toggles ──
+        // NOTE: Do NOT use json.has() for checkboxes — Jenkins f:checkbox omits
+        // the key entirely when unchecked, so json.has() returns false and the
+        // setter is never called.  optBoolean() already returns false for
+        // missing keys, which is the correct "unchecked" value.
+        setEnableAuthenticationEvents(json.optBoolean("enableAuthenticationEvents", false));
+        setEnableBuildEvents(json.optBoolean("enableBuildEvents", false));
+        setEnableJobConfigEvents(json.optBoolean("enableJobConfigEvents", false));
+        setEnableCredentialEvents(json.optBoolean("enableCredentialEvents", false));
+        setEnablePluginEvents(json.optBoolean("enablePluginEvents", false));
+        setEnableSystemConfigEvents(json.optBoolean("enableSystemConfigEvents", false));
+        setAnomalyFailedLogins(json.optBoolean("anomalyFailedLogins", false));
+        if (json.has("anomalyFailedLoginsThreshold")) {
+            setAnomalyFailedLoginsThreshold(json.optInt("anomalyFailedLoginsThreshold", anomalyFailedLoginsThreshold));
+        }
+        if (json.has("anomalyFailedLoginsWindowMinutes")) {
+            setAnomalyFailedLoginsWindowMinutes(json.optInt("anomalyFailedLoginsWindowMinutes", anomalyFailedLoginsWindowMinutes));
+        }
 
-        if (json.has("enableDashboardStats")) setEnableDashboardStats(json.optBoolean("enableDashboardStats", enableDashboardStats));
-        if (json.has("enableRiskLevels")) setEnableRiskLevels(json.optBoolean("enableRiskLevels", enableRiskLevels));
+        // ── Dashboard display toggles ──
+        setEnableDashboardStats(json.optBoolean("enableDashboardStats", false));
+        setEnableRiskLevels(json.optBoolean("enableRiskLevels", false));
         if (json.has("displayTimeZoneId")) setDisplayTimeZoneId(json.optString("displayTimeZoneId", displayTimeZoneId));
-        if (json.has("showMetricTotal")) setShowMetricTotal(json.optBoolean("showMetricTotal", showMetricTotal));
-        if (json.has("showMetricLogins")) setShowMetricLogins(json.optBoolean("showMetricLogins", showMetricLogins));
-        if (json.has("showMetricFailedLogins")) setShowMetricFailedLogins(json.optBoolean("showMetricFailedLogins", showMetricFailedLogins));
-        if (json.has("showMetricBuilds")) setShowMetricBuilds(json.optBoolean("showMetricBuilds", showMetricBuilds));
-        if (json.has("showMetricJobs")) setShowMetricJobs(json.optBoolean("showMetricJobs", showMetricJobs));
-        if (json.has("showMetricConfig")) setShowMetricConfig(json.optBoolean("showMetricConfig", showMetricConfig));
+        setShowMetricTotal(json.optBoolean("showMetricTotal", false));
+        setShowMetricLogins(json.optBoolean("showMetricLogins", false));
+        setShowMetricFailedLogins(json.optBoolean("showMetricFailedLogins", false));
+        setShowMetricBuilds(json.optBoolean("showMetricBuilds", false));
+        setShowMetricJobs(json.optBoolean("showMetricJobs", false));
+        setShowMetricConfig(json.optBoolean("showMetricConfig", false));
 
-        if (json.has("enableCsvExport")) setEnableCsvExport(json.optBoolean("enableCsvExport", enableCsvExport));
-        if (json.has("enableJsonExport")) setEnableJsonExport(json.optBoolean("enableJsonExport", enableJsonExport));
-        if (json.has("enableAuditApi")) setEnableAuditApi(json.optBoolean("enableAuditApi", enableAuditApi));
+        // ── Export toggles ──
+        setEnableCsvExport(json.optBoolean("enableCsvExport", false));
+        setEnableJsonExport(json.optBoolean("enableJsonExport", false));
+        setEnableAuditApi(json.optBoolean("enableAuditApi", false));
 
+        // ── Advanced (non-boolean fields keep json.has() guard) ──
         if (json.has("logRetentionDays")) setLogRetentionDays(json.optInt("logRetentionDays", logRetentionDays));
         if (json.has("maxLogFileSizeMB")) setMaxLogFileSizeMB(json.optInt("maxLogFileSizeMB", maxLogFileSizeMB));
-        if (json.has("enableLogRotation")) setEnableLogRotation(json.optBoolean("enableLogRotation", enableLogRotation));
+        setEnableLogRotation(json.optBoolean("enableLogRotation", false));
         if (json.has("startupGracePeriodSeconds")) setStartupGracePeriodSeconds(json.optInt("startupGracePeriodSeconds", startupGracePeriodSeconds));
         if (json.has("batchWriteSize")) setBatchWriteSize(json.optInt("batchWriteSize", batchWriteSize));
         if (json.has("batchFlushIntervalSeconds")) setBatchFlushIntervalSeconds(json.optInt("batchFlushIntervalSeconds", batchFlushIntervalSeconds));
 
-        if (json.has("maskTokens")) setMaskTokens(json.optBoolean("maskTokens", maskTokens));
-        if (json.has("maskEmailAddresses")) setMaskEmailAddresses(json.optBoolean("maskEmailAddresses", maskEmailAddresses));
-        if (json.has("maskCreditCards")) setMaskCreditCards(json.optBoolean("maskCreditCards", maskCreditCards));
+        // ── Privacy toggles ──
+        setMaskTokens(json.optBoolean("maskTokens", false));
+        setMaskEmailAddresses(json.optBoolean("maskEmailAddresses", false));
+        setMaskCreditCards(json.optBoolean("maskCreditCards", false));
+
+        // ── Notification toggles (same fix: no json.has() for checkboxes) ──
+        setEnableWebhookAlerts(json.optBoolean("enableWebhookAlerts", false));
+        if (json.has("webhookUrl")) setWebhookUrl(json.optString("webhookUrl", webhookUrl));
+        setEnableSlackAlerts(json.optBoolean("enableSlackAlerts", false));
+        if (json.has("slackWebhookUrl")) setSlackWebhookUrl(json.optString("slackWebhookUrl", slackWebhookUrl));
+        setEnableTeamsAlerts(json.optBoolean("enableTeamsAlerts", false));
+        if (json.has("teamsWebhookUrl")) setTeamsWebhookUrl(json.optString("teamsWebhookUrl", teamsWebhookUrl));
     }
 
     private static int clamp(int value, int min, int max) {
@@ -298,6 +333,24 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     }
 
     @DataBoundSetter
+    public void setAnomalyFailedLogins(boolean anomalyFailedLogins) {
+        this.anomalyFailedLogins = anomalyFailedLogins;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setAnomalyFailedLoginsThreshold(int anomalyFailedLoginsThreshold) {
+        this.anomalyFailedLoginsThreshold = clamp(anomalyFailedLoginsThreshold, 2, 1000);
+        save();
+    }
+
+    @DataBoundSetter
+    public void setAnomalyFailedLoginsWindowMinutes(int anomalyFailedLoginsWindowMinutes) {
+        this.anomalyFailedLoginsWindowMinutes = clamp(anomalyFailedLoginsWindowMinutes, 1, 1440);
+        save();
+    }
+
+    @DataBoundSetter
     public void setEnableDashboardStats(boolean enableDashboardStats) {
         this.enableDashboardStats = enableDashboardStats;
         save();
@@ -366,6 +419,60 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     @DataBoundSetter
     public void setEnableAuditApi(boolean enableAuditApi) {
         this.enableAuditApi = enableAuditApi;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableAlertEngine(boolean enableAlertEngine) {
+        this.enableAlertEngine = enableAlertEngine;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableEmailAlerts(boolean enableEmailAlerts) {
+        this.enableEmailAlerts = enableEmailAlerts;
+        save();
+    }
+    //add
+    @DataBoundSetter
+    public void setEnableWebhookAlerts(boolean enableWebhookAlerts) {
+        this.enableWebhookAlerts = enableWebhookAlerts;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setAlertEmailAddresses(String alertEmailAddresses) {
+        this.alertEmailAddresses = alertEmailAddresses;
+        save();
+    }
+    //add
+    @DataBoundSetter
+    public void setWebhookUrl(String webhookUrl) {
+        this.webhookUrl = webhookUrl;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableSlackAlerts(boolean enableSlackAlerts) {
+        this.enableSlackAlerts = enableSlackAlerts;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setSlackWebhookUrl(String slackWebhookUrl) {
+        this.slackWebhookUrl = slackWebhookUrl;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setEnableTeamsAlerts(boolean enableTeamsAlerts) {
+        this.enableTeamsAlerts = enableTeamsAlerts;
+        save();
+    }
+
+    @DataBoundSetter
+    public void setTeamsWebhookUrl(String teamsWebhookUrl) {
+        this.teamsWebhookUrl = teamsWebhookUrl;
         save();
     }
 
@@ -481,7 +588,15 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isMaskCreditCards() { return maskCreditCards; }
 
     public boolean isEnableAlertEngine() { return enableAlertEngine; }
+    public boolean isEnableEmailAlerts() { return enableEmailAlerts; }
+    public String getAlertEmailAddresses() { return alertEmailAddresses != null ? alertEmailAddresses : ""; }
     public boolean isEnableComplianceReports() { return enableComplianceReports; }
+    public boolean isEnableWebhookAlerts() { return enableWebhookAlerts; }
+    public String getWebhookUrl() { return webhookUrl != null ? webhookUrl : ""; }
+    public boolean isEnableSlackAlerts() { return enableSlackAlerts; }
+    public String getSlackWebhookUrl() { return slackWebhookUrl != null ? slackWebhookUrl : ""; }
+    public boolean isEnableTeamsAlerts() { return enableTeamsAlerts; }
+    public String getTeamsWebhookUrl() { return teamsWebhookUrl != null ? teamsWebhookUrl : ""; }
 
     public boolean isEnableRiskLevels() { return enableRiskLevels; }
     public boolean isEnableEventCategories() { return enableEventCategories; }

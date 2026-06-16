@@ -3,6 +3,7 @@ package io.jenkins.plugins.auditlogger;
 import hudson.Extension;
 import jenkins.model.Jenkins;
 import org.htmlunit.FailingHttpStatusCodeException;
+import org.htmlunit.html.HtmlPage;
 import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.MockAuthorizationStrategy;
 import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
@@ -13,6 +14,8 @@ import org.kohsuke.stapler.verb.GET;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -60,6 +63,17 @@ class AuditStaplerSurfaceRegressionTest {
                 () -> webClient.goTo("manage/auditflow-logs/alerts", "application/json"));
 
         assertEquals(403, failure.getStatusCode());
+    }
+
+    @Test
+    void managementPageOnlyShowsDismissActionForAnomalies(JenkinsRule j) throws Exception {
+        JenkinsRule.WebClient webClient = j.createWebClient();
+        webClient.getOptions().setJavaScriptEnabled(false);
+
+        HtmlPage page = webClient.goTo("manage/auditflow-logs");
+
+        assertNull(page.getElementById("btnInvestigate"));
+        assertNotNull(page.getElementById("btnDismiss"));
     }
 
     private static void enableAnonymousReadOnlySecurity(JenkinsRule j) {
