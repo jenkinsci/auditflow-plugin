@@ -110,6 +110,11 @@ public class AuditSaveableListener extends SaveableListener {
                 return;
             }
 
+            if (shouldSuppressRequestScopedSystemConfigSave(isSystem, requestUri)) {
+                LOGGER.log(Level.FINE, "Suppressing request-scoped system config save: {0}", objectName);
+                return;
+            }
+
             if (StartupPhaseManager.wasRecentlyLogged(objectName)) {
                 LOGGER.log(Level.FINE, "Skipping duplicate config log for: {0}", objectName);
                 return;
@@ -598,6 +603,10 @@ public class AuditSaveableListener extends SaveableListener {
         }
 
         return false;
+    }
+
+    static boolean shouldSuppressRequestScopedSystemConfigSave(boolean isSystemSave, String requestUri) {
+        return isSystemSave && RouteAwareUrlMatcher.isConfigurationChange(requestUri);
     }
 
     private static String currentRequestUri() {

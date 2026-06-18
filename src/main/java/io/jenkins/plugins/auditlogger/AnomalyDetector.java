@@ -149,14 +149,10 @@ public class AnomalyDetector {
                     if (config != null && config.isEnableEmailAlerts()) {
                         sendEmailNotification(alert, config.getAlertEmailAddresses());
                     }
-                    if (config != null && config.isEnableWebhookAlerts()) {
-                        sendWebhookNotification(alert, config.getWebhookUrl());
-                    }
-                    if (config != null && config.isEnableSlackAlerts()) {
-                        sendSlackNotification(alert, config.getSlackWebhookUrl());
-                    }
-                    if (config != null && config.isEnableTeamsAlerts()) {
-                        sendTeamsNotification(alert, config.getTeamsWebhookUrl());
+                    if (config != null) {
+                        for (AuditLoggerConfiguration.WebhookDestination destination : config.getEnabledWebhookDestinations()) {
+                            sendWebhookNotification(alert, destination);
+                        }
                     }
                 }
             }
@@ -336,7 +332,24 @@ public class AnomalyDetector {
         Transport.send(msg);
     }
 
-    private void sendWebhookNotification(AnomalyAlert alert, String webhookUrl) {
+    private void sendWebhookNotification(AnomalyAlert alert, AuditLoggerConfiguration.WebhookDestination destination) {
+        if (destination == null) {
+            return;
+        }
+
+        String type = destination.getType();
+        if ("slack".equals(type)) {
+            sendSlackNotification(alert, destination.getUrl());
+            return;
+        }
+        if ("teams".equals(type)) {
+            sendTeamsNotification(alert, destination.getUrl());
+            return;
+        }
+        sendGenericWebhookNotification(alert, destination.getUrl());
+    }
+
+    private void sendGenericWebhookNotification(AnomalyAlert alert, String webhookUrl) {
         if (webhookUrl == null || webhookUrl.trim().isEmpty()) {
             return;
         }

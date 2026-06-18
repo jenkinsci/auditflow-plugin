@@ -62,6 +62,7 @@ class AuditRequestCapturePluginRouteRegressionTest {
 
     @Test
     void configurationMatcherAcceptsSecuritySubmitRoute() {
+        assertTrue(RouteAwareUrlMatcher.isConfigurationChange("/configure"));
         assertTrue(RouteAwareUrlMatcher.isConfigurationChange("/manage/configureSecurity"));
         assertTrue(RouteAwareUrlMatcher.isConfigurationChange("/manage/configureSecurity/configure"));
         assertTrue(RouteAwareUrlMatcher.isConfigurationChange("/manage/configure"));

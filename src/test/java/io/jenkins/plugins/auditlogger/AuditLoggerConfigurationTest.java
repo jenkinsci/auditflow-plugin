@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.kohsuke.stapler.verb.GET;
 
 import java.time.ZoneId;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -121,6 +122,37 @@ class AuditLoggerConfigurationTest {
                         "application/json"));
 
         assertEquals(403, failure.getStatusCode());
+    }
+
+    @Test
+    void webhookDestinationsParseUnifiedTextareaAndLegacyFallback(JenkinsRule j) {
+        AuditLoggerConfiguration configuration = AuditLoggerConfiguration.get();
+
+        configuration.setEnableWebhookAlerts(true);
+        configuration.setWebhookDestinationsSpec("""
+                generic|https://example.invalid/audit
+                slack https://hooks.slack.invalid/services/A/B/C
+                teams|https://example.invalid/teams
+                """);
+
+        List<AuditLoggerConfiguration.WebhookDestination> destinations = configuration.getEnabledWebhookDestinations();
+        assertEquals(3, destinations.size());
+        assertEquals("generic", destinations.get(0).getType());
+        assertEquals("https://example.invalid/audit", destinations.get(0).getUrl());
+        assertEquals("slack", destinations.get(1).getType());
+        assertEquals("teams", destinations.get(2).getType());
+        assertTrue(configuration.getWebhookDestinationsSpec().contains("slack|https://hooks.slack.invalid/services/A/B/C"));
+
+        configuration.setWebhookDestinationsSpec("");
+        configuration.setEnableWebhookAlerts(false);
+        configuration.setEnableSlackAlerts(true);
+        configuration.setSlackWebhookUrl("https://hooks.slack.invalid/services/legacy");
+
+        List<AuditLoggerConfiguration.WebhookDestination> legacyDestinations = configuration.getEnabledWebhookDestinations();
+        assertEquals(1, legacyDestinations.size());
+        assertEquals("slack", legacyDestinations.get(0).getType());
+        assertEquals("https://hooks.slack.invalid/services/legacy", legacyDestinations.get(0).getUrl());
+        assertTrue(configuration.isEnableWebhookAlerts());
     }
 
     private static JSONObject findOption(JSONArray options, String id) {
