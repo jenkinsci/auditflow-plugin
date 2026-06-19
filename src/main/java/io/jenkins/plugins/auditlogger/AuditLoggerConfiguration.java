@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -699,6 +700,31 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         return new com.google.gson.Gson().toJson(anomalyConfig);
     }
 
+    Map<String, String> describeAuditConfigurationForLogging() {
+        Map<String, String> snapshot = new LinkedHashMap<>();
+        snapshot.put("Authentication events", booleanLabel(enableAuthenticationEvents));
+        snapshot.put("Build events", booleanLabel(enableBuildEvents));
+        snapshot.put("Job config events", booleanLabel(enableJobConfigEvents));
+        snapshot.put("Credential events", booleanLabel(enableCredentialEvents));
+        snapshot.put("Plugin events", booleanLabel(enablePluginEvents));
+        snapshot.put("System config events", booleanLabel(enableSystemConfigEvents));
+        snapshot.put("Failed login anomaly", booleanLabel(anomalyFailedLogins));
+        snapshot.put("Failed login threshold", Integer.toString(anomalyFailedLoginsThreshold));
+        snapshot.put("Failed login window (minutes)", Integer.toString(anomalyFailedLoginsWindowMinutes));
+        snapshot.put("Build failure anomaly", booleanLabel(anomalyBuildFailures));
+        snapshot.put("Build failure threshold", Integer.toString(anomalyBuildFailuresThreshold));
+        snapshot.put("Email alerts", booleanLabel(enableEmailAlerts));
+        snapshot.put("Alert recipient count", Integer.toString(countDelimitedValues(alertEmailAddresses)));
+        snapshot.put("Webhook alerts", booleanLabel(enableWebhookAlerts));
+        snapshot.put("Webhook destination count", Integer.toString(getWebhookDestinations().size()));
+        snapshot.put("Retention days", Integer.toString(logRetentionDays));
+        snapshot.put("Max log file size (MB)", Integer.toString(maxLogFileSizeMB));
+        snapshot.put("Log rotation", booleanLabel(enableLogRotation));
+        snapshot.put("Startup grace period (seconds)", Integer.toString(startupGracePeriodSeconds));
+        snapshot.put("Display time zone", getDisplayTimeZoneId());
+        return snapshot;
+    }
+
     private static String toDisplayTimeZoneLabel(String timeZoneId) {
         String sanitized = sanitizeTimeZoneId(timeZoneId);
         String alias = DISPLAY_TIME_ZONE_ALIASES.get(sanitized);
@@ -749,6 +775,20 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         int minutes = totalMinutes % 60;
         char sign = totalSeconds >= 0 ? '+' : '-';
         return String.format("UTC%c%02d:%02d", sign, hours, minutes);
+    }
+
+    private static String booleanLabel(boolean value) {
+        return value ? "enabled" : "disabled";
+    }
+
+    private static int countDelimitedValues(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return 0;
+        }
+        return (int) Arrays.stream(rawValue.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .count();
     }
 
     private boolean hasLegacyEnabledWebhookDestinations() {

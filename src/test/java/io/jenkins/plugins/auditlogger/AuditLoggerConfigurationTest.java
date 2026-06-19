@@ -155,6 +155,27 @@ class AuditLoggerConfigurationTest {
         assertTrue(configuration.isEnableWebhookAlerts());
     }
 
+    @Test
+    void auditLoggingSnapshotSummarizesSensitiveNotificationFields(JenkinsRule j) {
+        AuditLoggerConfiguration configuration = AuditLoggerConfiguration.get();
+
+        configuration.setEnableEmailAlerts(true);
+        configuration.setAlertEmailAddresses("alice@example.invalid, bob@example.invalid");
+        configuration.setEnableWebhookAlerts(true);
+        configuration.setWebhookDestinationsSpec("""
+                generic|https://hooks.example.invalid/a
+                slack|https://hooks.slack.invalid/services/A/B/C
+                """);
+
+        java.util.Map<String, String> snapshot = configuration.describeAuditConfigurationForLogging();
+        assertEquals("enabled", snapshot.get("Email alerts"));
+        assertEquals("2", snapshot.get("Alert recipient count"));
+        assertEquals("enabled", snapshot.get("Webhook alerts"));
+        assertEquals("2", snapshot.get("Webhook destination count"));
+        assertFalse(snapshot.toString().contains("alice@example.invalid"));
+        assertFalse(snapshot.toString().contains("hooks.slack.invalid"));
+    }
+
     private static JSONObject findOption(JSONArray options, String id) {
         for (int index = 0; index < options.size(); index++) {
             JSONObject option = options.getJSONObject(index);

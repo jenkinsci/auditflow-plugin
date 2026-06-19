@@ -11,8 +11,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.kohsuke.stapler.Stapler;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,6 +40,8 @@ public class AuditSaveableListener extends SaveableListener {
 
     /** Cache of credential hash codes per store, for detecting which credential was modified. */
     private static final Map<String, Map<String, Integer>> credentialHashCache = new ConcurrentHashMap<>();
+    /** Cache of safe configuration snapshots for field-level change summaries. */
+    private static final Map<String, Map<String, String>> configurationSnapshotCache = new ConcurrentHashMap<>();
 
     static void primeCredentialCaches() {
         try {
@@ -62,6 +67,14 @@ public class AuditSaveableListener extends SaveableListener {
             LOGGER.log(Level.FINE, "Credentials plugin not installed; skipping credential cache priming", e);
         } catch (ReflectiveOperationException | RuntimeException e) {
             LOGGER.log(Level.FINE, "Failed to prime credential caches", e);
+        }
+    }
+
+    static void primeConfigurationSnapshots() {
+        AuditLoggerConfiguration configuration = AuditLoggerConfiguration.get();
+        if (configuration != null) {
+            configurationSnapshotCache.put(configuration.getClass().getName(),
+                    snapshotForDetailedLogging(configuration));
         }
     }
 
@@ -110,7 +123,7 @@ public class AuditSaveableListener extends SaveableListener {
                 return;
             }
 
-            if (shouldSuppressRequestScopedSystemConfigSave(isSystem, requestUri)) {
+            if (shouldSuppressRequestScopedSystemConfigSave(isSystem, requestUri) && !shouldLogDetailedConfigChange(o)) {
                 LOGGER.log(Level.FINE, "Suppressing request-scoped system config save: {0}", objectName);
                 return;
             }
@@ -138,6 +151,10 @@ public class AuditSaveableListener extends SaveableListener {
             } else if (isUser) {
                 action = "USER_CONFIG_UPDATED";
                 details = String.format("User configuration updated: %s by %s", objectName, username);
+            } else if (o instanceof AuditLoggerConfiguration auditLoggerConfiguration) {
+                action = "AUDITFLOW_CONFIG_UPDATED";
+                objectName = "AuditFlow";
+                details = buildDetailedConfigChangeDetails(auditLoggerConfiguration, username);
             } else {
                 action = "GLOBAL_CONFIG_UPDATED";
                 details = String.format("Global configuration updated: %s (%s) by %s", objectName, objectType, username);
@@ -607,6 +624,60 @@ public class AuditSaveableListener extends SaveableListener {
 
     static boolean shouldSuppressRequestScopedSystemConfigSave(boolean isSystemSave, String requestUri) {
         return isSystemSave && RouteAwareUrlMatcher.isConfigurationChange(requestUri);
+    }
+
+    static boolean shouldLogDetailedConfigChange(Saveable saveable) {
+        return saveable instanceof AuditLoggerConfiguration;
+    }
+
+    static String buildDetailedConfigChangeDetails(AuditLoggerConfiguration configuration, String username) {
+        String actor = isRealUser(username) ? username : "SYSTEM";
+        Map<String, String> current = snapshotForDetailedLogging(configuration);
+        Map<String, String> previous = configurationSnapshotCache.put(configuration.getClass().getName(), current);
+        List<String> changes = describeConfigurationChanges(previous, current);
+
+        if (changes.isEmpty()) {
+            return String.format("AuditFlow configuration saved by %s (no tracked setting changes detected)", actor);
+        }
+
+        return String.format("AuditFlow configuration updated by %s | Changes: %s",
+                actor,
+                String.join("; ", changes));
+    }
+
+    static List<String> describeConfigurationChanges(Map<String, String> previous, Map<String, String> current) {
+        List<String> changes = new ArrayList<>();
+        if (current == null || current.isEmpty()) {
+            return changes;
+        }
+
+        if (previous == null || previous.isEmpty()) {
+            for (Map.Entry<String, String> entry : current.entrySet()) {
+                changes.add(entry.getKey() + ": initialized to " + entry.getValue());
+            }
+            return changes;
+        }
+
+        for (Map.Entry<String, String> entry : current.entrySet()) {
+            String key = entry.getKey();
+            String currentValue = entry.getValue();
+            String previousValue = previous.get(key);
+            if (!java.util.Objects.equals(previousValue, currentValue)) {
+                changes.add(key + ": " + nullSafe(previousValue) + " -> " + nullSafe(currentValue));
+            }
+        }
+        return changes;
+    }
+
+    private static Map<String, String> snapshotForDetailedLogging(Saveable saveable) {
+        if (saveable instanceof AuditLoggerConfiguration configuration) {
+            return new LinkedHashMap<>(configuration.describeAuditConfigurationForLogging());
+        }
+        return Collections.emptyMap();
+    }
+
+    private static String nullSafe(String value) {
+        return value == null || value.isBlank() ? "unset" : value;
     }
 
     private static String currentRequestUri() {

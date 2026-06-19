@@ -25,6 +25,7 @@ public class AuditLoggerPlugin extends Plugin {
         StartupPhaseManager.initStartupTracking();
         AuditLogStorage.getInstance().initialize();
         AuditSaveableListener.primeCredentialCaches();
+        AuditSaveableListener.primeConfigurationSnapshots();
 
         if (config != null) {
             LOGGER.info("Audit Logger configured: Auth=" + config.isEnableAuthenticationEvents()
