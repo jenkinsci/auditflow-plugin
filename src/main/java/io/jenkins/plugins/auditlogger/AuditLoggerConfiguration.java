@@ -124,13 +124,6 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private boolean enableComplianceReports = false;
     private boolean enableWebhookAlerts = false;
     private String webhookUrl = "";
-    private String webhookDestinationsSpec = "";
-    
-    private boolean enableSlackAlerts = false;
-    private String slackWebhookUrl = "";
-
-    private boolean enableTeamsAlerts = false;
-    private String teamsWebhookUrl = "";
 
     // UI
     private boolean enableRiskLevels = true;
@@ -240,14 +233,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
 
         // ── Notification toggles (same fix: no json.has() for checkboxes) ──
         setEnableWebhookAlerts(json.optBoolean("enableWebhookAlerts", false));
-        if (json.has("webhookDestinationsSpec")) {
-            setWebhookDestinationsSpec(json.optString("webhookDestinationsSpec", webhookDestinationsSpec));
-        }
         if (json.has("webhookUrl")) setWebhookUrl(json.optString("webhookUrl", webhookUrl));
-        setEnableSlackAlerts(json.optBoolean("enableSlackAlerts", false));
-        if (json.has("slackWebhookUrl")) setSlackWebhookUrl(json.optString("slackWebhookUrl", slackWebhookUrl));
-        setEnableTeamsAlerts(json.optBoolean("enableTeamsAlerts", false));
-        if (json.has("teamsWebhookUrl")) setTeamsWebhookUrl(json.optString("teamsWebhookUrl", teamsWebhookUrl));
     }
 
     private static int clamp(int value, int min, int max) {
@@ -455,35 +441,6 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         this.webhookUrl = webhookUrl;
     }
 
-    @DataBoundSetter
-    public void setWebhookDestinationsSpec(String webhookDestinationsSpec) {
-        this.webhookDestinationsSpec = normalizeWebhookDestinationsSpec(webhookDestinationsSpec);
-    }
-
-
-    @DataBoundSetter
-    public void setEnableSlackAlerts(boolean enableSlackAlerts) {
-        this.enableSlackAlerts = enableSlackAlerts;
-    }
-
-
-    @DataBoundSetter
-    public void setSlackWebhookUrl(String slackWebhookUrl) {
-        this.slackWebhookUrl = slackWebhookUrl;
-    }
-
-
-    @DataBoundSetter
-    public void setEnableTeamsAlerts(boolean enableTeamsAlerts) {
-        this.enableTeamsAlerts = enableTeamsAlerts;
-    }
-
-
-    @DataBoundSetter
-    public void setTeamsWebhookUrl(String teamsWebhookUrl) {
-        this.teamsWebhookUrl = teamsWebhookUrl;
-    }
-
 
     @DataBoundSetter
     public void setLogRetentionDays(int logRetentionDays) {
@@ -600,38 +557,8 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isEnableEmailAlerts() { return enableEmailAlerts; }
     public String getAlertEmailAddresses() { return alertEmailAddresses != null ? alertEmailAddresses : ""; }
     public boolean isEnableComplianceReports() { return enableComplianceReports; }
-    public boolean isEnableWebhookAlerts() {
-        if (!parseWebhookDestinationsSpec(webhookDestinationsSpec).isEmpty()) {
-            return enableWebhookAlerts;
-        }
-        return enableWebhookAlerts || hasLegacyEnabledWebhookDestinations();
-    }
+    public boolean isEnableWebhookAlerts() { return enableWebhookAlerts; }
     public String getWebhookUrl() { return webhookUrl != null ? webhookUrl : ""; }
-    public boolean isEnableSlackAlerts() { return enableSlackAlerts; }
-    public String getSlackWebhookUrl() { return slackWebhookUrl != null ? slackWebhookUrl : ""; }
-    public boolean isEnableTeamsAlerts() { return enableTeamsAlerts; }
-    public String getTeamsWebhookUrl() { return teamsWebhookUrl != null ? teamsWebhookUrl : ""; }
-    public String getWebhookDestinationsSpec() {
-        String normalized = normalizeWebhookDestinationsSpec(webhookDestinationsSpec);
-        if (!normalized.isEmpty()) {
-            return normalized;
-        }
-        return normalizeWebhookDestinationsSpec(buildLegacyWebhookDestinationsSpec());
-    }
-    public List<WebhookDestination> getWebhookDestinations() {
-        List<WebhookDestination> configured = parseWebhookDestinationsSpec(webhookDestinationsSpec);
-        if (!configured.isEmpty()) {
-            return configured;
-        }
-        return buildLegacyWebhookDestinations(false);
-    }
-    public List<WebhookDestination> getEnabledWebhookDestinations() {
-        List<WebhookDestination> configured = parseWebhookDestinationsSpec(webhookDestinationsSpec);
-        if (!configured.isEmpty()) {
-            return enableWebhookAlerts ? configured : List.of();
-        }
-        return buildLegacyWebhookDestinations(true);
-    }
 
     public boolean isEnableRiskLevels() { return enableRiskLevels; }
     public boolean isEnableEventCategories() { return enableEventCategories; }
@@ -751,144 +678,8 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         return String.format("UTC%c%02d:%02d", sign, hours, minutes);
     }
 
-    private boolean hasLegacyEnabledWebhookDestinations() {
-        return (enableWebhookAlerts && webhookUrl != null && !webhookUrl.isBlank())
-                || (enableSlackAlerts && slackWebhookUrl != null && !slackWebhookUrl.isBlank())
-                || (enableTeamsAlerts && teamsWebhookUrl != null && !teamsWebhookUrl.isBlank());
-    }
-
-    private String buildLegacyWebhookDestinationsSpec() {
-        StringBuilder spec = new StringBuilder();
-        appendLegacyWebhookDestination(spec, "generic", webhookUrl);
-        appendLegacyWebhookDestination(spec, "slack", slackWebhookUrl);
-        appendLegacyWebhookDestination(spec, "teams", teamsWebhookUrl);
-        return spec.toString();
-    }
-
-    private static void appendLegacyWebhookDestination(StringBuilder spec, String type, String url) {
-        if (url == null || url.isBlank()) {
-            return;
-        }
-        if (spec.length() > 0) {
-            spec.append('\n');
-        }
-        spec.append(type).append('|').append(url.trim());
-    }
-
-    private List<WebhookDestination> buildLegacyWebhookDestinations(boolean onlyEnabled) {
-        List<WebhookDestination> destinations = new ArrayList<>();
-        if ((!onlyEnabled || enableWebhookAlerts) && webhookUrl != null && !webhookUrl.isBlank()) {
-            destinations.add(new WebhookDestination("generic", webhookUrl.trim()));
-        }
-        if ((!onlyEnabled || enableSlackAlerts) && slackWebhookUrl != null && !slackWebhookUrl.isBlank()) {
-            destinations.add(new WebhookDestination("slack", slackWebhookUrl.trim()));
-        }
-        if ((!onlyEnabled || enableTeamsAlerts) && teamsWebhookUrl != null && !teamsWebhookUrl.isBlank()) {
-            destinations.add(new WebhookDestination("teams", teamsWebhookUrl.trim()));
-        }
-        return destinations;
-    }
-
-    static List<WebhookDestination> parseWebhookDestinationsSpec(String spec) {
-        List<WebhookDestination> destinations = new ArrayList<>();
-        if (spec == null || spec.isBlank()) {
-            return destinations;
-        }
-
-        for (String rawLine : spec.split("\\r?\\n")) {
-            String line = rawLine == null ? "" : rawLine.trim();
-            if (line.isEmpty() || line.startsWith("#")) {
-                continue;
-            }
-
-            String type = "generic";
-            String url = line;
-            int pipeIndex = line.indexOf('|');
-            if (pipeIndex > 0) {
-                String candidateType = normalizeWebhookDestinationType(line.substring(0, pipeIndex));
-                String candidateUrl = line.substring(pipeIndex + 1).trim();
-                if (candidateType != null && !candidateUrl.isEmpty()) {
-                    type = candidateType;
-                    url = candidateUrl;
-                }
-            } else {
-                int spaceIndex = line.indexOf(' ');
-                if (spaceIndex > 0) {
-                    String candidateType = normalizeWebhookDestinationType(line.substring(0, spaceIndex));
-                    String candidateUrl = line.substring(spaceIndex + 1).trim();
-                    if (candidateType != null && !candidateUrl.isEmpty()) {
-                        type = candidateType;
-                        url = candidateUrl;
-                    }
-                }
-            }
-
-            if (!url.isEmpty()) {
-                destinations.add(new WebhookDestination(type, url));
-            }
-        }
-
-        return destinations;
-    }
-
-    private static String normalizeWebhookDestinationsSpec(String spec) {
-        if (spec == null || spec.isBlank()) {
-            return "";
-        }
-
-        StringBuilder normalized = new StringBuilder();
-        for (WebhookDestination destination : parseWebhookDestinationsSpec(spec)) {
-            if (normalized.length() > 0) {
-                normalized.append('\n');
-            }
-            normalized.append(destination.getType()).append('|').append(destination.getUrl());
-        }
-        return normalized.toString();
-    }
-
-    private static String normalizeWebhookDestinationType(String rawType) {
-        if (rawType == null) {
-            return null;
-        }
-
-        String normalized = rawType.trim().toLowerCase(java.util.Locale.ENGLISH);
-        switch (normalized) {
-            case "generic":
-            case "webhook":
-            case "raw":
-                return "generic";
-            case "slack":
-                return "slack";
-            case "teams":
-            case "msteams":
-            case "microsoft-teams":
-            case "microsoftteams":
-                return "teams";
-            default:
-                return null;
-        }
-    }
-
     private static String escapeJsonString(String s) {
         if (s == null) return "";
         return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
-    }
-
-    public static final class WebhookDestination {
-        private final String type;
-        private final String url;
-
-        WebhookDestination(String type, String url) {
-            this.type = type;
-            this.url = url;
-        }
-
-        public String getType() {
-            return type;
-        }
-
-        public String getUrl() {
-            return url;
-        }
     }
 }

@@ -149,10 +149,8 @@ public class AnomalyDetector {
                     if (config != null && config.isEnableEmailAlerts()) {
                         sendEmailNotification(alert, config.getAlertEmailAddresses());
                     }
-                    if (config != null) {
-                        for (AuditLoggerConfiguration.WebhookDestination destination : config.getEnabledWebhookDestinations()) {
-                            sendWebhookNotification(alert, destination);
-                        }
+                    if (config != null && config.isEnableWebhookAlerts()) {
+                        sendWebhookNotification(alert, config.getWebhookUrl());
                     }
                 }
             }
@@ -332,24 +330,7 @@ public class AnomalyDetector {
         Transport.send(msg);
     }
 
-    private void sendWebhookNotification(AnomalyAlert alert, AuditLoggerConfiguration.WebhookDestination destination) {
-        if (destination == null) {
-            return;
-        }
-
-        String type = destination.getType();
-        if ("slack".equals(type)) {
-            sendSlackNotification(alert, destination.getUrl());
-            return;
-        }
-        if ("teams".equals(type)) {
-            sendTeamsNotification(alert, destination.getUrl());
-            return;
-        }
-        sendGenericWebhookNotification(alert, destination.getUrl());
-    }
-
-    private void sendGenericWebhookNotification(AnomalyAlert alert, String webhookUrl) {
+    private void sendWebhookNotification(AnomalyAlert alert, String webhookUrl) {
         if (webhookUrl == null || webhookUrl.trim().isEmpty()) {
             return;
         }
@@ -396,30 +377,6 @@ public class AnomalyDetector {
             LOGGER.info("Successfully sent anomaly webhook alert to " + webhookUrl);
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Failed to send anomaly webhook alert", e);
-        }
-    }
-
-    private void sendSlackNotification(AnomalyAlert alert, String webhookUrl) {
-        if (webhookUrl == null || webhookUrl.trim().isEmpty()) return;
-        try {
-            String text = "Jenkins AuditFlow Anomaly: " + alert.type + " - " + alert.details + " (User: " + alert.user + ")";
-            String json = "{\"text\":\"" + escapeJson(text) + "\"}";
-            sendWebhook(webhookUrl.trim(), json);
-            LOGGER.info("Successfully sent anomaly Slack alert");
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Failed to send anomaly Slack alert", e);
-        }
-    }
-
-    private void sendTeamsNotification(AnomalyAlert alert, String webhookUrl) {
-        if (webhookUrl == null || webhookUrl.trim().isEmpty()) return;
-        try {
-            String text = "Jenkins AuditFlow Anomaly: " + alert.type + " - " + alert.details + " (User: " + alert.user + ")";
-            String json = "{\"text\":\"" + escapeJson(text) + "\"}";
-            sendWebhook(webhookUrl.trim(), json);
-            LOGGER.info("Successfully sent anomaly Teams alert");
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Failed to send anomaly Teams alert", e);
         }
     }
 

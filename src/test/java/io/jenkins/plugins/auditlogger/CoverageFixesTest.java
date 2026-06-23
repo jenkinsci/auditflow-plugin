@@ -177,15 +177,13 @@ class CoverageFixesTest {
         // Exercise the configure() JSON path for webhook fields (lines 226-227)
         net.sf.json.JSONObject json = new net.sf.json.JSONObject();
         json.put("enableWebhookAlerts", true);
-        json.put("webhookDestinationsSpec", "generic|https://hooks.example.com/test\nslack|https://hooks.slack.example/test");
+        json.put("webhookUrl", "https://hooks.example.com/test");
         config.configure((org.kohsuke.stapler.StaplerRequest2) null, json);
 
         assertTrue(config.isEnableWebhookAlerts(), "enableWebhookAlerts should be true after configure");
-        assertEquals("generic|https://hooks.example.com/test\nslack|https://hooks.slack.example/test",
-                config.getWebhookDestinationsSpec(),
-                "webhook destinations should be normalized after configure");
-        assertEquals(2, config.getEnabledWebhookDestinations().size(),
-                "two webhook destinations should be available after configure");
+        assertEquals("https://hooks.example.com/test",
+                config.getWebhookUrl(),
+                "webhookUrl should be set after configure");
     }
 
     @Test

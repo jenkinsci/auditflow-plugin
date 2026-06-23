@@ -180,9 +180,9 @@
                          description="When enabled, AuditFlow will POST a JSON payload to the URL below whenever an anomaly is detected — use this to integrate with Slack, PagerDuty, Datadog, or any service that accepts incoming webhooks.">
                     <f:checkbox name="enableWebhookAlerts" checked="${descriptor.isEnableWebhookAlerts()}"/>
                 </f:entry>
-                <f:entry title="Webhook destinations"
-                         description="Add one destination per line. Use generic|URL, slack|URL, or teams|URL. Example: generic|https://example/hooks/audit or slack|https://hooks.slack.com/services/...">
-                    <f:textarea name="webhookDestinationsSpec" value="${descriptor.getWebhookDestinationsSpec()}" clazz="jenkins-input monospaced"/>
+                <f:entry title="Webhook URL"
+                         description="Add a webhook URL to receive anomaly alerts (Slack, Microsoft Teams, PagerDuty, etc.).">
+                    <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
                 </f:entry>
             </f:block>
 
