@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.kohsuke.stapler.verb.GET;
 
 import java.time.ZoneId;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -121,6 +120,16 @@ class AuditLoggerConfigurationTest {
                         "application/json"));
 
         assertEquals(403, failure.getStatusCode());
+    }
+
+    @Test
+    void webhookUrlSetterSupportsSimpleSingleDestination(JenkinsRule j) {
+        AuditLoggerConfiguration configuration = AuditLoggerConfiguration.get();
+
+        configuration.setEnableWebhookAlerts(true);
+        configuration.setWebhookUrl("https://example.invalid/audit");
+        assertTrue(configuration.isEnableWebhookAlerts());
+        assertEquals("https://example.invalid/audit", configuration.getWebhookUrl());
     }
 
     private static JSONObject findOption(JSONArray options, String id) {

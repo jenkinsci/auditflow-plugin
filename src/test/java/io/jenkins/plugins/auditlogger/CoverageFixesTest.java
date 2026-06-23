@@ -181,7 +181,9 @@ class CoverageFixesTest {
         config.configure((org.kohsuke.stapler.StaplerRequest2) null, json);
 
         assertTrue(config.isEnableWebhookAlerts(), "enableWebhookAlerts should be true after configure");
-        assertEquals("https://hooks.example.com/test", config.getWebhookUrl(), "webhookUrl should be set after configure");
+        assertEquals("https://hooks.example.com/test",
+                config.getWebhookUrl(),
+                "webhookUrl should be set after configure");
     }
 
     @Test

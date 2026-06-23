@@ -152,12 +152,6 @@ public class AnomalyDetector {
                     if (config != null && config.isEnableWebhookAlerts()) {
                         sendWebhookNotification(alert, config.getWebhookUrl());
                     }
-                    if (config != null && config.isEnableSlackAlerts()) {
-                        sendSlackNotification(alert, config.getSlackWebhookUrl());
-                    }
-                    if (config != null && config.isEnableTeamsAlerts()) {
-                        sendTeamsNotification(alert, config.getTeamsWebhookUrl());
-                    }
                 }
             }
         }
@@ -383,30 +377,6 @@ public class AnomalyDetector {
             LOGGER.info("Successfully sent anomaly webhook alert to " + webhookUrl);
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Failed to send anomaly webhook alert", e);
-        }
-    }
-
-    private void sendSlackNotification(AnomalyAlert alert, String webhookUrl) {
-        if (webhookUrl == null || webhookUrl.trim().isEmpty()) return;
-        try {
-            String text = "Jenkins AuditFlow Anomaly: " + alert.type + " - " + alert.details + " (User: " + alert.user + ")";
-            String json = "{\"text\":\"" + escapeJson(text) + "\"}";
-            sendWebhook(webhookUrl.trim(), json);
-            LOGGER.info("Successfully sent anomaly Slack alert");
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Failed to send anomaly Slack alert", e);
-        }
-    }
-
-    private void sendTeamsNotification(AnomalyAlert alert, String webhookUrl) {
-        if (webhookUrl == null || webhookUrl.trim().isEmpty()) return;
-        try {
-            String text = "Jenkins AuditFlow Anomaly: " + alert.type + " - " + alert.details + " (User: " + alert.user + ")";
-            String json = "{\"text\":\"" + escapeJson(text) + "\"}";
-            sendWebhook(webhookUrl.trim(), json);
-            LOGGER.info("Successfully sent anomaly Teams alert");
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Failed to send anomaly Teams alert", e);
         }
     }
 

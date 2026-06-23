@@ -162,7 +162,7 @@ public class RouteAwareUrlMatcher {
      * Checks if URI is a configuration/security change endpoint.
      * Valid patterns:
      * - /configureSecurity, /manage/configureSecurity, /manage/configureSecurity/configure
-     * - /manage/configure, /configSubmit, /manage/configSubmit
+     * - /configure, /manage/configure, /configSubmit, /manage/configSubmit
      */
     public static boolean isConfigurationChange(String uri) {
         if (uri == null || uri.isEmpty()) return false;
@@ -183,8 +183,9 @@ public class RouteAwareUrlMatcher {
             return true;
         }
         
-        // Check for /manage/configure, /configSubmit, /manage/configSubmit
-        if ((segments.length == 3 && "manage".equals(segments[1]) && "configure".equals(segments[2])) ||
+        // Check for /configure, /manage/configure, /configSubmit, /manage/configSubmit
+        if ((segments.length == 2 && "configure".equals(segments[1])) ||
+            (segments.length == 3 && "manage".equals(segments[1]) && "configure".equals(segments[2])) ||
             (segments.length == 2 && "configSubmit".equals(segments[1])) ||
             (segments.length == 3 && "manage".equals(segments[1]) && "configSubmit".equals(segments[2]))) {
             return true;

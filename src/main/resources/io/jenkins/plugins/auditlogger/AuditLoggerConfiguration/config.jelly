@@ -180,20 +180,9 @@
                          description="When enabled, AuditFlow will POST a JSON payload to the URL below whenever an anomaly is detected — use this to integrate with Slack, PagerDuty, Datadog, or any service that accepts incoming webhooks.">
                     <f:checkbox name="enableWebhookAlerts" checked="${descriptor.isEnableWebhookAlerts()}"/>
                 </f:entry>
-                <f:entry title="Generic Webhook URL" description="Paste the full POST endpoint URL from your webhook provider (e.g. https://hooks.slack.com/services/...). AuditFlow sends raw JSON with type, severity, user, details, and timestamp fields.">
+                <f:entry title="Webhook URL"
+                         description="Add a webhook URL to receive anomaly alerts (Slack, Microsoft Teams, PagerDuty, etc.).">
                     <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
-                </f:entry>
-                <f:entry title="Enable Slack notifications for anomalies">
-                    <f:checkbox name="enableSlackAlerts" checked="${descriptor.isEnableSlackAlerts()}"/>
-                </f:entry>
-                <f:entry title="Slack Webhook URL" description="Slack Incoming Webhook URL">
-                    <f:textbox name="slackWebhookUrl" value="${descriptor.getSlackWebhookUrl()}"/>
-                </f:entry>
-                <f:entry title="Enable Microsoft Teams notifications for anomalies">
-                    <f:checkbox name="enableTeamsAlerts" checked="${descriptor.isEnableTeamsAlerts()}"/>
-                </f:entry>
-                <f:entry title="Microsoft Teams Webhook URL" description="Teams Incoming Webhook URL">
-                    <f:textbox name="teamsWebhookUrl" value="${descriptor.getTeamsWebhookUrl()}"/>
                 </f:entry>
             </f:block>
 

@@ -35,4 +35,16 @@ class AuditSaveableListenerThemeSuppressionTest {
                 "/manage/configure",
                 Set.of("theme")));
     }
+
+    @Test
+    void suppressesSystemSaveablesDuringConfigurationSubmitRequests() {
+        assertTrue(AuditSaveableListener.shouldSuppressRequestScopedSystemConfigSave(true, "/configure"));
+        assertTrue(AuditSaveableListener.shouldSuppressRequestScopedSystemConfigSave(true, "/manage/configure"));
+    }
+
+    @Test
+    void keepsNonConfigurationSystemSavesAuditable() {
+        assertFalse(AuditSaveableListener.shouldSuppressRequestScopedSystemConfigSave(true, "/job/example/config.xml"));
+        assertFalse(AuditSaveableListener.shouldSuppressRequestScopedSystemConfigSave(false, "/configure"));
+    }
 }

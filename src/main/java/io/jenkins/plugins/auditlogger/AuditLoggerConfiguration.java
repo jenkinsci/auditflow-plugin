@@ -124,12 +124,6 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private boolean enableComplianceReports = false;
     private boolean enableWebhookAlerts = false;
     private String webhookUrl = "";
-    
-    private boolean enableSlackAlerts = false;
-    private String slackWebhookUrl = "";
-
-    private boolean enableTeamsAlerts = false;
-    private String teamsWebhookUrl = "";
 
     // UI
     private boolean enableRiskLevels = true;
@@ -240,10 +234,6 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         // ── Notification toggles (same fix: no json.has() for checkboxes) ──
         setEnableWebhookAlerts(json.optBoolean("enableWebhookAlerts", false));
         if (json.has("webhookUrl")) setWebhookUrl(json.optString("webhookUrl", webhookUrl));
-        setEnableSlackAlerts(json.optBoolean("enableSlackAlerts", false));
-        if (json.has("slackWebhookUrl")) setSlackWebhookUrl(json.optString("slackWebhookUrl", slackWebhookUrl));
-        setEnableTeamsAlerts(json.optBoolean("enableTeamsAlerts", false));
-        if (json.has("teamsWebhookUrl")) setTeamsWebhookUrl(json.optString("teamsWebhookUrl", teamsWebhookUrl));
     }
 
     private static int clamp(int value, int min, int max) {
@@ -299,237 +289,213 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     @DataBoundSetter
     public void setEnableAuthenticationEvents(boolean enableAuthenticationEvents) {
         this.enableAuthenticationEvents = enableAuthenticationEvents;
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnableBuildEvents(boolean enableBuildEvents) {
         this.enableBuildEvents = enableBuildEvents;
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnableJobConfigEvents(boolean enableJobConfigEvents) {
         this.enableJobConfigEvents = enableJobConfigEvents;
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnableCredentialEvents(boolean enableCredentialEvents) {
         this.enableCredentialEvents = enableCredentialEvents;
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnablePluginEvents(boolean enablePluginEvents) {
         this.enablePluginEvents = enablePluginEvents;
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnableSystemConfigEvents(boolean enableSystemConfigEvents) {
         this.enableSystemConfigEvents = enableSystemConfigEvents;
-        save();
     }
+
 
     @DataBoundSetter
     public void setAnomalyFailedLogins(boolean anomalyFailedLogins) {
         this.anomalyFailedLogins = anomalyFailedLogins;
-        save();
     }
+
 
     @DataBoundSetter
     public void setAnomalyFailedLoginsThreshold(int anomalyFailedLoginsThreshold) {
         this.anomalyFailedLoginsThreshold = clamp(anomalyFailedLoginsThreshold, 2, 1000);
-        save();
     }
+
 
     @DataBoundSetter
     public void setAnomalyFailedLoginsWindowMinutes(int anomalyFailedLoginsWindowMinutes) {
         this.anomalyFailedLoginsWindowMinutes = clamp(anomalyFailedLoginsWindowMinutes, 1, 1440);
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnableDashboardStats(boolean enableDashboardStats) {
         this.enableDashboardStats = enableDashboardStats;
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnableRiskLevels(boolean enableRiskLevels) {
         this.enableRiskLevels = enableRiskLevels;
-        save();
     }
+
 
     @DataBoundSetter
     public void setDisplayTimeZoneId(String displayTimeZoneId) {
         this.displayTimeZoneId = sanitizeTimeZoneId(displayTimeZoneId);
-        save();
     }
+
 
     @DataBoundSetter
     public void setShowMetricTotal(boolean showMetricTotal) {
         this.showMetricTotal = showMetricTotal;
-        save();
     }
+
 
     @DataBoundSetter
     public void setShowMetricLogins(boolean showMetricLogins) {
         this.showMetricLogins = showMetricLogins;
-        save();
     }
+
 
     @DataBoundSetter
     public void setShowMetricFailedLogins(boolean showMetricFailedLogins) {
         this.showMetricFailedLogins = showMetricFailedLogins;
-        save();
     }
+
 
     @DataBoundSetter
     public void setShowMetricBuilds(boolean showMetricBuilds) {
         this.showMetricBuilds = showMetricBuilds;
-        save();
     }
+
 
     @DataBoundSetter
     public void setShowMetricJobs(boolean showMetricJobs) {
         this.showMetricJobs = showMetricJobs;
-        save();
     }
+
 
     @DataBoundSetter
     public void setShowMetricConfig(boolean showMetricConfig) {
         this.showMetricConfig = showMetricConfig;
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnableCsvExport(boolean enableCsvExport) {
         this.enableCsvExport = enableCsvExport;
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnableJsonExport(boolean enableJsonExport) {
         this.enableJsonExport = enableJsonExport;
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnableAuditApi(boolean enableAuditApi) {
         this.enableAuditApi = enableAuditApi;
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnableAlertEngine(boolean enableAlertEngine) {
         this.enableAlertEngine = enableAlertEngine;
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnableEmailAlerts(boolean enableEmailAlerts) {
         this.enableEmailAlerts = enableEmailAlerts;
-        save();
     }
+
     //add
     @DataBoundSetter
     public void setEnableWebhookAlerts(boolean enableWebhookAlerts) {
         this.enableWebhookAlerts = enableWebhookAlerts;
-        save();
     }
+
 
     @DataBoundSetter
     public void setAlertEmailAddresses(String alertEmailAddresses) {
         this.alertEmailAddresses = alertEmailAddresses;
-        save();
     }
+
     //add
     @DataBoundSetter
     public void setWebhookUrl(String webhookUrl) {
         this.webhookUrl = webhookUrl;
-        save();
     }
 
-    @DataBoundSetter
-    public void setEnableSlackAlerts(boolean enableSlackAlerts) {
-        this.enableSlackAlerts = enableSlackAlerts;
-        save();
-    }
-
-    @DataBoundSetter
-    public void setSlackWebhookUrl(String slackWebhookUrl) {
-        this.slackWebhookUrl = slackWebhookUrl;
-        save();
-    }
-
-    @DataBoundSetter
-    public void setEnableTeamsAlerts(boolean enableTeamsAlerts) {
-        this.enableTeamsAlerts = enableTeamsAlerts;
-        save();
-    }
-
-    @DataBoundSetter
-    public void setTeamsWebhookUrl(String teamsWebhookUrl) {
-        this.teamsWebhookUrl = teamsWebhookUrl;
-        save();
-    }
 
     @DataBoundSetter
     public void setLogRetentionDays(int logRetentionDays) {
         this.logRetentionDays = clamp(logRetentionDays, 0, 3650);
-        save();
     }
+
 
     @DataBoundSetter
     public void setMaxLogFileSizeMB(int maxLogFileSizeMB) {
         this.maxLogFileSizeMB = clamp(maxLogFileSizeMB, 1, 1024);
-        save();
     }
+
 
     @DataBoundSetter
     public void setEnableLogRotation(boolean enableLogRotation) {
         this.enableLogRotation = enableLogRotation;
-        save();
     }
+
 
     @DataBoundSetter
     public void setStartupGracePeriodSeconds(int startupGracePeriodSeconds) {
         this.startupGracePeriodSeconds = clamp(startupGracePeriodSeconds, 5, 300);
         StartupPhaseManager.setGracePeriodSeconds(this.startupGracePeriodSeconds);
-        save();
     }
+
 
     @DataBoundSetter
     public void setBatchWriteSize(int batchWriteSize) {
         this.batchWriteSize = clamp(batchWriteSize, 1, 10000);
-        save();
     }
+
 
     @DataBoundSetter
     public void setBatchFlushIntervalSeconds(int batchFlushIntervalSeconds) {
         this.batchFlushIntervalSeconds = clamp(batchFlushIntervalSeconds, 1, 300);
-        save();
     }
+
 
     @DataBoundSetter
     public void setMaskTokens(boolean maskTokens) {
         this.maskTokens = maskTokens;
-        save();
     }
+
 
     @DataBoundSetter
     public void setMaskEmailAddresses(boolean maskEmailAddresses) {
         this.maskEmailAddresses = maskEmailAddresses;
-        save();
     }
+
 
     @DataBoundSetter
     public void setMaskCreditCards(boolean maskCreditCards) {
         this.maskCreditCards = maskCreditCards;
-        save();
     }
+
 
     // --- Getters ---
 
@@ -593,10 +559,6 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isEnableComplianceReports() { return enableComplianceReports; }
     public boolean isEnableWebhookAlerts() { return enableWebhookAlerts; }
     public String getWebhookUrl() { return webhookUrl != null ? webhookUrl : ""; }
-    public boolean isEnableSlackAlerts() { return enableSlackAlerts; }
-    public String getSlackWebhookUrl() { return slackWebhookUrl != null ? slackWebhookUrl : ""; }
-    public boolean isEnableTeamsAlerts() { return enableTeamsAlerts; }
-    public String getTeamsWebhookUrl() { return teamsWebhookUrl != null ? teamsWebhookUrl : ""; }
 
     public boolean isEnableRiskLevels() { return enableRiskLevels; }
     public boolean isEnableEventCategories() { return enableEventCategories; }
