@@ -5,6 +5,7 @@ import jenkins.model.Jenkins;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.htmlunit.FailingHttpStatusCodeException;
+import org.htmlunit.html.HtmlPage;
 import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.MockAuthorizationStrategy;
 import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
@@ -130,6 +131,40 @@ class AuditLoggerConfigurationTest {
         configuration.setWebhookUrl("https://example.invalid/audit");
         assertTrue(configuration.isEnableWebhookAlerts());
         assertEquals("https://example.invalid/audit", configuration.getWebhookUrl());
+    }
+
+    @Test
+    void configureJsonPersistsNotificationFields(JenkinsRule j) throws Exception {
+        AuditLoggerConfiguration configuration = new AuditLoggerConfiguration();
+        JSONObject json = new JSONObject();
+
+        json.put("enableEmailAlerts", true);
+        json.put("alertEmailAddresses", "secops@example.com, admins@example.com");
+        json.put("enableWebhookAlerts", true);
+        json.put("webhookUrl", "https://hooks.slack.com/services/T000/B000/XXXX");
+
+        configuration.configure((org.kohsuke.stapler.StaplerRequest2) null, json);
+
+        assertTrue(configuration.isEnableEmailAlerts());
+        assertEquals("secops@example.com, admins@example.com", configuration.getAlertEmailAddresses());
+        assertTrue(configuration.isEnableWebhookAlerts());
+        assertEquals("https://hooks.slack.com/services/T000/B000/XXXX", configuration.getWebhookUrl());
+    }
+
+    @Test
+    void configurePageShowsPhaseOneSectionsAndWebhookGuidance(JenkinsRule j) throws Exception {
+        JenkinsRule.WebClient webClient = j.createWebClient();
+        HtmlPage page = webClient.goTo("configure");
+        String html = page.getWebResponse().getContentAsString();
+
+        assertTrue(html.contains("Authentication"));
+        assertTrue(html.contains("Notifications"));
+        assertTrue(html.contains("System Changes"));
+        assertTrue(html.contains("Operational Monitoring"));
+        assertTrue(html.contains("Advanced"));
+        assertTrue(html.contains("Add a webhook URL to receive anomaly alerts"));
+        assertTrue(html.contains("https://hooks.slack.com/services/T000/B000/XXXX"));
+        assertTrue(html.contains("intended to be reused by future authentication detections"));
     }
 
     private static JSONObject findOption(JSONArray options, String id) {

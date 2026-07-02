@@ -232,6 +232,8 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         setMaskCreditCards(json.optBoolean("maskCreditCards", false));
 
         // ── Notification toggles (same fix: no json.has() for checkboxes) ──
+        setEnableEmailAlerts(json.optBoolean("enableEmailAlerts", false));
+        if (json.has("alertEmailAddresses")) setAlertEmailAddresses(json.optString("alertEmailAddresses", alertEmailAddresses));
         setEnableWebhookAlerts(json.optBoolean("enableWebhookAlerts", false));
         if (json.has("webhookUrl")) setWebhookUrl(json.optString("webhookUrl", webhookUrl));
     }

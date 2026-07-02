@@ -4,207 +4,236 @@
     <f:section title="AuditFlow Configuration">
         <f:block>
             <div class="jenkins-section__description">
-                Control which audit categories are stored, how the dashboard renders them, and which export endpoints stay available.
+                Configure what AuditFlow records, how alerts are delivered, and which dashboard and export features stay visible to admins.
             </div>
         </f:block>
 
-        <f:block>
-            <h4>What to Track</h4>
-            <div class="jenkins-section__description">
-                Uncheck an item to stop capturing and storing that category of audit event.
-            </div>
-            <f:entry title="Authentication (login, logout, failed login, API auth)">
-                <f:checkbox name="enableAuthenticationEvents" checked="${descriptor.isEnableAuthenticationEvents()}"/>
-            </f:entry>
-            <f:entry title="Builds (start, complete, fail, abort, delete)">
-                <f:checkbox name="enableBuildEvents" checked="${descriptor.isEnableBuildEvents()}"/>
-            </f:entry>
-            <f:entry title="Job Changes (create, rename, copy, move, delete, config update)">
-                <f:checkbox name="enableJobConfigEvents" checked="${descriptor.isEnableJobConfigEvents()}"/>
-            </f:entry>
-            <f:entry title="Credentials (create, update, delete, access during builds)">
-                <f:checkbox name="enableCredentialEvents" checked="${descriptor.isEnableCredentialEvents()}"/>
-            </f:entry>
-            <f:entry title="Plugins (install, update, remove, enable, disable)">
-                <f:checkbox name="enablePluginEvents" checked="${descriptor.isEnablePluginEvents()}"/>
-            </f:entry>
-            <f:entry title="System configuration saves (security and global settings)">
-                <f:checkbox name="enableSystemConfigEvents" checked="${descriptor.isEnableSystemConfigEvents()}"/>
-            </f:entry>
-        </f:block>
-
-        <f:block>
-            <h4>Dashboard Display</h4>
-            <div class="jenkins-section__description">
-                These options only change what the dashboard shows. They do not affect logging.
-            </div>
-            <f:entry title="Stats counters row">
-                <f:checkbox name="enableDashboardStats" checked="${descriptor.isEnableDashboardStats()}"/>
-            </f:entry>
-            <f:entry title="Risk level badges (Low / Medium / High / Critical)">
-                <f:checkbox name="enableRiskLevels" checked="${descriptor.isEnableRiskLevels()}"/>
-            </f:entry>
-            <f:entry title="Display time zone"
-                     field="displayTimeZoneId"
-                     description="Stored timestamps stay unchanged. This only controls how AuditFlow renders dates in the UI and exports.">
-                <div class="auditflow-timezone-picker" id="auditflowTimezonePicker">
-                    <input type="hidden" name="displayTimeZoneId" id="auditflowDisplayTimeZoneId" value="${descriptor.displayTimeZoneId}"/>
-                    <div class="auditflow-timezone-picker__combobox">
-                        <input type="text"
-                               class="jenkins-input auditflow-timezone-picker__input"
-                               id="auditflowTimezoneInput"
-                               value="${descriptor.displayTimeZoneDisplayName}"
-                               placeholder="Search time zone"
-                               autocomplete="off"
-                               spellcheck="false"
-                               role="combobox"
-                               aria-autocomplete="list"
-                               aria-expanded="false"
-                               aria-controls="auditflowTimezoneListbox"/>
-                        <button type="button"
-                                class="jenkins-button auditflow-timezone-picker__toggle"
-                                id="auditflowTimezoneToggle"
-                                aria-label="Show time zones">
-                            <span class="auditflow-timezone-picker__toggle-caret" aria-hidden="true"></span>
-                        </button>
-                    </div>
-                    <div class="auditflow-timezone-picker__menu jenkins-hidden" id="auditflowTimezoneMenu">
-                        <div class="auditflow-timezone-picker__list"
-                             id="auditflowTimezoneListbox"
-                             role="listbox"
-                             aria-label="Display time zone options"></div>
-                        <div class="auditflow-timezone-picker__empty jenkins-hidden" id="auditflowTimezoneEmpty">No matching time zones.</div>
-                    </div>
-                    <script type="application/json" id="auditflowTimezoneOptions">${descriptor.availableDisplayTimeZonesJson}</script>
-                </div>
-            </f:entry>
-        </f:block>
-
-        <f:block>
-            <h4>Metric Cards</h4>
-            <div class="jenkins-section__description">
-                Pick which counters show in the stats row.
-            </div>
-            <f:entry title="Total Events">
-                <f:checkbox name="showMetricTotal" checked="${descriptor.isShowMetricTotal()}"/>
-            </f:entry>
-            <f:entry title="Logins">
-                <f:checkbox name="showMetricLogins" checked="${descriptor.isShowMetricLogins()}"/>
-            </f:entry>
-            <f:entry title="Failed Logins">
-                <f:checkbox name="showMetricFailedLogins" checked="${descriptor.isShowMetricFailedLogins()}"/>
-            </f:entry>
-            <f:entry title="Build Events">
-                <f:checkbox name="showMetricBuilds" checked="${descriptor.isShowMetricBuilds()}"/>
-            </f:entry>
-            <f:entry title="Job Events">
-                <f:checkbox name="showMetricJobs" checked="${descriptor.isShowMetricJobs()}"/>
-            </f:entry>
-            <f:entry title="Config Changes">
-                <f:checkbox name="showMetricConfig" checked="${descriptor.isShowMetricConfig()}"/>
-            </f:entry>
-        </f:block>
-
-        <f:block>
-            <h4>Export</h4>
-            <div class="jenkins-section__description">
-                These switches only enable or disable the export and API endpoints.
-            </div>
-            <f:entry title="CSV Export">
-                <f:checkbox name="enableCsvExport" checked="${descriptor.isEnableCsvExport()}"/>
-            </f:entry>
-            <f:entry title="JSON Export">
-                <f:checkbox name="enableJsonExport" checked="${descriptor.isEnableJsonExport()}"/>
-            </f:entry>
-            <f:entry title="REST API endpoint (/auditflow/api)">
-                <f:checkbox name="enableAuditApi" checked="${descriptor.isEnableAuditApi()}"/>
-            </f:entry>
-        </f:block>
-
-        <f:advanced title="Advanced Settings">
+        <details open="open">
+            <summary><strong>Authentication</strong></summary>
             <f:block>
-                <h4>Log Retention</h4>
                 <div class="jenkins-section__description">
-                    AuditFlow stores audit entries in rotating log files on the controller.
+                    Capture sign-in activity and tune shared authentication alert settings without creating separate thresholds for each auth-related rule.
                 </div>
-                <f:entry title="Keep logs for (days, 0 = forever)">
-                    <f:number name="logRetentionDays" value="${descriptor.getLogRetentionDays()}"/>
+                <f:entry title="Authentication events"
+                         description="Log login, logout, failed login, and API authentication activity.">
+                    <f:checkbox name="enableAuthenticationEvents" checked="${descriptor.isEnableAuthenticationEvents()}"/>
                 </f:entry>
-                <f:entry title="Max log file size (MB)">
-                    <f:number name="maxLogFileSizeMB" value="${descriptor.getMaxLogFileSizeMB()}"/>
-                </f:entry>
-                <f:entry title="Auto-rotate when size exceeded">
-                    <f:checkbox name="enableLogRotation" checked="${descriptor.isEnableLogRotation()}"/>
-                </f:entry>
-            </f:block>
-
-            <f:block>
-                <h4>Performance</h4>
-                <div class="jenkins-section__description">
-                    Batch settings control write throughput. Failed-login detection is lightweight and configurable below.
-                </div>
-                <f:entry title="Startup grace period (seconds)"
-                         description="Suppress config-reload noise during startup. Valid range: 5-300.">
-                    <f:number name="startupGracePeriodSeconds" value="${descriptor.getStartupGracePeriodSeconds()}"/>
-                </f:entry>
-                <f:entry title="Batch write size">
-                    <f:number name="batchWriteSize" value="${descriptor.getBatchWriteSize()}"/>
-                </f:entry>
-                <f:entry title="Batch flush interval (seconds)">
-                    <f:number name="batchFlushIntervalSeconds" value="${descriptor.getBatchFlushIntervalSeconds()}"/>
-                </f:entry>
-            </f:block>
-
-            <f:block>
-                <h4>Failed Login Detection</h4>
-                <div class="jenkins-section__description">
-                    Detect repeated failed logins for the same username and surface them in the AuditFlow dashboard.
-                </div>
-                <f:entry title="Enable failed login anomaly detection">
+                <f:entry title="Failed login anomaly detection"
+                         description="Raise an AuditFlow alert when repeated failed logins suggest a brute-force attempt.">
                     <f:checkbox name="anomalyFailedLogins" checked="${descriptor.isAnomalyFailedLogins()}"/>
                 </f:entry>
-                <f:entry title="Alert threshold"
-                         description="Raise an alert after this many failed logins for the same user within the configured window.">
+                <f:entry title="Authentication alert threshold"
+                         description="Used by failed-login detection today and intended to be reused by future authentication detections.">
                     <f:number name="anomalyFailedLoginsThreshold" value="${descriptor.getAnomalyFailedLoginsThreshold()}"/>
                 </f:entry>
-                <f:entry title="Window (minutes)">
+                <f:entry title="Authentication detection window (minutes)"
+                         description="Count failed logins inside this rolling time window before raising an alert.">
                     <f:number name="anomalyFailedLoginsWindowMinutes" value="${descriptor.getAnomalyFailedLoginsWindowMinutes()}"/>
                 </f:entry>
-                <f:entry title="Enable email notifications for anomalies">
+            </f:block>
+        </details>
+
+        <details open="open">
+            <summary><strong>Notifications</strong></summary>
+            <f:block>
+                <div class="jenkins-section__description">
+                    Send anomaly alerts through email or a single webhook endpoint. Keep one destination URL here to avoid duplicate payload formats and extra clutter.
+                </div>
+                <f:entry title="Email notifications"
+                         description="Send anomaly alerts through Jenkins mail settings when an active alert is created.">
                     <f:checkbox name="enableEmailAlerts" checked="${descriptor.isEnableEmailAlerts()}"/>
                 </f:entry>
-                <f:entry title="Alert email addresses" description="Comma-separated list of emails to receive high-risk anomaly alerts">
+                <f:entry title="Alert email addresses"
+                         description="Comma-separated recipients for anomaly emails, for example: secops@example.com, admins@example.com">
                     <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
                 </f:entry>
-                <f:entry title="Enable webhook notifications for anomalies"
-                         description="When enabled, AuditFlow will POST a JSON payload to the URL below whenever an anomaly is detected — use this to integrate with Slack, PagerDuty, Datadog, or any service that accepts incoming webhooks.">
+                <f:entry title="Webhook notifications"
+                         description="POST the same anomaly JSON payload to one webhook endpoint whenever a new alert is created.">
                     <f:checkbox name="enableWebhookAlerts" checked="${descriptor.isEnableWebhookAlerts()}"/>
                 </f:entry>
                 <f:entry title="Webhook URL"
-                         description="Add a webhook URL to receive anomaly alerts (Slack, Microsoft Teams, PagerDuty, etc.).">
+                         description="Add a webhook URL to receive anomaly alerts (Slack, Microsoft Teams, PagerDuty, etc.). Example: https://hooks.slack.com/services/T000/B000/XXXX">
                     <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
                 </f:entry>
             </f:block>
+        </details>
 
+        <details>
+            <summary><strong>System Changes</strong></summary>
             <f:block>
-                <h4>Privacy / Data Masking</h4>
-                <f:entry title="Mask tokens and secrets">
+                <div class="jenkins-section__description">
+                    Control which high-impact administrative changes are written to the audit log.
+                </div>
+                <f:entry title="Job change events"
+                         description="Log job create, rename, copy, move, delete, and configuration update actions.">
+                    <f:checkbox name="enableJobConfigEvents" checked="${descriptor.isEnableJobConfigEvents()}"/>
+                </f:entry>
+                <f:entry title="Credential events"
+                         description="Log credential create, update, delete, and build-time usage events.">
+                    <f:checkbox name="enableCredentialEvents" checked="${descriptor.isEnableCredentialEvents()}"/>
+                </f:entry>
+                <f:entry title="Plugin events"
+                         description="Log plugin install, update, removal, enable, and disable actions.">
+                    <f:checkbox name="enablePluginEvents" checked="${descriptor.isEnablePluginEvents()}"/>
+                </f:entry>
+                <f:entry title="Global and security configuration saves"
+                         description="Log Configure System and security-related saves as a single configuration change event.">
+                    <f:checkbox name="enableSystemConfigEvents" checked="${descriptor.isEnableSystemConfigEvents()}"/>
+                </f:entry>
+            </f:block>
+        </details>
+
+        <details>
+            <summary><strong>Operational Monitoring</strong></summary>
+            <f:block>
+                <div class="jenkins-section__description">
+                    Tune what operators see in AuditFlow without affecting the underlying audit log retention.
+                </div>
+
+                <h4>Event Coverage</h4>
+                <f:entry title="Build events"
+                         description="Log build start, completion, failure, abort, and delete activity.">
+                    <f:checkbox name="enableBuildEvents" checked="${descriptor.isEnableBuildEvents()}"/>
+                </f:entry>
+
+                <h4>Dashboard Display</h4>
+                <f:entry title="Stats counters row"
+                         description="Show the summary counter row above the dashboard event list.">
+                    <f:checkbox name="enableDashboardStats" checked="${descriptor.isEnableDashboardStats()}"/>
+                </f:entry>
+                <f:entry title="Risk level badges"
+                         description="Display Low, Medium, High, and Critical badges beside each event.">
+                    <f:checkbox name="enableRiskLevels" checked="${descriptor.isEnableRiskLevels()}"/>
+                </f:entry>
+                <f:entry title="Display time zone"
+                         field="displayTimeZoneId"
+                         description="Stored timestamps stay unchanged. This only controls how AuditFlow renders dates in the UI and exports.">
+                    <div class="auditflow-timezone-picker" id="auditflowTimezonePicker">
+                        <input type="hidden" name="displayTimeZoneId" id="auditflowDisplayTimeZoneId" value="${descriptor.displayTimeZoneId}"/>
+                        <div class="auditflow-timezone-picker__combobox">
+                            <input type="text"
+                                   class="jenkins-input auditflow-timezone-picker__input"
+                                   id="auditflowTimezoneInput"
+                                   value="${descriptor.displayTimeZoneDisplayName}"
+                                   placeholder="Search time zone"
+                                   autocomplete="off"
+                                   spellcheck="false"
+                                   role="combobox"
+                                   aria-autocomplete="list"
+                                   aria-expanded="false"
+                                   aria-controls="auditflowTimezoneListbox"/>
+                            <button type="button"
+                                    class="jenkins-button auditflow-timezone-picker__toggle"
+                                    id="auditflowTimezoneToggle"
+                                    aria-label="Show time zones">
+                                <span class="auditflow-timezone-picker__toggle-caret" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                        <div class="auditflow-timezone-picker__menu jenkins-hidden" id="auditflowTimezoneMenu">
+                            <div class="auditflow-timezone-picker__list"
+                                 id="auditflowTimezoneListbox"
+                                 role="listbox"
+                                 aria-label="Display time zone options"></div>
+                            <div class="auditflow-timezone-picker__empty jenkins-hidden" id="auditflowTimezoneEmpty">No matching time zones.</div>
+                        </div>
+                        <script type="application/json" id="auditflowTimezoneOptions">${descriptor.availableDisplayTimeZonesJson}</script>
+                    </div>
+                </f:entry>
+
+                <h4>Metric Cards</h4>
+                <div class="jenkins-section__description">
+                    Choose which counters appear in the dashboard stats row.
+                </div>
+                <f:entry title="Total events"
+                         description="Show the total number of audit records captured by AuditFlow.">
+                    <f:checkbox name="showMetricTotal" checked="${descriptor.isShowMetricTotal()}"/>
+                </f:entry>
+                <f:entry title="Logins"
+                         description="Show successful login activity in the stats row.">
+                    <f:checkbox name="showMetricLogins" checked="${descriptor.isShowMetricLogins()}"/>
+                </f:entry>
+                <f:entry title="Failed logins"
+                         description="Show failed authentication attempts in the stats row.">
+                    <f:checkbox name="showMetricFailedLogins" checked="${descriptor.isShowMetricFailedLogins()}"/>
+                </f:entry>
+                <f:entry title="Build events"
+                         description="Show build-related audit activity in the stats row.">
+                    <f:checkbox name="showMetricBuilds" checked="${descriptor.isShowMetricBuilds()}"/>
+                </f:entry>
+                <f:entry title="Job events"
+                         description="Show job and pipeline change activity in the stats row.">
+                    <f:checkbox name="showMetricJobs" checked="${descriptor.isShowMetricJobs()}"/>
+                </f:entry>
+                <f:entry title="Configuration changes"
+                         description="Show global and security configuration saves in the stats row.">
+                    <f:checkbox name="showMetricConfig" checked="${descriptor.isShowMetricConfig()}"/>
+                </f:entry>
+
+                <h4>Export and API</h4>
+                <f:entry title="CSV export"
+                         description="Enable the CSV export action from the AuditFlow UI.">
+                    <f:checkbox name="enableCsvExport" checked="${descriptor.isEnableCsvExport()}"/>
+                </f:entry>
+                <f:entry title="JSON export"
+                         description="Enable the JSON export action from the AuditFlow UI.">
+                    <f:checkbox name="enableJsonExport" checked="${descriptor.isEnableJsonExport()}"/>
+                </f:entry>
+                <f:entry title="REST API endpoint (/auditflow/api)"
+                         description="Expose the AuditFlow REST API for dashboards, scripts, and external integrations.">
+                    <f:checkbox name="enableAuditApi" checked="${descriptor.isEnableAuditApi()}"/>
+                </f:entry>
+            </f:block>
+        </details>
+
+        <details>
+            <summary><strong>Advanced</strong></summary>
+            <f:block>
+                <div class="jenkins-section__description">
+                    Use these settings for retention, performance tuning, and masking. Most installations can keep the defaults.
+                </div>
+
+                <h4>Log Retention</h4>
+                <f:entry title="Keep logs for (days, 0 = forever)"
+                         description="Delete on-disk audit logs older than this many days, or keep them forever with 0.">
+                    <f:number name="logRetentionDays" value="${descriptor.getLogRetentionDays()}"/>
+                </f:entry>
+                <f:entry title="Max log file size (MB)"
+                         description="Rotate to a new audit log file after the current file reaches this size.">
+                    <f:number name="maxLogFileSizeMB" value="${descriptor.getMaxLogFileSizeMB()}"/>
+                </f:entry>
+                <f:entry title="Auto-rotate when size exceeded"
+                         description="Automatically create a new audit log file when the current file reaches the size limit.">
+                    <f:checkbox name="enableLogRotation" checked="${descriptor.isEnableLogRotation()}"/>
+                </f:entry>
+
+                <h4>Performance</h4>
+                <f:entry title="Startup grace period (seconds)"
+                         description="Suppress startup and reload noise for this many seconds after Jenkins comes up. Valid range: 5-300.">
+                    <f:number name="startupGracePeriodSeconds" value="${descriptor.getStartupGracePeriodSeconds()}"/>
+                </f:entry>
+                <f:entry title="Batch write size"
+                         description="Flush audit events in batches of this size to balance throughput and disk writes.">
+                    <f:number name="batchWriteSize" value="${descriptor.getBatchWriteSize()}"/>
+                </f:entry>
+                <f:entry title="Batch flush interval (seconds)"
+                         description="Flush queued audit events after this many seconds even if the batch size is not reached.">
+                    <f:number name="batchFlushIntervalSeconds" value="${descriptor.getBatchFlushIntervalSeconds()}"/>
+                </f:entry>
+
+                <h4>Privacy and Masking</h4>
+                <f:entry title="Mask tokens and secrets"
+                         description="Redact API tokens, secret values, and similar credentials from stored audit messages.">
                     <f:checkbox name="maskTokens" checked="${descriptor.isMaskTokens()}"/>
                 </f:entry>
-                <f:entry title="Mask email addresses">
+                <f:entry title="Mask email addresses"
+                         description="Redact email addresses from stored audit messages when possible.">
                     <f:checkbox name="maskEmailAddresses" checked="${descriptor.isMaskEmailAddresses()}"/>
                 </f:entry>
-                <f:entry title="Mask credit card numbers">
+                <f:entry title="Mask credit card numbers"
+                         description="Redact values that match common credit card formats from stored audit messages.">
                     <f:checkbox name="maskCreditCards" checked="${descriptor.isMaskCreditCards()}"/>
                 </f:entry>
             </f:block>
-
-            <f:block>
-                <h4>API</h4>
-                <div class="jenkins-section__description">
-                    Only currently supported runtime options are shown on this page.
-                </div>
-            </f:block>
-        </f:advanced>
+        </details>
     </f:section>
 </j:jelly>
