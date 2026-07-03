@@ -157,14 +157,15 @@ class AuditLoggerConfigurationTest {
         HtmlPage page = webClient.goTo("configure");
         String html = page.getWebResponse().getContentAsString();
 
-        assertTrue(html.contains("Authentication"));
+        assertTrue(html.contains("General"));
         assertTrue(html.contains("Notifications"));
-        assertTrue(html.contains("System Changes"));
+        assertTrue(html.contains("Authentication Anomalies"));
+        assertTrue(html.contains("System Change Monitoring"));
         assertTrue(html.contains("Operational Monitoring"));
         assertTrue(html.contains("Advanced"));
-        assertTrue(html.contains("Add a webhook URL to receive anomaly alerts"));
+        assertTrue(html.contains("Enter a valid HTTP webhook endpoint"));
         assertTrue(html.contains("https://hooks.slack.com/services/T000/B000/XXXX"));
-        assertTrue(html.contains("intended to be reused by future authentication detections"));
+        assertTrue(html.contains("Shared threshold and time-window patterns keep future authentication detections consistent"));
     }
 
     private static JSONObject findOption(JSONArray options, String id) {
