@@ -134,14 +134,29 @@ class AuditLoggerConfigurationTest {
     }
 
     @Test
-    void configureJsonPersistsNotificationFields(JenkinsRule j) throws Exception {
+    void configureJsonSupportsOptionalBlockPayloads(JenkinsRule j) throws Exception {
         AuditLoggerConfiguration configuration = new AuditLoggerConfiguration();
         JSONObject json = new JSONObject();
+        JSONObject emailAlerts = new JSONObject();
+        JSONObject webhookAlerts = new JSONObject();
+        JSONObject failedLoginDetection = new JSONObject();
+        JSONObject dashboardStats = new JSONObject();
 
-        json.put("enableEmailAlerts", true);
-        json.put("alertEmailAddresses", "secops@example.com, admins@example.com");
-        json.put("enableWebhookAlerts", true);
-        json.put("webhookUrl", "https://hooks.slack.com/services/T000/B000/XXXX");
+        emailAlerts.put("alertEmailAddresses", "secops@example.com, admins@example.com");
+        webhookAlerts.put("webhookUrl", "https://hooks.slack.com/services/T000/B000/XXXX");
+        failedLoginDetection.put("anomalyFailedLoginsThreshold", 4);
+        failedLoginDetection.put("anomalyFailedLoginsWindowMinutes", 12);
+        dashboardStats.put("showMetricTotal", true);
+        dashboardStats.put("showMetricLogins", false);
+        dashboardStats.put("showMetricFailedLogins", true);
+        dashboardStats.put("showMetricBuilds", true);
+        dashboardStats.put("showMetricJobs", false);
+        dashboardStats.put("showMetricConfig", true);
+
+        json.put("enableEmailAlerts", emailAlerts);
+        json.put("enableWebhookAlerts", webhookAlerts);
+        json.put("anomalyFailedLogins", failedLoginDetection);
+        json.put("enableDashboardStats", dashboardStats);
 
         configuration.configure((org.kohsuke.stapler.StaplerRequest2) null, json);
 
@@ -149,6 +164,16 @@ class AuditLoggerConfigurationTest {
         assertEquals("secops@example.com, admins@example.com", configuration.getAlertEmailAddresses());
         assertTrue(configuration.isEnableWebhookAlerts());
         assertEquals("https://hooks.slack.com/services/T000/B000/XXXX", configuration.getWebhookUrl());
+        assertTrue(configuration.isAnomalyFailedLogins());
+        assertEquals(4, configuration.getAnomalyFailedLoginsThreshold());
+        assertEquals(12, configuration.getAnomalyFailedLoginsWindowMinutes());
+        assertTrue(configuration.isEnableDashboardStats());
+        assertTrue(configuration.isShowMetricTotal());
+        assertFalse(configuration.isShowMetricLogins());
+        assertTrue(configuration.isShowMetricFailedLogins());
+        assertTrue(configuration.isShowMetricBuilds());
+        assertFalse(configuration.isShowMetricJobs());
+        assertTrue(configuration.isShowMetricConfig());
     }
 
     @Test

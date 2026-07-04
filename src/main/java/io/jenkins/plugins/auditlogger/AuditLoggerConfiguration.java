@@ -162,16 +162,10 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean configure(StaplerRequest2 req, JSONObject json) throws Descriptor.FormException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         try (BulkChange bulkChange = new BulkChange(this)) {
-            boolean configured;
-            if (req == null) {
-                applyJsonConfiguration(json);
-                configured = true;
-            } else {
-                configured = super.configure(req, json);
-            }
+            applyJsonConfiguration(json);
             StartupPhaseManager.setGracePeriodSeconds(startupGracePeriodSeconds);
             bulkChange.commit();
-            return configured;
+            return true;
         } catch (IOException e) {
             LOGGER.warning("Failed to save AuditFlow configuration: " + e.getMessage());
             return false;
@@ -194,24 +188,28 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         setEnableCredentialEvents(json.optBoolean("enableCredentialEvents", false));
         setEnablePluginEvents(json.optBoolean("enablePluginEvents", false));
         setEnableSystemConfigEvents(json.optBoolean("enableSystemConfigEvents", false));
-        setAnomalyFailedLogins(json.optBoolean("anomalyFailedLogins", false));
-        if (json.has("anomalyFailedLoginsThreshold")) {
-            setAnomalyFailedLoginsThreshold(json.optInt("anomalyFailedLoginsThreshold", anomalyFailedLoginsThreshold));
+        JSONObject failedLoginBlock = getOptionalBlock(json, "anomalyFailedLogins");
+        setAnomalyFailedLogins(isOptionalBlockEnabled(json, "anomalyFailedLogins"));
+        JSONObject failedLoginConfig = failedLoginBlock != null ? failedLoginBlock : json;
+        if (failedLoginConfig.has("anomalyFailedLoginsThreshold")) {
+            setAnomalyFailedLoginsThreshold(failedLoginConfig.optInt("anomalyFailedLoginsThreshold", anomalyFailedLoginsThreshold));
         }
-        if (json.has("anomalyFailedLoginsWindowMinutes")) {
-            setAnomalyFailedLoginsWindowMinutes(json.optInt("anomalyFailedLoginsWindowMinutes", anomalyFailedLoginsWindowMinutes));
+        if (failedLoginConfig.has("anomalyFailedLoginsWindowMinutes")) {
+            setAnomalyFailedLoginsWindowMinutes(failedLoginConfig.optInt("anomalyFailedLoginsWindowMinutes", anomalyFailedLoginsWindowMinutes));
         }
 
         // ── Dashboard display toggles ──
-        setEnableDashboardStats(json.optBoolean("enableDashboardStats", false));
+        JSONObject dashboardStatsBlock = getOptionalBlock(json, "enableDashboardStats");
+        setEnableDashboardStats(isOptionalBlockEnabled(json, "enableDashboardStats"));
         setEnableRiskLevels(json.optBoolean("enableRiskLevels", false));
         if (json.has("displayTimeZoneId")) setDisplayTimeZoneId(json.optString("displayTimeZoneId", displayTimeZoneId));
-        setShowMetricTotal(json.optBoolean("showMetricTotal", false));
-        setShowMetricLogins(json.optBoolean("showMetricLogins", false));
-        setShowMetricFailedLogins(json.optBoolean("showMetricFailedLogins", false));
-        setShowMetricBuilds(json.optBoolean("showMetricBuilds", false));
-        setShowMetricJobs(json.optBoolean("showMetricJobs", false));
-        setShowMetricConfig(json.optBoolean("showMetricConfig", false));
+        JSONObject dashboardStatsConfig = dashboardStatsBlock != null ? dashboardStatsBlock : json;
+        setShowMetricTotal(dashboardStatsConfig.optBoolean("showMetricTotal", false));
+        setShowMetricLogins(dashboardStatsConfig.optBoolean("showMetricLogins", false));
+        setShowMetricFailedLogins(dashboardStatsConfig.optBoolean("showMetricFailedLogins", false));
+        setShowMetricBuilds(dashboardStatsConfig.optBoolean("showMetricBuilds", false));
+        setShowMetricJobs(dashboardStatsConfig.optBoolean("showMetricJobs", false));
+        setShowMetricConfig(dashboardStatsConfig.optBoolean("showMetricConfig", false));
 
         // ── Export toggles ──
         setEnableCsvExport(json.optBoolean("enableCsvExport", false));
@@ -232,10 +230,23 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         setMaskCreditCards(json.optBoolean("maskCreditCards", false));
 
         // ── Notification toggles (same fix: no json.has() for checkboxes) ──
-        setEnableEmailAlerts(json.optBoolean("enableEmailAlerts", false));
-        if (json.has("alertEmailAddresses")) setAlertEmailAddresses(json.optString("alertEmailAddresses", alertEmailAddresses));
-        setEnableWebhookAlerts(json.optBoolean("enableWebhookAlerts", false));
-        if (json.has("webhookUrl")) setWebhookUrl(json.optString("webhookUrl", webhookUrl));
+        JSONObject emailAlertsBlock = getOptionalBlock(json, "enableEmailAlerts");
+        setEnableEmailAlerts(isOptionalBlockEnabled(json, "enableEmailAlerts"));
+        JSONObject emailAlertsConfig = emailAlertsBlock != null ? emailAlertsBlock : json;
+        if (emailAlertsConfig.has("alertEmailAddresses")) setAlertEmailAddresses(emailAlertsConfig.optString("alertEmailAddresses", alertEmailAddresses));
+        JSONObject webhookAlertsBlock = getOptionalBlock(json, "enableWebhookAlerts");
+        setEnableWebhookAlerts(isOptionalBlockEnabled(json, "enableWebhookAlerts"));
+        JSONObject webhookAlertsConfig = webhookAlertsBlock != null ? webhookAlertsBlock : json;
+        if (webhookAlertsConfig.has("webhookUrl")) setWebhookUrl(webhookAlertsConfig.optString("webhookUrl", webhookUrl));
+    }
+
+    private static JSONObject getOptionalBlock(JSONObject json, String key) {
+        Object value = json.opt(key);
+        return value instanceof JSONObject ? (JSONObject) value : null;
+    }
+
+    private static boolean isOptionalBlockEnabled(JSONObject json, String key) {
+        return getOptionalBlock(json, key) != null || json.optBoolean(key, false);
     }
 
     private static int clamp(int value, int min, int max) {
