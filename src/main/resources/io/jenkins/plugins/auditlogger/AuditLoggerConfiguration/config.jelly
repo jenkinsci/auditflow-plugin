@@ -25,89 +25,6 @@
         <f:entry title="Risk level badges (display Low, Medium, High, and Critical labels beside events)">
             <f:checkbox name="enableRiskLevels" checked="${descriptor.isEnableRiskLevels()}"/>
         </f:entry>
-        <f:entry title="Display time zone"
-                 field="displayTimeZoneId"
-                 description="Choose how AuditFlow displays timestamps in the UI and exports. Stored event timestamps are not modified.">
-            <div class="auditflow-timezone-picker" id="auditflowTimezonePicker">
-                <input type="hidden" name="displayTimeZoneId" id="auditflowDisplayTimeZoneId" value="${descriptor.displayTimeZoneId}"/>
-                <div class="auditflow-timezone-picker__combobox">
-                    <input type="text"
-                           class="jenkins-input auditflow-timezone-picker__input"
-                           id="auditflowTimezoneInput"
-                           value="${descriptor.displayTimeZoneDisplayName}"
-                           placeholder="Search time zone"
-                           autocomplete="off"
-                           spellcheck="false"
-                           role="combobox"
-                           aria-autocomplete="list"
-                           aria-expanded="false"
-                           aria-controls="auditflowTimezoneListbox"/>
-                    <button type="button"
-                            class="jenkins-button auditflow-timezone-picker__toggle"
-                            id="auditflowTimezoneToggle"
-                            aria-label="Show time zones">
-                        <span class="auditflow-timezone-picker__toggle-caret" aria-hidden="true"></span>
-                    </button>
-                </div>
-                <div class="auditflow-timezone-picker__menu jenkins-hidden" id="auditflowTimezoneMenu">
-                    <div class="auditflow-timezone-picker__list"
-                         id="auditflowTimezoneListbox"
-                         role="listbox"
-                         aria-label="Display time zone options"></div>
-                    <div class="auditflow-timezone-picker__empty jenkins-hidden" id="auditflowTimezoneEmpty">No matching time zones.</div>
-                </div>
-                <script type="application/json" id="auditflowTimezoneOptions">${descriptor.availableDisplayTimeZonesJson}</script>
-            </div>
-        </f:entry>
-    </f:section>
-
-    <f:section title="Notifications">
-        <f:block>
-            <div class="jenkins-section__description">
-                Configure how AuditFlow sends anomaly alerts after a new alert is created. These settings do not change detection logic.
-            </div>
-        </f:block>
-        <f:optionalBlock title="Email notifications (send anomaly alerts through Jenkins mail settings)"
-                         name="enableEmailAlerts"
-                         checked="${descriptor.isEnableEmailAlerts()}">
-            <f:entry title="Alert email addresses"
-                     description="Comma-separated recipients for anomaly emails, for example: secops@example.com, admins@example.com">
-                <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
-            </f:entry>
-        </f:optionalBlock>
-        <f:optionalBlock title="Webhook notifications (send anomaly alerts to a webhook endpoint using the same JSON payload)"
-                         name="enableWebhookAlerts"
-                         checked="${descriptor.isEnableWebhookAlerts()}">
-            <f:entry title="Webhook URL"
-                     description="Enter a valid HTTP webhook endpoint such as Slack, Microsoft Teams, or another supported service. AuditFlow sends a JSON payload whenever a new anomaly alert is detected. Example: https://hooks.slack.com/services/T000/B000/XXXX">
-                <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
-            </f:entry>
-        </f:optionalBlock>
-    </f:section>
-
-    <f:section title="Anomaly Detection">
-        <f:block>
-            <div class="jenkins-section__description">
-                Configure anomaly rules such as authentication anomalies here. Shared threshold and time-window patterns keep future detections consistent as more anomaly types are added.
-            </div>
-        </f:block>
-        <f:optionalBlock title="Failed login anomaly detection"
-                         name="anomalyFailedLogins"
-                         checked="${descriptor.isAnomalyFailedLogins()}">
-            <f:block>
-                <div class="jenkins-section__description">
-                    Raise an alert for repeated failed logins on the same account.
-                </div>
-            </f:block>
-            <f:entry title="Authentication alert threshold"
-                     description="Number of failed login attempts required before an authentication anomaly alert is raised.">
-                <f:number name="anomalyFailedLoginsThreshold" value="${descriptor.getAnomalyFailedLoginsThreshold()}"/>
-            </f:entry>
-            <f:entry title="Authentication detection window (minutes)"
-                     description="Rolling time window used when counting failed logins toward the alert threshold.">
-                <f:number name="anomalyFailedLoginsWindowMinutes" value="${descriptor.getAnomalyFailedLoginsWindowMinutes()}"/>
-            </f:entry>
-        </f:optionalBlock>
     </f:section>
 
     <f:section title="System Change Monitoring">
@@ -161,6 +78,89 @@
             </f:entry>
             <f:entry title="Configuration changes (show global and security configuration changes in the stats row)">
                 <f:checkbox name="showMetricConfig" checked="${descriptor.isShowMetricConfig()}"/>
+            </f:entry>
+        </f:optionalBlock>
+        <f:block>
+            <h4>Display Time Zone</h4>
+            <div class="jenkins-section__description">
+                Choose how AuditFlow displays timestamps in the UI and exports. Stored event timestamps are not modified.
+            </div>
+        </f:block>
+        <f:entry title="Display time zone" field="displayTimeZoneId">
+            <div class="auditflow-timezone-picker" id="auditflowTimezonePicker">
+                <input type="hidden" name="displayTimeZoneId" id="auditflowDisplayTimeZoneId" value="${descriptor.displayTimeZoneId}"/>
+                <div class="auditflow-timezone-picker__combobox">
+                    <input type="text"
+                           class="jenkins-input auditflow-timezone-picker__input"
+                           id="auditflowTimezoneInput"
+                           value="${descriptor.displayTimeZoneDisplayName}"
+                           placeholder="Search time zone"
+                           autocomplete="off"
+                           spellcheck="false"
+                           role="combobox"
+                           aria-autocomplete="list"
+                           aria-expanded="false"
+                           aria-controls="auditflowTimezoneListbox"/>
+                    <button type="button"
+                            class="jenkins-button auditflow-timezone-picker__toggle"
+                            id="auditflowTimezoneToggle"
+                            aria-label="Show time zones">
+                        <span class="auditflow-timezone-picker__toggle-caret" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <div class="auditflow-timezone-picker__menu jenkins-hidden" id="auditflowTimezoneMenu">
+                    <div class="auditflow-timezone-picker__list"
+                         id="auditflowTimezoneListbox"
+                         role="listbox"
+                         aria-label="Display time zone options"></div>
+                    <div class="auditflow-timezone-picker__empty jenkins-hidden" id="auditflowTimezoneEmpty">No matching time zones.</div>
+                </div>
+                <script type="application/json" id="auditflowTimezoneOptions">${descriptor.availableDisplayTimeZonesJson}</script>
+            </div>
+        </f:entry>
+        <f:block>
+            <h4>Notifications</h4>
+            <div class="jenkins-section__description">
+                Configure how AuditFlow sends anomaly alerts after a new alert is created. These settings do not change detection logic.
+            </div>
+        </f:block>
+        <f:optionalBlock title="Email notifications (send anomaly alerts through Jenkins mail settings)"
+                         name="enableEmailAlerts"
+                         checked="${descriptor.isEnableEmailAlerts()}">
+            <f:entry title="Alert email addresses"
+                     description="Comma-separated recipients for anomaly emails, for example: secops@example.com, admins@example.com">
+                <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
+            </f:entry>
+        </f:optionalBlock>
+        <f:optionalBlock title="Webhook notifications (send anomaly alerts to a webhook endpoint using the same JSON payload)"
+                         name="enableWebhookAlerts"
+                         checked="${descriptor.isEnableWebhookAlerts()}">
+            <f:entry title="Webhook URL"
+                     description="Enter a valid HTTP webhook endpoint such as Slack, Microsoft Teams, or another supported service. AuditFlow sends a JSON payload whenever a new anomaly alert is detected. Example: https://hooks.slack.com/services/T000/B000/XXXX">
+                <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
+            </f:entry>
+        </f:optionalBlock>
+        <f:block>
+            <h4>Anomaly Detection</h4>
+            <div class="jenkins-section__description">
+                Configure anomaly rules such as authentication anomalies here. Shared threshold and time-window patterns keep future detections consistent as more anomaly types are added.
+            </div>
+        </f:block>
+        <f:optionalBlock title="Failed login anomaly detection"
+                         name="anomalyFailedLogins"
+                         checked="${descriptor.isAnomalyFailedLogins()}">
+            <f:block>
+                <div class="jenkins-section__description">
+                    Raise an alert for repeated failed logins on the same account.
+                </div>
+            </f:block>
+            <f:entry title="Authentication alert threshold"
+                     description="Number of failed login attempts required before an authentication anomaly alert is raised.">
+                <f:number name="anomalyFailedLoginsThreshold" value="${descriptor.getAnomalyFailedLoginsThreshold()}"/>
+            </f:entry>
+            <f:entry title="Authentication detection window (minutes)"
+                     description="Rolling time window used when counting failed logins toward the alert threshold.">
+                <f:number name="anomalyFailedLoginsWindowMinutes" value="${descriptor.getAnomalyFailedLoginsWindowMinutes()}"/>
             </f:entry>
         </f:optionalBlock>
         <f:block>

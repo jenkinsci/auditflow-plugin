@@ -158,16 +158,29 @@ class AuditLoggerConfigurationTest {
         String html = page.getWebResponse().getContentAsString();
 
         assertTrue(html.contains("General"));
-        assertTrue(html.contains("Notifications"));
-        assertTrue(html.contains("Anomaly Detection"));
         assertTrue(html.contains("System Change Monitoring"));
         assertTrue(html.contains("Operational Monitoring"));
+        assertTrue(html.contains("Display Time Zone"));
+        assertTrue(html.contains("Notifications"));
+        assertTrue(html.contains("Anomaly Detection"));
+        assertTrue(html.contains("Export and API"));
         assertTrue(html.contains("Advanced"));
         assertTrue(html.contains("Enter a valid HTTP webhook endpoint"));
         assertTrue(html.contains("https://hooks.slack.com/services/T000/B000/XXXX"));
         assertTrue(html.contains("Configure anomaly rules such as authentication anomalies here"));
         assertTrue(html.contains("Failed login anomaly detection"));
         assertTrue(html.contains("Raise an alert for repeated failed logins on the same account."));
+
+        int operationalIndex = html.indexOf("Operational Monitoring");
+        int timeZoneIndex = html.indexOf("Display Time Zone");
+        int notificationsIndex = html.indexOf("Notifications");
+        int anomalyIndex = html.indexOf("Anomaly Detection");
+        int exportIndex = html.indexOf("Export and API");
+
+        assertTrue(operationalIndex < timeZoneIndex);
+        assertTrue(timeZoneIndex < notificationsIndex);
+        assertTrue(notificationsIndex < anomalyIndex);
+        assertTrue(anomalyIndex < exportIndex);
     }
 
     private static JSONObject findOption(JSONArray options, String id) {
