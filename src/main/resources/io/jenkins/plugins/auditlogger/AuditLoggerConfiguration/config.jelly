@@ -85,15 +85,20 @@
         </f:optionalBlock>
     </f:section>
 
-    <f:section title="Authentication Anomalies">
+    <f:section title="Anomaly Detection">
         <f:block>
             <div class="jenkins-section__description">
-                Settings for suspicious authentication behavior. Shared threshold and time-window patterns keep future authentication detections consistent.
+                Configure anomaly rules such as authentication anomalies here. Shared threshold and time-window patterns keep future detections consistent as more anomaly types are added.
             </div>
         </f:block>
-        <f:optionalBlock title="Failed login anomaly detection (raise an alert for repeated failed logins on the same account)"
+        <f:optionalBlock title="Failed login anomaly detection"
                          name="anomalyFailedLogins"
                          checked="${descriptor.isAnomalyFailedLogins()}">
+            <f:block>
+                <div class="jenkins-section__description">
+                    Raise an alert for repeated failed logins on the same account.
+                </div>
+            </f:block>
             <f:entry title="Authentication alert threshold"
                      description="Number of failed login attempts required before an authentication anomaly alert is raised.">
                 <f:number name="anomalyFailedLoginsThreshold" value="${descriptor.getAnomalyFailedLoginsThreshold()}"/>

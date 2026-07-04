@@ -159,13 +159,15 @@ class AuditLoggerConfigurationTest {
 
         assertTrue(html.contains("General"));
         assertTrue(html.contains("Notifications"));
-        assertTrue(html.contains("Authentication Anomalies"));
+        assertTrue(html.contains("Anomaly Detection"));
         assertTrue(html.contains("System Change Monitoring"));
         assertTrue(html.contains("Operational Monitoring"));
         assertTrue(html.contains("Advanced"));
         assertTrue(html.contains("Enter a valid HTTP webhook endpoint"));
         assertTrue(html.contains("https://hooks.slack.com/services/T000/B000/XXXX"));
-        assertTrue(html.contains("Shared threshold and time-window patterns keep future authentication detections consistent"));
+        assertTrue(html.contains("Configure anomaly rules such as authentication anomalies here"));
+        assertTrue(html.contains("Failed login anomaly detection"));
+        assertTrue(html.contains("Raise an alert for repeated failed logins on the same account."));
     }
 
     private static JSONObject findOption(JSONArray options, String id) {
