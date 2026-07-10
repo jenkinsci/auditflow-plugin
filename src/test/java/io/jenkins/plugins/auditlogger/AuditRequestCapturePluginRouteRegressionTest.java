@@ -61,6 +61,50 @@ class AuditRequestCapturePluginRouteRegressionTest {
     }
 
     @Test
+    void extractPluginTargetFromAdvancedUploadAndUrlBodies() {
+        String multipartUploadBody = """
+                ------WebKitFormBoundary
+                Content-Disposition: form-data; name="name"; filename="git-client.hpi"
+                Content-Type: application/octet-stream
+
+                binary
+                ------WebKitFormBoundary--
+                """;
+        String multipartUrlBody = """
+                ------WebKitFormBoundary
+                Content-Disposition: form-data; name="pluginUrl"
+
+                https://updates.jenkins.io/download/plugins/mailer/489.vd4b_25144138f/mailer.hpi
+                ------WebKitFormBoundary--
+                """;
+        String formBody = "pluginUrl=https%3A%2F%2Fupdates.jenkins.io%2Fdownload%2Fplugins%2Fgit%2F5.8.0%2Fgit.hpi";
+
+        assertEquals("git-client", AuditRequestCapture.extractPluginTargetFromRequestBody(multipartUploadBody));
+        assertEquals("mailer", AuditRequestCapture.extractPluginTargetFromRequestBody(multipartUrlBody));
+        assertEquals("git", AuditRequestCapture.extractPluginTargetFromRequestBody(formBody));
+    }
+
+    @Test
+    void normalizePluginTargetStripsVersionsPathsAndExtensions() {
+        assertEquals("git", AuditRequestCapture.normalizePluginTarget("git@5.8.0"));
+        assertEquals("mailer", AuditRequestCapture.normalizePluginTarget("https://updates.jenkins.io/download/plugins/mailer/489.vd4b_25144138f/mailer.hpi"));
+        assertEquals("credentials", AuditRequestCapture.normalizePluginTarget("C:/temp/credentials.jpi"));
+        assertEquals("git, mailer", AuditRequestCapture.normalizePluginTarget("git@5.8.0, mailer.hpi"));
+    }
+
+    @Test
+    void installClassificationPromotesAlreadyInstalledPluginsToUpdated() {
+        assertEquals("PLUGIN_UPDATED",
+                AuditRequestCapture.resolvePluginAction("PLUGIN_INSTALLED", "git", "git"::equals));
+        assertEquals("PLUGIN_INSTALLED",
+                AuditRequestCapture.resolvePluginAction("PLUGIN_INSTALLED", "mailer", "git"::equals));
+        assertEquals("PLUGIN_INSTALLED",
+                AuditRequestCapture.resolvePluginAction("PLUGIN_INSTALLED", "git, mailer", "git"::equals));
+        assertEquals("PLUGIN_UPDATED",
+                AuditRequestCapture.resolvePluginAction("PLUGIN_UPDATED", "git", plugin -> false));
+    }
+
+    @Test
     void configurationMatcherAcceptsSecuritySubmitRoute() {
         assertTrue(RouteAwareUrlMatcher.isConfigurationChange("/configure"));
         assertTrue(RouteAwareUrlMatcher.isConfigurationChange("/manage/configureSecurity"));
