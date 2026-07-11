@@ -191,7 +191,8 @@ public class AuditRequestCapture {
 
             // ===== RESTART (route-aware matching) =====
             // Now prevents bypass via /static/lol/restart or /job/restart
-            if ("POST".equalsIgnoreCase(method) && RouteAwareUrlMatcher.isRestartAction(uri)) {
+            if (RouteAwareUrlMatcher.isRestartAction(uri)
+                    && ("POST".equalsIgnoreCase(method) || "GET".equalsIgnoreCase(method))) {
                 action = "SYSTEM_RESTART";
                 target = "Jenkins";
                 boolean isSafe = uri.contains("safe");
@@ -207,8 +208,7 @@ public class AuditRequestCapture {
                     if (pluginTarget != null) {
                         action = resolvedPluginAction;
                         target = pluginTarget;
-                        details = ("PLUGIN_UPDATED".equals(resolvedPluginAction) ? "Plugin updated: " : "Plugin installed: ")
-                                + target + " by " + username;
+                        details = formatPluginActionDetails(resolvedPluginAction, target, username);
                     }
                 } else if ("PLUGIN_REMOVED".equals(pluginAction)) {
                     action = "PLUGIN_REMOVED";
@@ -457,6 +457,13 @@ public class AuditRequestCapture {
             return null;
         }
         return String.join(", ", normalizedTargets);
+    }
+
+    static String formatPluginActionDetails(String pluginAction, String pluginTarget, String username) {
+        boolean multiplePlugins = pluginTarget != null && pluginTarget.contains(",");
+        String noun = multiplePlugins ? "Plugins" : "Plugin";
+        String verb = "PLUGIN_UPDATED".equals(pluginAction) ? "updated" : "installed";
+        return noun + " " + verb + ": " + pluginTarget + " by " + username;
     }
 
     private static String normalizeSinglePluginToken(String rawToken) {

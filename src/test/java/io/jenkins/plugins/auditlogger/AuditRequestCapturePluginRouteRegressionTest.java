@@ -105,6 +105,16 @@ class AuditRequestCapturePluginRouteRegressionTest {
     }
 
     @Test
+    void pluginActionDetailsUsePluralForMultipleTargets() {
+        assertEquals("Plugin installed: git by admin",
+                AuditRequestCapture.formatPluginActionDetails("PLUGIN_INSTALLED", "git", "admin"));
+        assertEquals("Plugins installed: git, mailer by admin",
+                AuditRequestCapture.formatPluginActionDetails("PLUGIN_INSTALLED", "git, mailer", "admin"));
+        assertEquals("Plugins updated: git, mailer by admin",
+                AuditRequestCapture.formatPluginActionDetails("PLUGIN_UPDATED", "git, mailer", "admin"));
+    }
+
+    @Test
     void configurationMatcherAcceptsSecuritySubmitRoute() {
         assertTrue(RouteAwareUrlMatcher.isConfigurationChange("/configure"));
         assertTrue(RouteAwareUrlMatcher.isConfigurationChange("/manage/configureSecurity"));
@@ -117,6 +127,8 @@ class AuditRequestCapturePluginRouteRegressionTest {
     void restartMatcherAcceptsPostInstallUpdateCenterRoute() {
         assertTrue(RouteAwareUrlMatcher.isRestartAction("/updateCenter/safeRestart"));
         assertTrue(RouteAwareUrlMatcher.isRestartAction("/updateCenter/restart"));
+        assertTrue(RouteAwareUrlMatcher.isRestartAction("/restart"));
+        assertTrue(RouteAwareUrlMatcher.isRestartAction("/manage/restart"));
         assertFalse(RouteAwareUrlMatcher.isRestartAction("/updateCenter/restartStatus"));
     }
 
