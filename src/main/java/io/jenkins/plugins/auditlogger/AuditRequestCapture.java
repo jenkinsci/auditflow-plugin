@@ -189,16 +189,6 @@ public class AuditRequestCapture {
             String details = null;
             String severity = "HIGH";
 
-            // ===== RESTART (route-aware matching) =====
-            // Now prevents bypass via /static/lol/restart or /job/restart
-            if (RouteAwareUrlMatcher.isRestartAction(uri)
-                    && ("POST".equalsIgnoreCase(method) || "GET".equalsIgnoreCase(method))) {
-                action = "SYSTEM_RESTART";
-                target = "Jenkins";
-                boolean isSafe = uri.contains("safe");
-                details = (isSafe ? "Safe" : "Immediate") + " restart initiated by " + username;
-                severity = "CRITICAL";
-            }
             // ===== PLUGIN OPERATIONS (route-aware matching) =====
             if (pluginEventsEnabled && "POST".equalsIgnoreCase(method) && RouteAwareUrlMatcher.isPluginManagerAction(uri)) {
                 String pluginAction = classifyPluginAction(uri);
@@ -244,9 +234,6 @@ public class AuditRequestCapture {
                 entry.setSeverity(severity);
                 AuditLogStorage storage = AuditLogStorage.getInstance();
                 storage.addEntry(entry);
-                if ("SYSTEM_RESTART".equals(action)) {
-                    storage.flushNow();
-                }
                 LOGGER.log(Level.INFO, "{0}: target={1} by user={2}",
                         new Object[]{action, target, username});
             }
