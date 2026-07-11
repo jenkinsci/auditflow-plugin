@@ -242,7 +242,11 @@ public class AuditRequestCapture {
             if (action != null) {
                 AuditLogEntry entry = new AuditLogEntry(username, action, target, details);
                 entry.setSeverity(severity);
-                AuditLogStorage.getInstance().addEntry(entry);
+                AuditLogStorage storage = AuditLogStorage.getInstance();
+                storage.addEntry(entry);
+                if ("SYSTEM_RESTART".equals(action)) {
+                    storage.flushNow();
+                }
                 LOGGER.log(Level.INFO, "{0}: target={1} by user={2}",
                         new Object[]{action, target, username});
             }

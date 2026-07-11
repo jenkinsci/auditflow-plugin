@@ -224,6 +224,18 @@ public class AuditLogStorage {
     }
 
     /**
+     * Force pending audit entries to be written immediately.
+     * Useful for events such as immediate restarts where the JVM may terminate
+     * before the scheduled writer thread gets its next flush window.
+     */
+    public void flushNow() {
+        if (shuttingDown) {
+            return;
+        }
+        drainWriteQueue();
+    }
+
+    /**
      * Filter entries by criteria. Returns a defensive copy.
      */
     public List<AuditLogEntry> filterEntries(String username, String action, Long startTime, Long endTime) {
