@@ -71,7 +71,12 @@ public class AuditRequestCapture {
                 @Override
                 public void requestInitialized(ServletRequestEvent sre) {
                     if (sre.getServletRequest() instanceof HttpServletRequest) {
-                        RequestHolder.set((HttpServletRequest) sre.getServletRequest());
+                        HttpServletRequest req = (HttpServletRequest) sre.getServletRequest();
+                        RequestHolder.set(req);
+                        String preChainUser = resolveUsername(req);
+                        if (preChainUser != null) {
+                            RequestHolder.setAuthenticatedUser(preChainUser);
+                        }
                     }
                 }
 
@@ -233,6 +238,7 @@ public class AuditRequestCapture {
                 target = "Jenkins";
                 details = formatRestartActionDetails(uri, username);
                 severity = "CRITICAL";
+                RequestHolder.setLastRestartInitiator(username);
 
                 long now = System.currentTimeMillis();
                 if (AuditRestartListener.shouldSuppressDuplicateRestartLog(now)) {
@@ -573,6 +579,13 @@ public class AuditRequestCapture {
 
     /** Resolve the authenticated username from the request. */
     private static String resolveUsername(HttpServletRequest req) {
+        String preChainUser = RequestHolder.getAuthenticatedUser();
+        if (preChainUser != null && !preChainUser.isEmpty()
+                && !"anonymous".equalsIgnoreCase(preChainUser)
+                && !"anonymousUser".equalsIgnoreCase(preChainUser)
+                && !"SYSTEM".equalsIgnoreCase(preChainUser)) {
+            return preChainUser;
+        }
         // 1. Try session-based Spring Security context (preserves real user even in impersonated context)
         try {
             HttpSession session = req.getSession(false);

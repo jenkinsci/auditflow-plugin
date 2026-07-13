@@ -18,6 +18,7 @@ class AuditRestartListenerTest {
     @AfterEach
     void cleanup() {
         RequestHolder.clear();
+        RequestHolder.clearLastRestartInitiator();
         SecurityContextHolder.clearContext();
         try {
             AuditLogStorage.getInstance().shutdown();
@@ -29,7 +30,7 @@ class AuditRestartListenerTest {
 
     @Test
     void onRestartLogsImmediateRestartEvent(JenkinsRule j) {
-        RequestHolder.setAuthenticatedUser("harry");
+        RequestHolder.setLastRestartInitiator("harry");
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("SYSTEM", "secret"));
 

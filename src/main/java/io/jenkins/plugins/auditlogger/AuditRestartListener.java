@@ -77,6 +77,11 @@ public class AuditRestartListener extends RestartListener {
             return requestUser;
         }
 
+        String restartInitiator = RequestHolder.getLastRestartInitiator();
+        if (isMeaningfulUser(restartInitiator)) {
+            return restartInitiator;
+        }
+
         try {
             StaplerRequest2 req = Stapler.getCurrentRequest2();
             if (req != null) {
