@@ -228,6 +228,25 @@ public class AuditRequestCapture {
                     severity = "HIGH";
                 }
             }
+            else if (systemConfigEventsEnabled && RouteAwareUrlMatcher.isRestartAction(uri)) {
+                action = "SYSTEM_RESTART";
+                target = "Jenkins";
+                details = formatRestartActionDetails(uri, username);
+                severity = "CRITICAL";
+
+                long now = System.currentTimeMillis();
+                if (AuditRestartListener.shouldSuppressDuplicateRestartLog(now)) {
+                    return;
+                }
+                AuditLogEntry entry = new AuditLogEntry(username, action, target, details, now);
+                entry.setSeverity(severity);
+                AuditLogStorage storage = AuditLogStorage.getInstance();
+                storage.addEntry(entry);
+                storage.flushNow();
+                LOGGER.log(Level.INFO, "{0}: target={1} by user={2}",
+                        new Object[]{action, target, username});
+                return;
+            }
 
             if (action != null) {
                 AuditLogEntry entry = new AuditLogEntry(username, action, target, details);
@@ -455,6 +474,11 @@ public class AuditRequestCapture {
         String noun = multiplePlugins ? "Plugins" : "Plugin";
         String verb = "PLUGIN_UPDATED".equals(pluginAction) ? "updated" : "installed";
         return noun + " " + verb + ": " + pluginTarget + " by " + username;
+    }
+
+    static String formatRestartActionDetails(String uri, String username) {
+        boolean safeRestart = RouteAwareUrlMatcher.isSafeRestartAction(uri);
+        return (safeRestart ? "Safe" : "Immediate") + " restart initiated by " + username;
     }
 
     private static String normalizeSinglePluginToken(String rawToken) {

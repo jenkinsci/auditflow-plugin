@@ -62,6 +62,28 @@ public class RouteAwareUrlMatcher {
     }
 
     /**
+     * Checks if URI is a safe restart action endpoint.
+     * Valid patterns mirror {@link #isRestartAction(String)} but only accept safe restart variants.
+     */
+    public static boolean isSafeRestartAction(String uri) {
+        if (uri == null || uri.isEmpty()) return false;
+
+        String normalized = normalizeUri(uri);
+        String[] segments = normalized.split("/");
+
+        if (segments.length == 2 && segments[0].isEmpty()) {
+            return "safeRestart".equals(segments[1]);
+        }
+
+        if (segments.length == 3 && segments[0].isEmpty()
+                && ("manage".equals(segments[1]) || "updateCenter".equals(segments[1]))) {
+            return "safeRestart".equals(segments[2]);
+        }
+
+        return false;
+    }
+
+    /**
      * Checks if URI accesses plugin manager endpoints.
      * Valid patterns must start with /pluginManager or /plugin and NOT be
      * something like /job/plugins/...

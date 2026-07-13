@@ -129,6 +129,10 @@ class AuditRequestCapturePluginRouteRegressionTest {
         assertTrue(RouteAwareUrlMatcher.isRestartAction("/updateCenter/restart"));
         assertTrue(RouteAwareUrlMatcher.isRestartAction("/restart"));
         assertTrue(RouteAwareUrlMatcher.isRestartAction("/manage/restart"));
+        assertTrue(RouteAwareUrlMatcher.isSafeRestartAction("/safeRestart"));
+        assertTrue(RouteAwareUrlMatcher.isSafeRestartAction("/manage/safeRestart"));
+        assertTrue(RouteAwareUrlMatcher.isSafeRestartAction("/updateCenter/safeRestart"));
+        assertFalse(RouteAwareUrlMatcher.isSafeRestartAction("/restart"));
         assertFalse(RouteAwareUrlMatcher.isRestartAction("/updateCenter/restartStatus"));
     }
 
