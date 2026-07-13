@@ -71,12 +71,7 @@ public class AuditRequestCapture {
                 @Override
                 public void requestInitialized(ServletRequestEvent sre) {
                     if (sre.getServletRequest() instanceof HttpServletRequest) {
-                        HttpServletRequest req = (HttpServletRequest) sre.getServletRequest();
-                        RequestHolder.set(req);
-                        String preChainUser = resolveUsername(req);
-                        if (preChainUser != null) {
-                            RequestHolder.setAuthenticatedUser(preChainUser);
-                        }
+                        RequestHolder.set((HttpServletRequest) sre.getServletRequest());
                     }
                 }
 
@@ -233,27 +228,6 @@ public class AuditRequestCapture {
                     severity = "HIGH";
                 }
             }
-            else if (systemConfigEventsEnabled && RouteAwareUrlMatcher.isRestartAction(uri)) {
-                action = "SYSTEM_RESTART";
-                target = "Jenkins";
-                details = formatRestartActionDetails(uri, username);
-                severity = "CRITICAL";
-                RequestHolder.setLastRestartInitiator(username);
-
-                long now = System.currentTimeMillis();
-                if (AuditRestartListener.shouldSuppressDuplicateRestartLog(now)) {
-                    return;
-                }
-                AuditLogEntry entry = new AuditLogEntry(username, action, target, details, now);
-                entry.setSeverity(severity);
-                AuditLogStorage storage = AuditLogStorage.getInstance();
-                storage.addEntry(entry);
-                storage.flushNow();
-                LOGGER.log(Level.INFO, "{0}: target={1} by user={2}",
-                        new Object[]{action, target, username});
-                return;
-            }
-
             if (action != null) {
                 AuditLogEntry entry = new AuditLogEntry(username, action, target, details);
                 entry.setSeverity(severity);
@@ -482,11 +456,6 @@ public class AuditRequestCapture {
         return noun + " " + verb + ": " + pluginTarget + " by " + username;
     }
 
-    static String formatRestartActionDetails(String uri, String username) {
-        boolean safeRestart = RouteAwareUrlMatcher.isSafeRestartAction(uri);
-        return (safeRestart ? "Safe" : "Immediate") + " restart initiated by " + username;
-    }
-
     private static String normalizeSinglePluginToken(String rawToken) {
         if (rawToken == null) {
             return "";
@@ -579,13 +548,6 @@ public class AuditRequestCapture {
 
     /** Resolve the authenticated username from the request. */
     private static String resolveUsername(HttpServletRequest req) {
-        String preChainUser = RequestHolder.getAuthenticatedUser();
-        if (preChainUser != null && !preChainUser.isEmpty()
-                && !"anonymous".equalsIgnoreCase(preChainUser)
-                && !"anonymousUser".equalsIgnoreCase(preChainUser)
-                && !"SYSTEM".equalsIgnoreCase(preChainUser)) {
-            return preChainUser;
-        }
         // 1. Try session-based Spring Security context (preserves real user even in impersonated context)
         try {
             HttpSession session = req.getSession(false);

@@ -4,13 +4,10 @@ import hudson.Extension;
 import hudson.model.RestartListener;
 import hudson.model.User;
 import jenkins.model.Jenkins;
-import org.kohsuke.stapler.Stapler;
-import org.kohsuke.stapler.StaplerRequest2;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.IOException;
-import java.security.Principal;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -35,9 +32,11 @@ public class AuditRestartListener extends RestartListener {
         }
 
         long now = System.currentTimeMillis();
-        if (shouldSuppressDuplicateRestartLog(now)) {
+        long previous = LAST_RESTART_LOGGED_AT.get();
+        if ((now - previous) < RESTART_LOG_SUPPRESSION_MS && LAST_RESTART_LOGGED_AT.compareAndSet(previous, now)) {
             return;
         }
+        LAST_RESTART_LOGGED_AT.set(now);
 
         String username = resolveCurrentUsername();
         boolean safeRestart = isSafeRestartInProgress();
@@ -49,12 +48,6 @@ public class AuditRestartListener extends RestartListener {
         AuditLogStorage storage = AuditLogStorage.getInstance();
         storage.addEntry(entry);
         storage.flushNow();
-    }
-
-    static boolean shouldSuppressDuplicateRestartLog(long now) {
-        long previous = LAST_RESTART_LOGGED_AT.get();
-        return (now - previous) < RESTART_LOG_SUPPRESSION_MS
-                && LAST_RESTART_LOGGED_AT.compareAndSet(previous, now);
     }
 
     private static boolean isSafeRestartInProgress() {
@@ -75,28 +68,6 @@ public class AuditRestartListener extends RestartListener {
         String requestUser = RequestHolder.getAuthenticatedUser();
         if (isMeaningfulUser(requestUser)) {
             return requestUser;
-        }
-
-        String restartInitiator = RequestHolder.getLastRestartInitiator();
-        if (isMeaningfulUser(restartInitiator)) {
-            return restartInitiator;
-        }
-
-        try {
-            StaplerRequest2 req = Stapler.getCurrentRequest2();
-            if (req != null) {
-                String remoteUser = req.getRemoteUser();
-                if (isMeaningfulUser(remoteUser)) {
-                    return remoteUser;
-                }
-
-                Principal principal = req.getUserPrincipal();
-                if (principal != null && isMeaningfulUser(principal.getName())) {
-                    return principal.getName();
-                }
-            }
-        } catch (RuntimeException ignored) {
-            // Fall through to Jenkins and Spring Security resolution.
         }
 
         try {
