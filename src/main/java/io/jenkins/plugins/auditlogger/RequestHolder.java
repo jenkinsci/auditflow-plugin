@@ -5,6 +5,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -22,6 +23,7 @@ public final class RequestHolder {
     private static final ThreadLocal<HttpServletRequest> CURRENT = new ThreadLocal<>();
     /** Authenticated username captured BEFORE chain.doFilter() - survives Jenkins SYSTEM impersonation. */
     private static final ThreadLocal<String> AUTHENTICATED_USER = new ThreadLocal<>();
+    private static final AtomicReference<String> PENDING_SAFE_RESTART_INITIATOR = new AtomicReference<>();
 
     /**
      * Pending auth entries awaiting User-Agent enrichment, keyed by username.
@@ -67,6 +69,20 @@ public final class RequestHolder {
     /** Get the pre-chain authenticated username (survives SYSTEM impersonation). */
     public static String getAuthenticatedUser() {
         return AUTHENTICATED_USER.get();
+    }
+
+    public static void setPendingSafeRestartInitiator(String username) {
+        if (isMeaningfulUser(username)) {
+            PENDING_SAFE_RESTART_INITIATOR.set(username);
+        }
+    }
+
+    public static String consumePendingSafeRestartInitiator() {
+        return PENDING_SAFE_RESTART_INITIATOR.getAndSet(null);
+    }
+
+    public static void clearPendingSafeRestartInitiator() {
+        PENDING_SAFE_RESTART_INITIATOR.set(null);
     }
 
     /** Cache of user -> last-known IP for resolving IPs in async contexts (build events). */
@@ -161,5 +177,13 @@ public final class RequestHolder {
         } catch (RuntimeException e) {
             LOGGER.log(Level.FINE, "Failed to flush a pending auth entry", e);
         }
+    }
+
+    private static boolean isMeaningfulUser(String user) {
+        return user != null
+                && !user.isEmpty()
+                && !"anonymous".equalsIgnoreCase(user)
+                && !"anonymousUser".equalsIgnoreCase(user)
+                && !"SYSTEM".equalsIgnoreCase(user);
     }
 }

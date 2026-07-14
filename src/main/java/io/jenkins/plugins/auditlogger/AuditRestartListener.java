@@ -28,6 +28,7 @@ public class AuditRestartListener extends RestartListener {
     public void onRestart() {
         AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
         if (config != null && !config.isEnableSystemConfigEvents()) {
+            RequestHolder.clearPendingSafeRestartInitiator();
             return;
         }
 
@@ -38,8 +39,9 @@ public class AuditRestartListener extends RestartListener {
         }
         LAST_RESTART_LOGGED_AT.set(now);
 
-        String username = resolveCurrentUsername();
         boolean safeRestart = isSafeRestartInProgress();
+        String username = resolveCurrentUsername(safeRestart);
+        RequestHolder.clearPendingSafeRestartInitiator();
         String detail = (safeRestart ? "Safe" : "Immediate") + " restart initiated by " + username;
 
         AuditLogEntry entry = new AuditLogEntry(username, "SYSTEM_RESTART", "Jenkins", detail, now);
@@ -64,10 +66,17 @@ public class AuditRestartListener extends RestartListener {
         }
     }
 
-    private static String resolveCurrentUsername() {
+    static String resolveCurrentUsername(boolean safeRestartInProgress) {
         String requestUser = RequestHolder.getAuthenticatedUser();
         if (isMeaningfulUser(requestUser)) {
             return requestUser;
+        }
+
+        if (safeRestartInProgress) {
+            String safeRestartInitiator = RequestHolder.consumePendingSafeRestartInitiator();
+            if (isMeaningfulUser(safeRestartInitiator)) {
+                return safeRestartInitiator;
+            }
         }
 
         try {

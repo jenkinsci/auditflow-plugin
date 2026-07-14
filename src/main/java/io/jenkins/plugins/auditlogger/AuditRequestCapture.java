@@ -71,7 +71,12 @@ public class AuditRequestCapture {
                 @Override
                 public void requestInitialized(ServletRequestEvent sre) {
                     if (sre.getServletRequest() instanceof HttpServletRequest) {
-                        RequestHolder.set((HttpServletRequest) sre.getServletRequest());
+                        HttpServletRequest req = (HttpServletRequest) sre.getServletRequest();
+                        RequestHolder.set(req);
+                        String preChainUser = resolveUsername(req);
+                        if (preChainUser != null) {
+                            RequestHolder.setAuthenticatedUser(preChainUser);
+                        }
                     }
                 }
 
@@ -183,6 +188,8 @@ public class AuditRequestCapture {
 
             String username = resolveUsername(req);
             if (username == null) username = "anonymous";
+
+            captureSafeRestartInitiator(uri, username, systemConfigEventsEnabled);
 
             String action = null;
             String target = null;
@@ -456,6 +463,17 @@ public class AuditRequestCapture {
         return noun + " " + verb + ": " + pluginTarget + " by " + username;
     }
 
+    static void captureSafeRestartInitiator(String uri, String username, boolean systemConfigEventsEnabled) {
+        if (!systemConfigEventsEnabled || !RouteAwareUrlMatcher.isSafeRestartAction(uri)) {
+            return;
+        }
+        if (isMeaningfulUser(username)) {
+            RequestHolder.setPendingSafeRestartInitiator(username);
+            return;
+        }
+        RequestHolder.setPendingSafeRestartInitiator(RequestHolder.getAuthenticatedUser());
+    }
+
     private static String normalizeSinglePluginToken(String rawToken) {
         if (rawToken == null) {
             return "";
@@ -590,6 +608,14 @@ public class AuditRequestCapture {
             return auth.getName();
         }
         return null;
+    }
+
+    private static boolean isMeaningfulUser(String username) {
+        return username != null
+                && !username.isEmpty()
+                && !"anonymous".equalsIgnoreCase(username)
+                && !"anonymousUser".equalsIgnoreCase(username)
+                && !"SYSTEM".equalsIgnoreCase(username);
     }
 
     private static HttpServletRequest cacheRequestBody(HttpServletRequest request) throws IOException {
