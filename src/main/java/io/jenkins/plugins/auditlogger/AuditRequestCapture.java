@@ -189,13 +189,21 @@ public class AuditRequestCapture {
             String username = resolveUsername(req);
             if (username == null) username = "anonymous";
 
-            captureSafeRestartInitiator(uri, username, systemConfigEventsEnabled);
-
             String action = null;
             String target = null;
             String details = null;
             String severity = "HIGH";
 
+            // ===== RESTART (route-aware matching) =====
+            if ("POST".equalsIgnoreCase(method)
+                    && systemConfigEventsEnabled
+                    && RouteAwareUrlMatcher.isRestartAction(uri)) {
+                action = "SYSTEM_RESTART";
+                target = "Jenkins";
+                boolean isSafe = RouteAwareUrlMatcher.isSafeRestartAction(uri);
+                details = (isSafe ? "Safe" : "Immediate") + " restart initiated by " + username;
+                severity = "CRITICAL";
+            }
             // ===== PLUGIN OPERATIONS (route-aware matching) =====
             if (pluginEventsEnabled && "POST".equalsIgnoreCase(method) && RouteAwareUrlMatcher.isPluginManagerAction(uri)) {
                 String pluginAction = classifyPluginAction(uri);
@@ -461,17 +469,6 @@ public class AuditRequestCapture {
         String noun = multiplePlugins ? "Plugins" : "Plugin";
         String verb = "PLUGIN_UPDATED".equals(pluginAction) ? "updated" : "installed";
         return noun + " " + verb + ": " + pluginTarget + " by " + username;
-    }
-
-    static void captureSafeRestartInitiator(String uri, String username, boolean systemConfigEventsEnabled) {
-        if (!systemConfigEventsEnabled || !RouteAwareUrlMatcher.isSafeRestartAction(uri)) {
-            return;
-        }
-        if (isMeaningfulUser(username)) {
-            RequestHolder.setPendingSafeRestartInitiator(username);
-            return;
-        }
-        RequestHolder.setPendingSafeRestartInitiator(RequestHolder.getAuthenticatedUser());
     }
 
     private static String normalizeSinglePluginToken(String rawToken) {

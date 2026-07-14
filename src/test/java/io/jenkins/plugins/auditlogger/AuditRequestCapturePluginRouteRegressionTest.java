@@ -136,22 +136,4 @@ class AuditRequestCapturePluginRouteRegressionTest {
         assertFalse(RouteAwareUrlMatcher.isRestartAction("/updateCenter/restartStatus"));
     }
 
-    @Test
-    void safeRestartInitiatorCapturePrefersRealUserAndOnlyForSafeRestartRoutes() {
-        RequestHolder.clearPendingSafeRestartInitiator();
-
-        AuditRequestCapture.captureSafeRestartInitiator("/safeRestart", "harry", true);
-        assertEquals("harry", RequestHolder.consumePendingSafeRestartInitiator());
-
-        AuditRequestCapture.captureSafeRestartInitiator("/restart", "harry", true);
-        assertNull(RequestHolder.consumePendingSafeRestartInitiator());
-
-        RequestHolder.setAuthenticatedUser("sally");
-        AuditRequestCapture.captureSafeRestartInitiator("/manage/safeRestart", "SYSTEM", true);
-        assertEquals("sally", RequestHolder.consumePendingSafeRestartInitiator());
-
-        RequestHolder.clear();
-        RequestHolder.clearPendingSafeRestartInitiator();
-    }
-
 }
