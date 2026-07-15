@@ -136,4 +136,23 @@ class AuditRequestCapturePluginRouteRegressionTest {
         assertFalse(RouteAwareUrlMatcher.isRestartAction("/updateCenter/restartStatus"));
     }
 
+    @Test
+    void restartAuditRequestAllowsUpdateCenterGetAndStandardPost() {
+        assertTrue(AuditRequestCapture.isRestartAuditRequest("POST", "/restart"));
+        assertTrue(AuditRequestCapture.isRestartAuditRequest("POST", "/safeRestart"));
+        assertTrue(AuditRequestCapture.isRestartAuditRequest("GET", "/updateCenter/restart"));
+        assertTrue(AuditRequestCapture.isRestartAuditRequest("GET", "/updateCenter/safeRestart"));
+        assertFalse(AuditRequestCapture.isRestartAuditRequest("GET", "/restart"));
+        assertFalse(AuditRequestCapture.isRestartAuditRequest("GET", "/manage/restart"));
+        assertFalse(AuditRequestCapture.isRestartAuditRequest("POST", "/updateCenter/restartStatus"));
+    }
+
+    @Test
+    void selectMeaningfulUserPrefersPreChainUserOverSystemFallback() {
+        assertEquals("harry", AuditRequestCapture.selectMeaningfulUser("harry", "SYSTEM"));
+        assertEquals("harry", AuditRequestCapture.selectMeaningfulUser(null, "harry"));
+        assertNull(AuditRequestCapture.selectMeaningfulUser("SYSTEM", null));
+        assertNull(AuditRequestCapture.selectMeaningfulUser("anonymous", "SYSTEM"));
+    }
+
 }

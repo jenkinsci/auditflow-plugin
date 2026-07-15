@@ -186,7 +186,7 @@ public class AuditRequestCapture {
             boolean pluginEventsEnabled = config == null || config.isEnablePluginEvents();
             boolean systemConfigEventsEnabled = config != null && config.isEnableSystemConfigEvents();
 
-            String username = resolveUsername(req);
+            String username = selectMeaningfulUser(RequestHolder.getAuthenticatedUser(), resolveUsername(req));
             if (username == null) username = "anonymous";
 
             String action = null;
@@ -195,9 +195,7 @@ public class AuditRequestCapture {
             String severity = "HIGH";
 
             // ===== RESTART (route-aware matching) =====
-            if ("POST".equalsIgnoreCase(method)
-                    && systemConfigEventsEnabled
-                    && RouteAwareUrlMatcher.isRestartAction(uri)) {
+            if (systemConfigEventsEnabled && isRestartAuditRequest(method, uri)) {
                 action = "SYSTEM_RESTART";
                 target = "Jenkins";
                 boolean isSafe = RouteAwareUrlMatcher.isSafeRestartAction(uri);
@@ -248,6 +246,9 @@ public class AuditRequestCapture {
                 entry.setSeverity(severity);
                 AuditLogStorage storage = AuditLogStorage.getInstance();
                 storage.addEntry(entry);
+                if ("SYSTEM_RESTART".equals(action)) {
+                    storage.flushNow();
+                }
                 LOGGER.log(Level.INFO, "{0}: target={1} by user={2}",
                         new Object[]{action, target, username});
             }
@@ -471,6 +472,24 @@ public class AuditRequestCapture {
         return noun + " " + verb + ": " + pluginTarget + " by " + username;
     }
 
+    static boolean isRestartAuditRequest(String method, String uri) {
+        if (method == null || !RouteAwareUrlMatcher.isRestartAction(uri)) {
+            return false;
+        }
+        if ("POST".equalsIgnoreCase(method)) {
+            return true;
+        }
+        return "GET".equalsIgnoreCase(method)
+                && ("/updateCenter/restart".equals(uri) || "/updateCenter/safeRestart".equals(uri));
+    }
+
+    static String selectMeaningfulUser(String primary, String secondary) {
+        if (isMeaningfulUser(primary)) {
+            return primary;
+        }
+        return isMeaningfulUser(secondary) ? secondary : null;
+    }
+
     private static String normalizeSinglePluginToken(String rawToken) {
         if (rawToken == null) {
             return "";
@@ -585,14 +604,12 @@ public class AuditRequestCapture {
         } catch (ReflectiveOperationException | RuntimeException ignored) {}
         // 2. Try getRemoteUser()
         String remoteUser = req.getRemoteUser();
-        if (remoteUser != null && !remoteUser.isEmpty()
-                && !"anonymous".equalsIgnoreCase(remoteUser)) {
+        if (isMeaningfulUser(remoteUser)) {
             return remoteUser;
         }
         // 3. Try getUserPrincipal()
         Principal p = req.getUserPrincipal();
-        if (p != null && p.getName() != null && !p.getName().isEmpty()
-                && !"anonymous".equalsIgnoreCase(p.getName())) {
+        if (p != null && isMeaningfulUser(p.getName())) {
             return p.getName();
         }
         // 4. Try thread-local Spring SecurityContext
