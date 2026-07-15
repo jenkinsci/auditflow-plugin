@@ -49,6 +49,7 @@ import net.sf.json.JSONObject;
 public class AuditRequestCapture {
     private static final Logger LOGGER = Logger.getLogger(AuditRequestCapture.class.getName());
     private static final String CACHED_REQUEST_BODY_ATTR = AuditRequestCapture.class.getName() + ".cachedRequestBody";
+    private static final String RESTART_AUDIT_LOGGED_ATTR = AuditRequestCapture.class.getName() + ".restartAuditLogged";
     private static final Pattern MULTIPART_FILE_NAME_PATTERN =
             Pattern.compile("filename=\"([^\"]+)\"", Pattern.CASE_INSENSITIVE);
     private static final Pattern MULTIPART_FIELD_PATTERN =
@@ -77,6 +78,7 @@ public class AuditRequestCapture {
                         if (preChainUser != null) {
                             RequestHolder.setAuthenticatedUser(preChainUser);
                         }
+                        captureRestartAction(req, preChainUser);
                     }
                 }
 
@@ -123,6 +125,7 @@ public class AuditRequestCapture {
                         if (preChainUser != null) {
                             RequestHolder.setAuthenticatedUser(preChainUser);
                         }
+                        captureRestartAction(effectiveReq, preChainUser);
                     }
                     try {
                         chain.doFilter(effectiveReq != null ? effectiveReq : req, res);
@@ -195,7 +198,9 @@ public class AuditRequestCapture {
             String severity = "HIGH";
 
             // ===== RESTART (route-aware matching) =====
-            if (systemConfigEventsEnabled && isRestartAuditRequest(method, uri)) {
+            if (systemConfigEventsEnabled
+                    && !Boolean.TRUE.equals(req.getAttribute(RESTART_AUDIT_LOGGED_ATTR))
+                    && isRestartAuditRequest(method, uri)) {
                 action = "SYSTEM_RESTART";
                 target = "Jenkins";
                 boolean isSafe = RouteAwareUrlMatcher.isSafeRestartAction(uri);
@@ -470,6 +475,50 @@ public class AuditRequestCapture {
         String noun = multiplePlugins ? "Plugins" : "Plugin";
         String verb = "PLUGIN_UPDATED".equals(pluginAction) ? "updated" : "installed";
         return noun + " " + verb + ": " + pluginTarget + " by " + username;
+    }
+
+    static void captureRestartAction(HttpServletRequest req, String preferredUsername) {
+        try {
+            if (req == null || Boolean.TRUE.equals(req.getAttribute(RESTART_AUDIT_LOGGED_ATTR))) {
+                return;
+            }
+
+            String method = req.getMethod();
+            String uri = req.getRequestURI();
+            if (uri == null) {
+                return;
+            }
+
+            String ctx = req.getContextPath();
+            if (ctx != null && !ctx.isEmpty() && uri.startsWith(ctx)) {
+                uri = uri.substring(ctx.length());
+            }
+
+            AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+            if (config == null || !config.isEnableSystemConfigEvents() || !isRestartAuditRequest(method, uri)) {
+                return;
+            }
+
+            String username = selectMeaningfulUser(preferredUsername, resolveUsername(req));
+            if (username == null) {
+                username = "anonymous";
+            }
+
+            boolean isSafe = RouteAwareUrlMatcher.isSafeRestartAction(uri);
+            String details = (isSafe ? "Safe" : "Immediate") + " restart initiated by " + username;
+            AuditLogEntry entry = new AuditLogEntry(username, "SYSTEM_RESTART", "Jenkins", details);
+            entry.setSeverity("CRITICAL");
+
+            AuditLogStorage storage = AuditLogStorage.getInstance();
+            storage.addEntry(entry);
+            storage.flushNow();
+            req.setAttribute(RESTART_AUDIT_LOGGED_ATTR, Boolean.TRUE);
+
+            LOGGER.log(Level.INFO, "{0}: target={1} by user={2}",
+                    new Object[]{"SYSTEM_RESTART", "Jenkins", username});
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Error capturing restart action", e);
+        }
     }
 
     static boolean isRestartAuditRequest(String method, String uri) {
