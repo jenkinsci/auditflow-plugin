@@ -90,7 +90,6 @@ public final class RequestHolder {
         return AUTHENTICATED_USER.get();
     }
 
-<<<<<<< HEAD
     public static void rememberPendingRestart(String username, boolean safeRestart, boolean requestLogged) {
         if (!isMeaningfulUser(username)) {
             return;
@@ -116,8 +115,6 @@ public final class RequestHolder {
         PENDING_RESTART.set(null);
     }
 
-=======
->>>>>>> refs/remotes/origin/restart-logging-bugfix
     /** Cache of user -> last-known IP for resolving IPs in async contexts (build events). */
     private static final ConcurrentHashMap<String, String> USER_IP_CACHE = new ConcurrentHashMap<>();
     private static final int MAX_USER_IP_ENTRIES = 10_000;
