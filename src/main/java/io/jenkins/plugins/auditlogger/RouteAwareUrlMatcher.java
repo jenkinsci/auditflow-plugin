@@ -108,6 +108,11 @@ public class RouteAwareUrlMatcher {
         if (segments.length >= 3 && "manage".equals(firstAction) && "pluginManager".equals(segments[2])) {
             return true;
         }
+
+        // Update center plugin lifecycle routes: /updateCenter/plugin/{name}/...
+        if (segments.length >= 4 && "updateCenter".equals(firstAction) && "plugin".equals(segments[2])) {
+            return true;
+        }
         
         return false;
     }
@@ -177,6 +182,11 @@ public class RouteAwareUrlMatcher {
             return resolvePluginLifecycleAction(segments[5]);
         }
 
+        if (segments.length == 5 && segments[0].isEmpty() && "updateCenter".equals(segments[1])
+                && "plugin".equals(segments[2])) {
+            return resolvePluginLifecycleAction(segments[4]);
+        }
+
         return null;
     }
 
@@ -240,6 +250,8 @@ public class RouteAwareUrlMatcher {
             case "makeDisabled":
             case "disable":
                 return "PLUGIN_DISABLED";
+            case "downgrade":
+                return "PLUGIN_DOWNGRADED";
             default:
                 return null;
         }

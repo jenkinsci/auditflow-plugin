@@ -24,6 +24,11 @@ class AuditRequestCapturePluginRouteRegressionTest {
     }
 
     @Test
+    void classifyPluginActionRecognizesUpdateCenterDowngradeRoute() {
+        assertEquals("PLUGIN_DOWNGRADED", AuditRequestCapture.classifyPluginAction("/updateCenter/plugin/matrix-auth/downgrade"));
+    }
+
+    @Test
     void extractPluginNameFromModernRoutesUsesPluginSegment() {
         assertEquals("greenballs", AuditRequestCapture.extractPluginNameFromUri("/plugin/greenballs/doUninstall"));
         assertEquals("greenballs", AuditRequestCapture.extractPluginNameFromUri("/plugin/greenballs/makeDisabled"));
@@ -85,6 +90,30 @@ class AuditRequestCapturePluginRouteRegressionTest {
     }
 
     @Test
+    void extractRequestedPluginVersionFromAdvancedUploadAndUrlBodies() {
+        String multipartUploadBody = """
+                ------WebKitFormBoundary
+                Content-Disposition: form-data; name="name"; filename="git-client-4.3.0.hpi"
+                Content-Type: application/octet-stream
+
+                binary
+                ------WebKitFormBoundary--
+                """;
+        String multipartUrlBody = """
+                ------WebKitFormBoundary
+                Content-Disposition: form-data; name="pluginUrl"
+
+                https://updates.jenkins.io/download/plugins/mailer/489.vd4b_25144138f/mailer.hpi
+                ------WebKitFormBoundary--
+                """;
+        String formBody = "pluginUrl=https%3A%2F%2Fupdates.jenkins.io%2Fdownload%2Fplugins%2Fgit%2F5.8.0%2Fgit.hpi";
+
+        assertEquals("4.3.0", AuditRequestCapture.extractRequestedPluginVersionFromRequestBody(multipartUploadBody));
+        assertEquals("489.vd4b_25144138f", AuditRequestCapture.extractRequestedPluginVersionFromRequestBody(multipartUrlBody));
+        assertEquals("5.8.0", AuditRequestCapture.extractRequestedPluginVersionFromRequestBody(formBody));
+    }
+
+    @Test
     void normalizePluginTargetStripsVersionsPathsAndExtensions() {
         assertEquals("git", AuditRequestCapture.normalizePluginTarget("git@5.8.0"));
         assertEquals("mailer", AuditRequestCapture.normalizePluginTarget("https://updates.jenkins.io/download/plugins/mailer/489.vd4b_25144138f/mailer.hpi"));
@@ -105,6 +134,24 @@ class AuditRequestCapturePluginRouteRegressionTest {
     }
 
     @Test
+    void installClassificationTreatsOlderRequestedVersionAsDowngrade() {
+        assertEquals("PLUGIN_DOWNGRADED",
+                AuditRequestCapture.resolvePluginAction(
+                        "PLUGIN_INSTALLED",
+                        "git",
+                        "5.7.0",
+                        "git"::equals,
+                        plugin -> "5.8.0"));
+        assertEquals("PLUGIN_UPDATED",
+                AuditRequestCapture.resolvePluginAction(
+                        "PLUGIN_INSTALLED",
+                        "git",
+                        "5.8.0",
+                        "git"::equals,
+                        plugin -> "5.7.0"));
+    }
+
+    @Test
     void pluginActionDetailsUsePluralForMultipleTargets() {
         assertEquals("Plugin installed: git by admin",
                 AuditRequestCapture.formatPluginActionDetails("PLUGIN_INSTALLED", "git", "admin"));
@@ -112,6 +159,8 @@ class AuditRequestCapturePluginRouteRegressionTest {
                 AuditRequestCapture.formatPluginActionDetails("PLUGIN_INSTALLED", "git, mailer", "admin"));
         assertEquals("Plugins updated: git, mailer by admin",
                 AuditRequestCapture.formatPluginActionDetails("PLUGIN_UPDATED", "git, mailer", "admin"));
+        assertEquals("Plugin rolled back to previous version: git by admin",
+                AuditRequestCapture.formatPluginActionDetails("PLUGIN_DOWNGRADED", "git", "admin"));
     }
 
     @Test

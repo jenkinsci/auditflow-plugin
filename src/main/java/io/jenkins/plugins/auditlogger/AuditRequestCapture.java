@@ -9,9 +9,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.logging.Level;
@@ -21,6 +25,7 @@ import java.util.regex.Pattern;
 
 import hudson.init.InitMilestone;
 import hudson.init.Initializer;
+import hudson.util.VersionNumber;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.FilterConfig;
@@ -56,6 +61,8 @@ public class AuditRequestCapture {
             Pattern.compile("name=\"(?:pluginName|pluginUrl|url|name)\"\\s*\\r?\\n\\r?\\n([^\\r\\n]+)",
                     Pattern.CASE_INSENSITIVE);
     private static volatile boolean registered = false;
+    private static volatile boolean requestListenerRegistered = false;
+    private static volatile boolean filterRegistered = false;
 
     @Initializer(after = InitMilestone.STARTED)
     public static void register() {
@@ -85,13 +92,18 @@ public class AuditRequestCapture {
                 @Override
                 public void requestDestroyed(ServletRequestEvent sre) {
                     if (sre.getServletRequest() instanceof HttpServletRequest) {
-                        HttpServletRequest req = (HttpServletRequest) sre.getServletRequest();
+                        HttpServletRequest req = RequestHolder.get();
+                        if (req == null) {
+                            req = (HttpServletRequest) sre.getServletRequest();
+                        }
                         enrichPendingAuthEntry(req);
                         detectAdminAction(req);
                     }
                     RequestHolder.clear();
                 }
             });
+            requestListenerRegistered = true;
+            registerFallbackFilter();
             registered = true;
             LOGGER.info("AuditRequestCapture: ServletRequestListener registered");
         } catch (IllegalStateException | UnsupportedOperationException e) {
@@ -104,6 +116,9 @@ public class AuditRequestCapture {
     }
 
     private static void registerFallbackFilter() {
+        if (filterRegistered) {
+            return;
+        }
         try {
             hudson.util.PluginServletFilter.addFilter(new Filter() {
                 @Override
@@ -117,6 +132,10 @@ public class AuditRequestCapture {
                     if (req instanceof HttpServletRequest) {
                         HttpServletRequest httpReq = (HttpServletRequest) req;
                         effectiveReq = cacheRequestBody(httpReq);
+                        if (effectiveReq != httpReq
+                                && Boolean.TRUE.equals(httpReq.getAttribute(RESTART_AUDIT_LOGGED_ATTR))) {
+                            effectiveReq.setAttribute(RESTART_AUDIT_LOGGED_ATTR, Boolean.TRUE);
+                        }
                         RequestHolder.set(effectiveReq);
                         // Capture the authenticated username BEFORE chain.doFilter() —
                         // Jenkins may impersonate SYSTEM during save operations,
@@ -133,26 +152,37 @@ public class AuditRequestCapture {
                         // Enrich AFTER chain — security chain has already run by the
                         // time PluginServletFilter is invoked, so SecurityContext is
                         // populated and we can resolve the username for pending entries.
-                        if (effectiveReq != null) {
-                            // Re-capture username in case it wasn't resolved before chain
-                            if (RequestHolder.getAuthenticatedUser() == null) {
+                        if (requestListenerRegistered) {
+                            if (effectiveReq != null && RequestHolder.getAuthenticatedUser() == null) {
                                 String postChainUser = resolveUsername(effectiveReq);
                                 if (postChainUser != null) {
                                     RequestHolder.setAuthenticatedUser(postChainUser);
                                 }
                             }
-                            enrichPendingAuthEntry(effectiveReq);
-                            detectAdminAction(effectiveReq);
+                        } else {
+                            if (effectiveReq != null) {
+                                if (RequestHolder.getAuthenticatedUser() == null) {
+                                    String postChainUser = resolveUsername(effectiveReq);
+                                    if (postChainUser != null) {
+                                        RequestHolder.setAuthenticatedUser(postChainUser);
+                                    }
+                                }
+                                enrichPendingAuthEntry(effectiveReq);
+                                detectAdminAction(effectiveReq);
+                            }
+                            RequestHolder.clear();
                         }
-                        RequestHolder.clear();
                     }
                 }
 
                 @Override
                 public void destroy() {}
             });
+            filterRegistered = true;
             registered = true;
-            LOGGER.info("AuditRequestCapture: PluginServletFilter fallback registered");
+            LOGGER.info(requestListenerRegistered
+                    ? "AuditRequestCapture: companion PluginServletFilter registered"
+                    : "AuditRequestCapture: PluginServletFilter fallback registered");
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Failed to register fallback filter — IP capture will rely on thread name parsing", e);
         }
@@ -197,6 +227,11 @@ public class AuditRequestCapture {
             String details = null;
             String severity = "HIGH";
 
+            if ("POST".equalsIgnoreCase(method) && isRestartCancellationRequest(uri)) {
+                RequestHolder.clearPendingRestart();
+                return;
+            }
+
             // ===== RESTART (route-aware matching) =====
             if (systemConfigEventsEnabled
                     && !Boolean.TRUE.equals(req.getAttribute(RESTART_AUDIT_LOGGED_ATTR))
@@ -210,9 +245,17 @@ public class AuditRequestCapture {
             // ===== PLUGIN OPERATIONS (route-aware matching) =====
             if (pluginEventsEnabled && "POST".equalsIgnoreCase(method) && RouteAwareUrlMatcher.isPluginManagerAction(uri)) {
                 String pluginAction = classifyPluginAction(uri);
-                if ("PLUGIN_INSTALLED".equals(pluginAction) || "PLUGIN_UPDATED".equals(pluginAction)) {
+                if ("PLUGIN_INSTALLED".equals(pluginAction)
+                        || "PLUGIN_UPDATED".equals(pluginAction)
+                        || "PLUGIN_DOWNGRADED".equals(pluginAction)) {
                     String pluginTarget = extractPluginTarget(req, uri);
-                    String resolvedPluginAction = resolvePluginAction(pluginAction, pluginTarget, AuditRequestCapture::isInstalledPlugin);
+                    String requestedVersion = extractRequestedPluginVersion(req);
+                    String resolvedPluginAction = resolvePluginAction(
+                            pluginAction,
+                            pluginTarget,
+                            requestedVersion,
+                            AuditRequestCapture::isInstalledPlugin,
+                            AuditRequestCapture::getInstalledPluginVersion);
                     if (pluginTarget != null) {
                         action = resolvedPluginAction;
                         target = pluginTarget;
@@ -251,6 +294,11 @@ public class AuditRequestCapture {
                 entry.setSeverity(severity);
                 AuditLogStorage storage = AuditLogStorage.getInstance();
                 storage.addEntry(entry);
+                if ("PLUGIN_INSTALLED".equals(action)
+                        || "PLUGIN_UPDATED".equals(action)
+                        || "PLUGIN_DOWNGRADED".equals(action)) {
+                    RequestHolder.rememberPendingRestart(username, true, false);
+                }
                 if ("SYSTEM_RESTART".equals(action)) {
                     storage.flushNow();
                 }
@@ -297,6 +345,26 @@ public class AuditRequestCapture {
         return null;
     }
 
+    private static String extractRequestedPluginVersion(HttpServletRequest req) {
+        try {
+            String[] directCandidates = {
+                    req.getParameter("pluginName"),
+                    req.getParameter("name"),
+                    req.getParameter("pluginUrl"),
+                    req.getParameter("url")
+            };
+            for (String candidate : directCandidates) {
+                String version = extractPluginVersionHint(candidate);
+                if (version != null) {
+                    return version;
+                }
+            }
+            return extractRequestedPluginVersionFromRequestBody((String) req.getAttribute(CACHED_REQUEST_BODY_ATTR));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
     static String extractPluginTargetFromRequestBody(String requestBody) {
         String pluginsFromJson = extractPluginTargetFromJsonBody(requestBody);
         if (pluginsFromJson != null) {
@@ -309,6 +377,24 @@ public class AuditRequestCapture {
         }
 
         return extractPluginTargetFromFormBody(requestBody);
+    }
+
+    static String extractRequestedPluginVersionFromRequestBody(String requestBody) {
+        if (requestBody == null || requestBody.isBlank()) {
+            return null;
+        }
+
+        String fromJson = extractRequestedPluginVersionFromJsonBody(requestBody);
+        if (fromJson != null) {
+            return fromJson;
+        }
+
+        String fromMultipart = extractRequestedPluginVersionFromMultipartBody(requestBody);
+        if (fromMultipart != null) {
+            return fromMultipart;
+        }
+
+        return extractRequestedPluginVersionFromFormBody(requestBody);
     }
 
     static String extractPluginTargetFromJsonBody(String requestBody) {
@@ -348,6 +434,32 @@ public class AuditRequestCapture {
         }
     }
 
+    static String extractRequestedPluginVersionFromJsonBody(String requestBody) {
+        if (requestBody == null || requestBody.isBlank()) {
+            return null;
+        }
+
+        try {
+            JSONObject json = JSONObject.fromObject(requestBody);
+            Object pluginsValue = json.get("plugins");
+            if (!(pluginsValue instanceof JSONArray plugins) || plugins.isEmpty()) {
+                return null;
+            }
+
+            Object firstPlugin = plugins.get(0);
+            String rawValue = firstPlugin instanceof JSONObject pluginObject
+                    ? pluginObject.optString("version",
+                    pluginObject.optString("requestedVersion",
+                            pluginObject.optString("url",
+                                    pluginObject.optString("name", pluginObject.optString("shortName", firstPlugin.toString())))))
+                    : firstPlugin.toString();
+            return extractPluginVersionHint(rawValue);
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Failed to parse plugin version from JSON body", e);
+            return null;
+        }
+    }
+
     private static String extractPluginTargetFromMultipartBody(String requestBody) {
         if (requestBody == null || requestBody.isBlank()) {
             return null;
@@ -368,6 +480,30 @@ public class AuditRequestCapture {
                 return normalized;
             }
         }
+        return null;
+    }
+
+    private static String extractRequestedPluginVersionFromMultipartBody(String requestBody) {
+        if (requestBody == null || requestBody.isBlank()) {
+            return null;
+        }
+
+        Matcher fileMatcher = MULTIPART_FILE_NAME_PATTERN.matcher(requestBody);
+        if (fileMatcher.find()) {
+            String version = extractPluginVersionHint(fileMatcher.group(1));
+            if (version != null) {
+                return version;
+            }
+        }
+
+        Matcher fieldMatcher = MULTIPART_FIELD_PATTERN.matcher(requestBody);
+        while (fieldMatcher.find()) {
+            String version = extractPluginVersionHint(fieldMatcher.group(1));
+            if (version != null) {
+                return version;
+            }
+        }
+
         return null;
     }
 
@@ -394,6 +530,33 @@ public class AuditRequestCapture {
             }
         } catch (IllegalArgumentException e) {
             LOGGER.log(Level.FINE, "Failed to decode plugin install form body", e);
+        }
+        return null;
+    }
+
+    private static String extractRequestedPluginVersionFromFormBody(String requestBody) {
+        if (requestBody == null || requestBody.isBlank()) {
+            return null;
+        }
+
+        try {
+            String decodedBody = URLDecoder.decode(requestBody, StandardCharsets.UTF_8);
+            for (String pair : decodedBody.split("&")) {
+                if (pair.isBlank()) {
+                    continue;
+                }
+                int separatorIndex = pair.indexOf('=');
+                String key = separatorIndex >= 0 ? pair.substring(0, separatorIndex) : pair;
+                String value = separatorIndex >= 0 ? pair.substring(separatorIndex + 1) : "";
+                if ("pluginName".equals(key) || "name".equals(key) || "pluginUrl".equals(key) || "url".equals(key)) {
+                    String version = extractPluginVersionHint(value);
+                    if (version != null) {
+                        return version;
+                    }
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            LOGGER.log(Level.FINE, "Failed to decode plugin install form body for version detection", e);
         }
         return null;
     }
@@ -434,12 +597,36 @@ public class AuditRequestCapture {
     }
 
     static String resolvePluginAction(String pluginAction, String pluginTarget, Predicate<String> installedPluginLookup) {
+        return resolvePluginAction(pluginAction, pluginTarget, null, installedPluginLookup, AuditRequestCapture::getInstalledPluginVersion);
+    }
+
+    static String resolvePluginAction(String pluginAction,
+                                      String pluginTarget,
+                                      String requestedVersion,
+                                      Predicate<String> installedPluginLookup,
+                                      java.util.function.Function<String, String> installedVersionLookup) {
+        if ("PLUGIN_DOWNGRADED".equals(pluginAction)) {
+            return pluginAction;
+        }
         if (!"PLUGIN_INSTALLED".equals(pluginAction) || pluginTarget == null || installedPluginLookup == null) {
             return pluginAction;
         }
 
+        String[] targets = pluginTarget.split("\\s*,\\s*");
+        if (targets.length == 1 && requestedVersion != null && installedVersionLookup != null) {
+            String normalized = normalizeSinglePluginToken(targets[0]);
+            if (!normalized.isBlank() && installedPluginLookup.test(normalized)) {
+                String installedVersion = installedVersionLookup.apply(normalized);
+                Integer comparison = comparePluginVersions(requestedVersion, installedVersion);
+                if (comparison != null && comparison < 0) {
+                    return "PLUGIN_DOWNGRADED";
+                }
+                return "PLUGIN_UPDATED";
+            }
+        }
+
         boolean sawTarget = false;
-        for (String token : pluginTarget.split("\\s*,\\s*")) {
+        for (String token : targets) {
             String normalized = normalizeSinglePluginToken(token);
             if (normalized.isBlank()) {
                 continue;
@@ -473,6 +660,9 @@ public class AuditRequestCapture {
     static String formatPluginActionDetails(String pluginAction, String pluginTarget, String username) {
         boolean multiplePlugins = pluginTarget != null && pluginTarget.contains(",");
         String noun = multiplePlugins ? "Plugins" : "Plugin";
+        if ("PLUGIN_DOWNGRADED".equals(pluginAction)) {
+            return noun + " rolled back to previous version: " + pluginTarget + " by " + username;
+        }
         String verb = "PLUGIN_UPDATED".equals(pluginAction) ? "updated" : "installed";
         return noun + " " + verb + ": " + pluginTarget + " by " + username;
     }
@@ -506,6 +696,7 @@ public class AuditRequestCapture {
 
             boolean isSafe = RouteAwareUrlMatcher.isSafeRestartAction(uri);
             String details = (isSafe ? "Safe" : "Immediate") + " restart initiated by " + username;
+            RequestHolder.rememberPendingRestart(username, isSafe, true);
             AuditLogEntry entry = new AuditLogEntry(username, "SYSTEM_RESTART", "Jenkins", details);
             entry.setSeverity("CRITICAL");
 
@@ -530,6 +721,10 @@ public class AuditRequestCapture {
         }
         return "GET".equalsIgnoreCase(method)
                 && ("/updateCenter/restart".equals(uri) || "/updateCenter/safeRestart".equals(uri));
+    }
+
+    static boolean isRestartCancellationRequest(String uri) {
+        return "/updateCenter/cancelRestart".equals(uri);
     }
 
     static String selectMeaningfulUser(String primary, String secondary) {
@@ -589,6 +784,117 @@ public class AuditRequestCapture {
         return jenkins != null
                 && jenkins.getPluginManager() != null
                 && jenkins.getPluginManager().getPlugin(shortName) != null;
+    }
+
+    private static String getInstalledPluginVersion(String shortName) {
+        Jenkins jenkins = Jenkins.getInstanceOrNull();
+        if (jenkins == null || jenkins.getPluginManager() == null || shortName == null) {
+            return null;
+        }
+        var plugin = jenkins.getPluginManager().getPlugin(shortName);
+        return plugin != null ? plugin.getVersion() : null;
+    }
+
+    private static Integer comparePluginVersions(String requestedVersion, String installedVersion) {
+        if (requestedVersion == null || installedVersion == null) {
+            return null;
+        }
+        try {
+            return new VersionNumber(requestedVersion).compareTo(new VersionNumber(installedVersion));
+        } catch (RuntimeException e) {
+            LOGGER.log(Level.FINE, "Failed to compare plugin versions", e);
+            return null;
+        }
+    }
+
+    static String extractPluginVersionHint(String rawToken) {
+        if (rawToken == null) {
+            return null;
+        }
+
+        String token = rawToken.trim();
+        if (token.isEmpty()) {
+            return null;
+        }
+
+        if (token.contains("://")) {
+            int queryIndex = token.indexOf('?');
+            if (queryIndex >= 0) {
+                token = token.substring(0, queryIndex);
+            }
+            int hashIndex = token.indexOf('#');
+            if (hashIndex >= 0) {
+                token = token.substring(0, hashIndex);
+            }
+            String[] segments = token.split("/");
+            for (int i = segments.length - 2; i >= 0; i--) {
+                String candidate = segments[i].trim();
+                if (looksLikeVersion(candidate)) {
+                    return candidate;
+                }
+            }
+            if (segments.length > 0) {
+                return extractPluginVersionHintFromFilename(segments[segments.length - 1]);
+            }
+            return null;
+        }
+
+        int atIndex = token.indexOf('@');
+        if (atIndex > 0 && atIndex + 1 < token.length()) {
+            String version = token.substring(atIndex + 1).trim();
+            return looksLikeVersion(version) ? version : null;
+        }
+
+        int colonIndex = token.indexOf(':');
+        if (colonIndex > 0 && colonIndex + 1 < token.length() && token.indexOf("://") < 0) {
+            String version = token.substring(colonIndex + 1).trim();
+            return looksLikeVersion(version) ? version : null;
+        }
+
+        token = token.replace('\\', '/');
+        int slashIndex = token.lastIndexOf('/');
+        if (slashIndex >= 0 && slashIndex + 1 < token.length()) {
+            token = token.substring(slashIndex + 1);
+        }
+        return extractPluginVersionHintFromFilename(token);
+    }
+
+    private static String extractPluginVersionHintFromFilename(String filename) {
+        if (filename == null) {
+            return null;
+        }
+        String normalized = filename.trim();
+        if (normalized.endsWith(".jpi") || normalized.endsWith(".hpi")) {
+            normalized = normalized.substring(0, normalized.length() - 4);
+        }
+
+        int separatorIndex = normalized.lastIndexOf('-');
+        if (separatorIndex > 0 && separatorIndex + 1 < normalized.length()) {
+            String version = normalized.substring(separatorIndex + 1).trim();
+            if (looksLikeVersion(version)) {
+                return version;
+            }
+        }
+        return null;
+    }
+
+    private static boolean looksLikeVersion(String candidate) {
+        if (candidate == null || candidate.isBlank()) {
+            return false;
+        }
+
+        boolean sawDigit = false;
+        for (int i = 0; i < candidate.length(); i++) {
+            char ch = candidate.charAt(i);
+            if (Character.isDigit(ch)) {
+                sawDigit = true;
+                continue;
+            }
+            if (!(Character.isLetter(ch) || ch == '.' || ch == '_' || ch == '-')) {
+                return false;
+            }
+        }
+        return sawDigit;
     }
 
     /**
@@ -684,8 +990,14 @@ public class AuditRequestCapture {
     private static HttpServletRequest cacheRequestBody(HttpServletRequest request) throws IOException {
         String method = request.getMethod();
         String contentType = request.getContentType();
-        if (!"POST".equalsIgnoreCase(method) || contentType == null
-                || !contentType.toLowerCase(Locale.ROOT).contains("application/json")) {
+        if (!"POST".equalsIgnoreCase(method) || contentType == null) {
+            return request;
+        }
+
+        String normalizedContentType = contentType.toLowerCase(Locale.ROOT);
+        if (!normalizedContentType.contains("application/json")
+                && !normalizedContentType.contains("application/x-www-form-urlencoded")
+                && !normalizedContentType.contains("multipart/form-data")) {
             return request;
         }
 
@@ -697,16 +1009,46 @@ public class AuditRequestCapture {
     private static final class BufferedRequestWrapper extends HttpServletRequestWrapper {
         private final byte[] body;
         private final Charset charset;
+        private final Map<String, String[]> cachedParameters;
+        private final boolean formEncoded;
 
         BufferedRequestWrapper(HttpServletRequest request) throws IOException {
             super(request);
             this.body = request.getInputStream().readAllBytes();
             String encoding = request.getCharacterEncoding();
             this.charset = encoding != null ? Charset.forName(encoding) : StandardCharsets.UTF_8;
+            String contentType = request.getContentType();
+            this.formEncoded = contentType != null
+                    && contentType.toLowerCase(Locale.ROOT).contains("application/x-www-form-urlencoded");
+            this.cachedParameters = formEncoded ? parseFormParameters(new String(body, charset)) : Collections.emptyMap();
         }
 
         String getCachedBody() {
             return new String(body, charset);
+        }
+
+        @Override
+        public String getParameter(String name) {
+            if (formEncoded) {
+                String[] values = cachedParameters.get(name);
+                return values != null && values.length > 0 ? values[0] : null;
+            }
+            return super.getParameter(name);
+        }
+
+        @Override
+        public Map<String, String[]> getParameterMap() {
+            return formEncoded ? Collections.unmodifiableMap(cachedParameters) : super.getParameterMap();
+        }
+
+        @Override
+        public Enumeration<String> getParameterNames() {
+            return formEncoded ? Collections.enumeration(cachedParameters.keySet()) : super.getParameterNames();
+        }
+
+        @Override
+        public String[] getParameterValues(String name) {
+            return formEncoded ? cachedParameters.get(name) : super.getParameterValues(name);
         }
 
         @Override
@@ -738,6 +1080,35 @@ public class AuditRequestCapture {
         @Override
         public BufferedReader getReader() {
             return new BufferedReader(new InputStreamReader(getInputStream(), charset));
+        }
+
+        private static Map<String, String[]> parseFormParameters(String requestBody) {
+            if (requestBody == null || requestBody.isBlank()) {
+                return Collections.emptyMap();
+            }
+
+            Map<String, List<String>> parameters = new LinkedHashMap<>();
+            try {
+                String decodedBody = URLDecoder.decode(requestBody, StandardCharsets.UTF_8);
+                for (String pair : decodedBody.split("&")) {
+                    if (pair.isBlank()) {
+                        continue;
+                    }
+                    int separatorIndex = pair.indexOf('=');
+                    String key = separatorIndex >= 0 ? pair.substring(0, separatorIndex) : pair;
+                    String value = separatorIndex >= 0 ? pair.substring(separatorIndex + 1) : "";
+                    parameters.computeIfAbsent(key, ignored -> new ArrayList<>()).add(value);
+                }
+            } catch (IllegalArgumentException e) {
+                LOGGER.log(Level.FINE, "Failed to parse cached form parameters", e);
+                return Collections.emptyMap();
+            }
+
+            Map<String, String[]> normalized = new LinkedHashMap<>();
+            for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {
+                normalized.put(entry.getKey(), entry.getValue().toArray(new String[0]));
+            }
+            return normalized;
         }
     }
 

@@ -247,6 +247,7 @@
                                             <option value="PLUGIN_INSTALLED">Plugin Installed</option>
                                             <option value="PLUGIN_REMOVED">Plugin Removed</option>
                                             <option value="PLUGIN_UPDATED">Plugin Updated</option>
+                                            <option value="PLUGIN_DOWNGRADED">Plugin Downgraded</option>
                                             <option value="PLUGIN_ENABLED">Plugin Enabled</option>
                                             <option value="PLUGIN_DISABLED">Plugin Disabled</option>
                                         </optgroup>
