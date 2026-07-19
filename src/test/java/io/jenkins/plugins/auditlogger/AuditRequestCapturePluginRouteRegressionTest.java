@@ -90,6 +90,7 @@ class AuditRequestCapturePluginRouteRegressionTest {
     }
 
     @Test
+<<<<<<< HEAD
     void extractRequestedPluginVersionFromAdvancedUploadAndUrlBodies() {
         String multipartUploadBody = """
                 ------WebKitFormBoundary
@@ -114,6 +115,8 @@ class AuditRequestCapturePluginRouteRegressionTest {
     }
 
     @Test
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
     void normalizePluginTargetStripsVersionsPathsAndExtensions() {
         assertEquals("git", AuditRequestCapture.normalizePluginTarget("git@5.8.0"));
         assertEquals("mailer", AuditRequestCapture.normalizePluginTarget("https://updates.jenkins.io/download/plugins/mailer/489.vd4b_25144138f/mailer.hpi"));
@@ -134,6 +137,7 @@ class AuditRequestCapturePluginRouteRegressionTest {
     }
 
     @Test
+<<<<<<< HEAD
     void installClassificationTreatsOlderRequestedVersionAsDowngrade() {
         assertEquals("PLUGIN_DOWNGRADED",
                 AuditRequestCapture.resolvePluginAction(
@@ -152,6 +156,8 @@ class AuditRequestCapturePluginRouteRegressionTest {
     }
 
     @Test
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
     void pluginActionDetailsUsePluralForMultipleTargets() {
         assertEquals("Plugin installed: git by admin",
                 AuditRequestCapture.formatPluginActionDetails("PLUGIN_INSTALLED", "git", "admin"));
@@ -159,8 +165,11 @@ class AuditRequestCapturePluginRouteRegressionTest {
                 AuditRequestCapture.formatPluginActionDetails("PLUGIN_INSTALLED", "git, mailer", "admin"));
         assertEquals("Plugins updated: git, mailer by admin",
                 AuditRequestCapture.formatPluginActionDetails("PLUGIN_UPDATED", "git, mailer", "admin"));
+<<<<<<< HEAD
         assertEquals("Plugin rolled back to previous version: git by admin",
                 AuditRequestCapture.formatPluginActionDetails("PLUGIN_DOWNGRADED", "git", "admin"));
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
     }
 
     @Test

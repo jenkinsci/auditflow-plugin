@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+<<<<<<< HEAD
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
@@ -16,6 +17,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+=======
+import java.util.Enumeration;
+import java.util.LinkedHashSet;
+import java.util.Locale;
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.logging.Level;
@@ -245,6 +251,7 @@ public class AuditRequestCapture {
             // ===== PLUGIN OPERATIONS (route-aware matching) =====
             if (pluginEventsEnabled && "POST".equalsIgnoreCase(method) && RouteAwareUrlMatcher.isPluginManagerAction(uri)) {
                 String pluginAction = classifyPluginAction(uri);
+<<<<<<< HEAD
                 if ("PLUGIN_INSTALLED".equals(pluginAction)
                         || "PLUGIN_UPDATED".equals(pluginAction)
                         || "PLUGIN_DOWNGRADED".equals(pluginAction)) {
@@ -256,6 +263,11 @@ public class AuditRequestCapture {
                             requestedVersion,
                             AuditRequestCapture::isInstalledPlugin,
                             AuditRequestCapture::getInstalledPluginVersion);
+=======
+                if ("PLUGIN_INSTALLED".equals(pluginAction) || "PLUGIN_UPDATED".equals(pluginAction)) {
+                    String pluginTarget = extractPluginTarget(req, uri);
+                    String resolvedPluginAction = resolvePluginAction(pluginAction, pluginTarget, AuditRequestCapture::isInstalledPlugin);
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
                     if (pluginTarget != null) {
                         action = resolvedPluginAction;
                         target = pluginTarget;
@@ -294,11 +306,14 @@ public class AuditRequestCapture {
                 entry.setSeverity(severity);
                 AuditLogStorage storage = AuditLogStorage.getInstance();
                 storage.addEntry(entry);
+<<<<<<< HEAD
                 if ("PLUGIN_INSTALLED".equals(action)
                         || "PLUGIN_UPDATED".equals(action)
                         || "PLUGIN_DOWNGRADED".equals(action)) {
                     RequestHolder.rememberPendingRestart(username, true, false);
                 }
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
                 if ("SYSTEM_RESTART".equals(action)) {
                     storage.flushNow();
                 }
@@ -345,6 +360,7 @@ public class AuditRequestCapture {
         return null;
     }
 
+<<<<<<< HEAD
     private static String extractRequestedPluginVersion(HttpServletRequest req) {
         try {
             String[] directCandidates = {
@@ -365,6 +381,8 @@ public class AuditRequestCapture {
         }
     }
 
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
     static String extractPluginTargetFromRequestBody(String requestBody) {
         String pluginsFromJson = extractPluginTargetFromJsonBody(requestBody);
         if (pluginsFromJson != null) {
@@ -379,6 +397,7 @@ public class AuditRequestCapture {
         return extractPluginTargetFromFormBody(requestBody);
     }
 
+<<<<<<< HEAD
     static String extractRequestedPluginVersionFromRequestBody(String requestBody) {
         if (requestBody == null || requestBody.isBlank()) {
             return null;
@@ -397,6 +416,8 @@ public class AuditRequestCapture {
         return extractRequestedPluginVersionFromFormBody(requestBody);
     }
 
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
     static String extractPluginTargetFromJsonBody(String requestBody) {
         if (requestBody == null || requestBody.isBlank()) {
             return null;
@@ -434,6 +455,7 @@ public class AuditRequestCapture {
         }
     }
 
+<<<<<<< HEAD
     static String extractRequestedPluginVersionFromJsonBody(String requestBody) {
         if (requestBody == null || requestBody.isBlank()) {
             return null;
@@ -460,6 +482,8 @@ public class AuditRequestCapture {
         }
     }
 
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
     private static String extractPluginTargetFromMultipartBody(String requestBody) {
         if (requestBody == null || requestBody.isBlank()) {
             return null;
@@ -483,6 +507,7 @@ public class AuditRequestCapture {
         return null;
     }
 
+<<<<<<< HEAD
     private static String extractRequestedPluginVersionFromMultipartBody(String requestBody) {
         if (requestBody == null || requestBody.isBlank()) {
             return null;
@@ -507,6 +532,8 @@ public class AuditRequestCapture {
         return null;
     }
 
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
     private static String extractPluginTargetFromFormBody(String requestBody) {
         if (requestBody == null || requestBody.isBlank()) {
             return null;
@@ -534,6 +561,7 @@ public class AuditRequestCapture {
         return null;
     }
 
+<<<<<<< HEAD
     private static String extractRequestedPluginVersionFromFormBody(String requestBody) {
         if (requestBody == null || requestBody.isBlank()) {
             return null;
@@ -561,6 +589,8 @@ public class AuditRequestCapture {
         return null;
     }
 
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
     static boolean isPluginInstallUri(String uri) {
         return RouteAwareUrlMatcher.isPluginInstallAction(uri);
     }
@@ -597,6 +627,7 @@ public class AuditRequestCapture {
     }
 
     static String resolvePluginAction(String pluginAction, String pluginTarget, Predicate<String> installedPluginLookup) {
+<<<<<<< HEAD
         return resolvePluginAction(pluginAction, pluginTarget, null, installedPluginLookup, AuditRequestCapture::getInstalledPluginVersion);
     }
 
@@ -608,10 +639,13 @@ public class AuditRequestCapture {
         if ("PLUGIN_DOWNGRADED".equals(pluginAction)) {
             return pluginAction;
         }
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
         if (!"PLUGIN_INSTALLED".equals(pluginAction) || pluginTarget == null || installedPluginLookup == null) {
             return pluginAction;
         }
 
+<<<<<<< HEAD
         String[] targets = pluginTarget.split("\\s*,\\s*");
         if (targets.length == 1 && requestedVersion != null && installedVersionLookup != null) {
             String normalized = normalizeSinglePluginToken(targets[0]);
@@ -627,6 +661,10 @@ public class AuditRequestCapture {
 
         boolean sawTarget = false;
         for (String token : targets) {
+=======
+        boolean sawTarget = false;
+        for (String token : pluginTarget.split("\\s*,\\s*")) {
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
             String normalized = normalizeSinglePluginToken(token);
             if (normalized.isBlank()) {
                 continue;
@@ -660,9 +698,12 @@ public class AuditRequestCapture {
     static String formatPluginActionDetails(String pluginAction, String pluginTarget, String username) {
         boolean multiplePlugins = pluginTarget != null && pluginTarget.contains(",");
         String noun = multiplePlugins ? "Plugins" : "Plugin";
+<<<<<<< HEAD
         if ("PLUGIN_DOWNGRADED".equals(pluginAction)) {
             return noun + " rolled back to previous version: " + pluginTarget + " by " + username;
         }
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
         String verb = "PLUGIN_UPDATED".equals(pluginAction) ? "updated" : "installed";
         return noun + " " + verb + ": " + pluginTarget + " by " + username;
     }
@@ -696,7 +737,10 @@ public class AuditRequestCapture {
 
             boolean isSafe = RouteAwareUrlMatcher.isSafeRestartAction(uri);
             String details = (isSafe ? "Safe" : "Immediate") + " restart initiated by " + username;
+<<<<<<< HEAD
             RequestHolder.rememberPendingRestart(username, isSafe, true);
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
             AuditLogEntry entry = new AuditLogEntry(username, "SYSTEM_RESTART", "Jenkins", details);
             entry.setSeverity("CRITICAL");
 
@@ -723,10 +767,13 @@ public class AuditRequestCapture {
                 && ("/updateCenter/restart".equals(uri) || "/updateCenter/safeRestart".equals(uri));
     }
 
+<<<<<<< HEAD
     static boolean isRestartCancellationRequest(String uri) {
         return "/updateCenter/cancelRestart".equals(uri);
     }
 
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
     static String selectMeaningfulUser(String primary, String secondary) {
         if (isMeaningfulUser(primary)) {
             return primary;
@@ -786,6 +833,7 @@ public class AuditRequestCapture {
                 && jenkins.getPluginManager().getPlugin(shortName) != null;
     }
 
+<<<<<<< HEAD
     private static String getInstalledPluginVersion(String shortName) {
         Jenkins jenkins = Jenkins.getInstanceOrNull();
         if (jenkins == null || jenkins.getPluginManager() == null || shortName == null) {
@@ -897,6 +945,8 @@ public class AuditRequestCapture {
         return sawDigit;
     }
 
+=======
+>>>>>>> refs/remotes/origin/restart-logging-bugfix
     /**
      * Enrich a pending auth entry (created by SecurityListener before PluginServletFilter ran)
      * with User-Agent from the now-available HTTP request, then write it to the audit log.
