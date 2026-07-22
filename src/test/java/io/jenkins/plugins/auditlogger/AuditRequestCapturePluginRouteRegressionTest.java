@@ -66,6 +66,18 @@ class AuditRequestCapturePluginRouteRegressionTest {
     }
 
     @Test
+    void requestBodyCachingNeverWrapsFormOrMultipartPluginSubmissions() {
+        assertTrue(AuditRequestCapture.shouldCacheRequestBody(
+                "POST", "application/json", "/pluginManager/installPlugins"));
+        assertFalse(AuditRequestCapture.shouldCacheRequestBody(
+                "POST", "application/x-www-form-urlencoded", "/pluginManager/install"));
+        assertFalse(AuditRequestCapture.shouldCacheRequestBody(
+                "POST", "multipart/form-data; boundary=----Jenkins", "/pluginManager/uploadPlugin"));
+        assertFalse(AuditRequestCapture.shouldCacheRequestBody(
+                "POST", "application/json", "/configure"));
+    }
+
+    @Test
     void extractPluginTargetFromAdvancedUploadAndUrlBodies() {
         String multipartUploadBody = """
                 ------WebKitFormBoundary

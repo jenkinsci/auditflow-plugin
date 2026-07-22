@@ -8,14 +8,9 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Enumeration;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.logging.Level;
@@ -988,16 +983,12 @@ public class AuditRequestCapture {
     }
 
     private static HttpServletRequest cacheRequestBody(HttpServletRequest request) throws IOException {
-        String method = request.getMethod();
-        String contentType = request.getContentType();
-        if (!"POST".equalsIgnoreCase(method) || contentType == null) {
-            return request;
+        String uri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (uri != null && contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)) {
+            uri = uri.substring(contextPath.length());
         }
-
-        String normalizedContentType = contentType.toLowerCase(Locale.ROOT);
-        if (!normalizedContentType.contains("application/json")
-                && !normalizedContentType.contains("application/x-www-form-urlencoded")
-                && !normalizedContentType.contains("multipart/form-data")) {
+        if (!shouldCacheRequestBody(request.getMethod(), request.getContentType(), uri)) {
             return request;
         }
 
@@ -1006,49 +997,30 @@ public class AuditRequestCapture {
         return wrapped;
     }
 
+    /**
+     * Replay only JSON plugin-manager API requests. Reading form or multipart bodies
+     * here prevents Jenkins from parsing its install/update submissions correctly.
+     */
+    static boolean shouldCacheRequestBody(String method, String contentType, String uri) {
+        return "POST".equalsIgnoreCase(method)
+                && contentType != null
+                && contentType.toLowerCase(Locale.ROOT).contains("application/json")
+                && (isPluginInstallUri(uri) || isPluginUpdateUri(uri));
+    }
+
     private static final class BufferedRequestWrapper extends HttpServletRequestWrapper {
         private final byte[] body;
         private final Charset charset;
-        private final Map<String, String[]> cachedParameters;
-        private final boolean formEncoded;
 
         BufferedRequestWrapper(HttpServletRequest request) throws IOException {
             super(request);
             this.body = request.getInputStream().readAllBytes();
             String encoding = request.getCharacterEncoding();
             this.charset = encoding != null ? Charset.forName(encoding) : StandardCharsets.UTF_8;
-            String contentType = request.getContentType();
-            this.formEncoded = contentType != null
-                    && contentType.toLowerCase(Locale.ROOT).contains("application/x-www-form-urlencoded");
-            this.cachedParameters = formEncoded ? parseFormParameters(new String(body, charset)) : Collections.emptyMap();
         }
 
         String getCachedBody() {
             return new String(body, charset);
-        }
-
-        @Override
-        public String getParameter(String name) {
-            if (formEncoded) {
-                String[] values = cachedParameters.get(name);
-                return values != null && values.length > 0 ? values[0] : null;
-            }
-            return super.getParameter(name);
-        }
-
-        @Override
-        public Map<String, String[]> getParameterMap() {
-            return formEncoded ? Collections.unmodifiableMap(cachedParameters) : super.getParameterMap();
-        }
-
-        @Override
-        public Enumeration<String> getParameterNames() {
-            return formEncoded ? Collections.enumeration(cachedParameters.keySet()) : super.getParameterNames();
-        }
-
-        @Override
-        public String[] getParameterValues(String name) {
-            return formEncoded ? cachedParameters.get(name) : super.getParameterValues(name);
         }
 
         @Override
@@ -1082,34 +1054,6 @@ public class AuditRequestCapture {
             return new BufferedReader(new InputStreamReader(getInputStream(), charset));
         }
 
-        private static Map<String, String[]> parseFormParameters(String requestBody) {
-            if (requestBody == null || requestBody.isBlank()) {
-                return Collections.emptyMap();
-            }
-
-            Map<String, List<String>> parameters = new LinkedHashMap<>();
-            try {
-                String decodedBody = URLDecoder.decode(requestBody, StandardCharsets.UTF_8);
-                for (String pair : decodedBody.split("&")) {
-                    if (pair.isBlank()) {
-                        continue;
-                    }
-                    int separatorIndex = pair.indexOf('=');
-                    String key = separatorIndex >= 0 ? pair.substring(0, separatorIndex) : pair;
-                    String value = separatorIndex >= 0 ? pair.substring(separatorIndex + 1) : "";
-                    parameters.computeIfAbsent(key, ignored -> new ArrayList<>()).add(value);
-                }
-            } catch (IllegalArgumentException e) {
-                LOGGER.log(Level.FINE, "Failed to parse cached form parameters", e);
-                return Collections.emptyMap();
-            }
-
-            Map<String, String[]> normalized = new LinkedHashMap<>();
-            for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {
-                normalized.put(entry.getKey(), entry.getValue().toArray(new String[0]));
-            }
-            return normalized;
-        }
     }
 
     /**
