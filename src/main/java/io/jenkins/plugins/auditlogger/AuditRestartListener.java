@@ -51,6 +51,23 @@ public class AuditRestartListener extends RestartListener {
         logRestart(username, isSafeRestartInProgress(), now);
     }
 
+    /**
+     * Some Update Center restarts bypass {@link #onRestart()}. The plugin stop
+     * hook runs on that path, while the pending user context is still available.
+     */
+    static void logPendingRestartOnPluginStop() {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        if (config != null && !config.isEnableSystemConfigEvents()) {
+            return;
+        }
+
+        RequestHolder.PendingRestartContext pending = RequestHolder.consumePendingRestart();
+        if (pending == null || pending.requestLogged) {
+            return;
+        }
+        logRestart(pending.username, pending.safeRestart, System.currentTimeMillis());
+    }
+
     private static void logRestart(String username, boolean safeRestart, long timestamp) {
         String details = (safeRestart ? "Safe" : "Immediate") + " restart initiated by " + username;
         AuditLogEntry entry = new AuditLogEntry(username, "SYSTEM_RESTART", "Jenkins", details, timestamp);

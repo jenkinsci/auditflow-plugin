@@ -51,6 +51,24 @@ class AuditRestartListenerTest {
     }
 
     @Test
+    void pluginStopLogsPendingPluginRestartWhenRestartListenerWasSkipped(JenkinsRule j) {
+        RequestHolder.rememberPendingRestart("harry", true, false);
+
+        AuditLogStorage storage = AuditLogStorage.getInstance();
+        storage.initialize();
+
+        AuditRestartListener.logPendingRestartOnPluginStop();
+
+        AuditLogEntry restartEntry = storage.getAllEntries().stream()
+                .filter(entry -> "SYSTEM_RESTART".equals(entry.getAction()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Missing SYSTEM_RESTART audit entry"));
+
+        assertEquals("harry", restartEntry.getUsername());
+        assertTrue(restartEntry.getDetails().contains("Safe restart initiated by harry"));
+    }
+
+    @Test
     void onRestartSkipsWhenRequestPathAlreadyLoggedRestart(JenkinsRule j) {
         RequestHolder.rememberPendingRestart("harry", true, true);
 
