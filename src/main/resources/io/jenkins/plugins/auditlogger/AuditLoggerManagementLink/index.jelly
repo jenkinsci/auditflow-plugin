@@ -237,6 +237,11 @@
                                             <option value="JOB_COPIED">Job Copied</option>
                                             <option value="JOB_MOVED">Job Moved</option>
                                         </optgroup>
+                                        <optgroup label="Nodes">
+                                            <option value="NODE_CREATED">Node Created</option>
+                                            <option value="NODE_UPDATED">Node Updated</option>
+                                            <option value="NODE_DELETED">Node Deleted</option>
+                                        </optgroup>
                                         <optgroup label="Credentials">
                                             <option value="CREDENTIAL_ACCESSED">Credential Accessed</option>
                                             <option value="CREDENTIAL_CREATED">Credential Created</option>

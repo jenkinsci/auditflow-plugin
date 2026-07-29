@@ -59,7 +59,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private boolean enableCredentialEvents = true;
     private boolean enablePluginEvents = true;
     private boolean enableSystemConfigEvents = true;
-    private boolean enableNodeEvents = false;
+    private boolean enableNodeEvents = true;
     private boolean enableApiEvents = false;
 
     // Risk Detection — temporarily disabled to keep the write path lightweight.
@@ -188,6 +188,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         setEnableCredentialEvents(json.optBoolean("enableCredentialEvents", false));
         setEnablePluginEvents(json.optBoolean("enablePluginEvents", false));
         setEnableSystemConfigEvents(json.optBoolean("enableSystemConfigEvents", false));
+        setEnableNodeEvents(json.optBoolean("enableNodeEvents", false));
         JSONObject failedLoginBlock = getOptionalBlock(json, "anomalyFailedLogins");
         setAnomalyFailedLogins(isOptionalBlockEnabled(json, "anomalyFailedLogins"));
         JSONObject failedLoginConfig = failedLoginBlock != null ? failedLoginBlock : json;
@@ -332,6 +333,11 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     @DataBoundSetter
     public void setEnableSystemConfigEvents(boolean enableSystemConfigEvents) {
         this.enableSystemConfigEvents = enableSystemConfigEvents;
+    }
+
+    @DataBoundSetter
+    public void setEnableNodeEvents(boolean enableNodeEvents) {
+        this.enableNodeEvents = enableNodeEvents;
     }
 
 

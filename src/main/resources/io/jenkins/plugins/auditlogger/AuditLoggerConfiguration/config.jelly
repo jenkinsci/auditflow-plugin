@@ -45,6 +45,9 @@
         <f:entry title="Global and security configuration saves (log Configure System and security-related saves)">
             <f:checkbox name="enableSystemConfigEvents" checked="${descriptor.isEnableSystemConfigEvents()}"/>
         </f:entry>
+        <f:entry title="Node events (log agent creation, configuration updates, and deletion)">
+            <f:checkbox name="enableNodeEvents" checked="${descriptor.isEnableNodeEvents()}"/>
+        </f:entry>
     </f:section>
 
     <f:section title="Operational Monitoring">
