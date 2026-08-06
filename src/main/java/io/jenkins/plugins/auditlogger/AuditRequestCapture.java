@@ -932,21 +932,34 @@ public class AuditRequestCapture {
 
     /** Resolve the authenticated username from the request. */
     private static String resolveUsername(HttpServletRequest req) {
-        // 1. Try session-based Spring Security context (preserves real user even in impersonated context)
+        if (req == null) return null;
+
+        // 0. Try Basic Auth header from HTTP request
+        try {
+            String authHeader = req.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Basic ")) {
+                String decoded = new String(java.util.Base64.getDecoder().decode(authHeader.substring(6)), java.nio.charset.StandardCharsets.UTF_8);
+                String username = decoded.contains(":") ? decoded.substring(0, decoded.indexOf(':')) : decoded;
+                if (isMeaningfulUser(username)) return username;
+            }
+        } catch (RuntimeException ignored) {}
+
+        // 1. Try session-based Spring/Acegi Security context (preserves real user even in impersonated context)
         try {
             HttpSession session = req.getSession(false);
             if (session != null) {
-                Object ctx = session.getAttribute("SPRING_SECURITY_CONTEXT");
-                if (ctx != null) {
-                    java.lang.reflect.Method getAuth = ctx.getClass().getMethod("getAuthentication");
-                    Object auth = getAuth.invoke(ctx);
-                    if (auth != null) {
-                        java.lang.reflect.Method getName = auth.getClass().getMethod("getName");
-                        String name = (String) getName.invoke(auth);
-                        if (name != null && !name.isEmpty()
-                                && !"anonymous".equalsIgnoreCase(name)
-                                && !"SYSTEM".equalsIgnoreCase(name)) {
-                            return name;
+                String[] keys = {"SPRING_SECURITY_CONTEXT", "ACEGI_SECURITY_CONTEXT"};
+                for (String key : keys) {
+                    Object ctx = session.getAttribute(key);
+                    if (ctx != null) {
+                        java.lang.reflect.Method getAuth = ctx.getClass().getMethod("getAuthentication");
+                        Object auth = getAuth.invoke(ctx);
+                        if (auth != null) {
+                            java.lang.reflect.Method getName = auth.getClass().getMethod("getName");
+                            String name = (String) getName.invoke(auth);
+                            if (isMeaningfulUser(name)) {
+                                return name;
+                            }
                         }
                     }
                 }

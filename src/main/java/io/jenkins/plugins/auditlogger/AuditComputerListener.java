@@ -1,8 +1,11 @@
 package io.jenkins.plugins.auditlogger;
 
 import hudson.Extension;
-import hudson.model.Node;
+import hudson.model.Computer;
+import hudson.model.TaskListener;
 import hudson.model.User;
+import hudson.slaves.ComputerListener;
+import hudson.slaves.OfflineCause;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.kohsuke.stapler.Stapler;
@@ -11,76 +14,106 @@ import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import jenkins.model.NodeListener;
 
-/** Records administrator-initiated Jenkins agent lifecycle changes. */
+/**
+ * Audit listener for Jenkins agent/computer online, offline, connect, disconnect, and launch events.
+ */
 @Extension
-public class AuditNodeListener extends NodeListener {
-    private static final Logger LOGGER = Logger.getLogger(AuditNodeListener.class.getName());
+public class AuditComputerListener extends ComputerListener {
+    private static final Logger LOGGER = Logger.getLogger(AuditComputerListener.class.getName());
 
     @Override
-    public void onCreated(Node node) {
-        log("NODE_CREATED", node,
-                "Node created: %s (type: %s) by %s");
+    public void onOnline(Computer c, TaskListener listener) {
+        log("NODE_ONLINE", c, null);
     }
 
     @Override
-    public void onUpdated(Node oldNode, Node newNode) {
-        log("NODE_UPDATED", newNode,
-                "Node configuration updated: %s by %s");
+    public void onOffline(Computer c, OfflineCause cause) {
+        log("NODE_OFFLINE", c, formatCause(cause));
     }
 
     @Override
-    public void onDeleted(Node node) {
-        log("NODE_DELETED", node,
-                "Node deleted: %s by %s");
+    public void onTemporarilyOnline(Computer c) {
+        log("NODE_TEMPORARILY_ONLINE", c, null);
     }
 
-    private void log(String action, Node node, String detailsTemplate) {
+    @Override
+    public void onTemporarilyOffline(Computer c, OfflineCause cause) {
+        log("NODE_TEMPORARILY_OFFLINE", c, formatCause(cause));
+    }
+
+    @Override
+    public void onLaunchFailure(Computer c, TaskListener taskListener) {
+        log("NODE_LAUNCH_FAILURE", c, null);
+    }
+
+    private void log(String action, Computer c, String causeMsg) {
         try {
             AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
             if (config != null && !config.isEnableNodeEvents()) {
                 return;
             }
 
-            String username = currentUser();
-            String nodeName = nodeName(node);
+            String nodeName = computerName(c);
 
-            // Suppress non-real user events ONLY during startup or non-HTTP background processing.
-            // If an HTTP or Stapler request is active (UI / REST API action), it is user-initiated.
-            boolean hasRequest = RequestHolder.get() != null || Stapler.getCurrentRequest2() != null;
-            if (!isRealUser(username) && (!hasRequest || StartupPhaseManager.isInStartupGracePeriod())) {
-                LOGGER.log(Level.FINE, "Suppressing non-real user node event: {0} on {1}",
-                        new Object[]{action, nodeName});
-                return;
-            }
-
-            String duplicateKey = "NODE:" + action + ":" + nodeName;
+            String duplicateKey = "COMPUTER:" + action + ":" + nodeName;
             if (StartupPhaseManager.wasRecentlyLogged(duplicateKey)) {
-                LOGGER.log(Level.FINE, "Skipping duplicate node log for: {0}", duplicateKey);
+                LOGGER.log(Level.FINE, "Skipping duplicate computer log for: {0}", duplicateKey);
                 return;
             }
             StartupPhaseManager.markAsLogged(duplicateKey);
 
-            String details = "NODE_CREATED".equals(action)
-                    ? String.format(detailsTemplate, nodeName, node.getClass().getSimpleName(), username)
-                    : String.format(detailsTemplate, nodeName, username);
-            AuditLogEntry entry = new AuditLogEntry(username, action, nodeName, details);
-            if ("NODE_UPDATED".equals(action)) {
-                entry.setSeverity("MEDIUM");
+            String username = currentUser();
+
+            String details;
+            if ("NODE_TEMPORARILY_OFFLINE".equals(action)) {
+                details = causeMsg != null && !causeMsg.isEmpty()
+                        ? String.format("Node taken offline: %s (cause: %s) by %s", nodeName, causeMsg, username)
+                        : String.format("Node taken offline: %s by %s", nodeName, username);
+            } else if ("NODE_TEMPORARILY_ONLINE".equals(action)) {
+                details = String.format("Node brought online: %s by %s", nodeName, username);
+            } else if ("NODE_OFFLINE".equals(action)) {
+                details = causeMsg != null && !causeMsg.isEmpty()
+                        ? String.format("Node offline: %s (cause: %s)", nodeName, causeMsg)
+                        : String.format("Node offline: %s", nodeName);
+            } else if ("NODE_ONLINE".equals(action)) {
+                details = String.format("Node online: %s", nodeName);
+            } else if ("NODE_LAUNCH_FAILURE".equals(action)) {
+                details = String.format("Node launch failed: %s", nodeName);
+            } else {
+                details = String.format("%s: %s", action, nodeName);
             }
+
+            AuditLogEntry entry = new AuditLogEntry(username, action, nodeName, details);
+            if ("NODE_TEMPORARILY_OFFLINE".equals(action) || "NODE_OFFLINE".equals(action) || "NODE_LAUNCH_FAILURE".equals(action)) {
+                entry.setSeverity("HIGH");
+            } else if ("NODE_TEMPORARILY_ONLINE".equals(action)) {
+                entry.setSeverity("MEDIUM");
+            } else {
+                entry.setSeverity("LOW");
+            }
+
             AuditLogStorage.getInstance().addEntry(entry);
-        } catch (RuntimeException e) {
-            LOGGER.log(Level.FINE, "Error recording node event: " + action, e);
+            LOGGER.log(Level.INFO, "Computer Event: {0} on {1} by {2}", new Object[]{action, nodeName, username});
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error recording computer event: " + action, e);
         }
     }
 
-    private static String nodeName(Node node) {
-        String name = node != null ? node.getNodeName() : null;
+    private static String computerName(Computer c) {
+        if (c == null) return "built-in";
+        String name = c.getName();
         return name == null || name.isBlank() ? "built-in" : name;
     }
 
-    private static String currentUser() {
+    private static String formatCause(OfflineCause cause) {
+        if (cause == null) return "";
+        String msg = cause.toString();
+        if (msg == null || msg.isBlank()) return "";
+        return msg.trim();
+    }
+
+    static String currentUser() {
         // 0. Try Basic Auth header from HTTP request
         try {
             HttpServletRequest req = RequestHolder.get();
@@ -100,7 +133,7 @@ public class AuditNodeListener extends NodeListener {
             return requestUser;
         }
 
-        // 2. Try session-based Spring Security / Acegi context or request user
+        // 2. Try session-based Spring Security context or request user
         try {
             HttpServletRequest request = RequestHolder.get();
             if (request != null) {
@@ -145,9 +178,7 @@ public class AuditNodeListener extends NodeListener {
                     if (isRealUser(sessionUser)) return sessionUser;
                 }
             }
-        } catch (RuntimeException ignored) {
-            // No request is expected for some programmatic node changes.
-        }
+        } catch (RuntimeException ignored) {}
 
         // 4. Try Jenkins User.current()
         try {
@@ -155,9 +186,7 @@ public class AuditNodeListener extends NodeListener {
             if (user != null && isRealUser(user.getId())) {
                 return user.getId();
             }
-        } catch (RuntimeException ignored) {
-            // Fall through to the Spring Security context.
-        }
+        } catch (RuntimeException ignored) {}
 
         // 5. Try Spring SecurityContext
         try {
