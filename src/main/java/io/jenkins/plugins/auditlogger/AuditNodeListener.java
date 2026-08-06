@@ -54,11 +54,9 @@ public class AuditNodeListener extends NodeListener {
                 return;
             }
 
-            // Suppress NODE_UPDATED if this node was just marked online/offline by AuditComputerListener
+            // Suppress NODE_UPDATED if this node status change was just logged by AuditComputerListener
             if ("NODE_UPDATED".equals(action)) {
-                if (StartupPhaseManager.wasRecentlyLogged("COMPUTER:NODE_TEMPORARILY_OFFLINE:" + nodeName)
-                        || StartupPhaseManager.wasRecentlyLogged("COMPUTER:NODE_TEMPORARILY_ONLINE:" + nodeName)
-                        || StartupPhaseManager.wasRecentlyLogged("COMPUTER:NODE_ONLINE:" + nodeName)) {
+                if (StartupPhaseManager.wasRecentlyLogged("COMPUTER:RECENT_STATUS_CHANGE:" + nodeName)) {
                     LOGGER.log(Level.FINE, "Suppressing NODE_UPDATED because status change was already logged for: {0}", nodeName);
                     return;
                 }

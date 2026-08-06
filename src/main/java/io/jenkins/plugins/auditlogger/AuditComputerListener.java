@@ -34,11 +34,13 @@ public class AuditComputerListener extends ComputerListener {
 
     @Override
     public void onTemporarilyOnline(Computer c) {
+        StartupPhaseManager.markAsLogged("COMPUTER:RECENT_STATUS_CHANGE:" + computerName(c));
         log("NODE_ONLINE", c, null);
     }
 
     @Override
     public void onTemporarilyOffline(Computer c, OfflineCause cause) {
+        StartupPhaseManager.markAsLogged("COMPUTER:RECENT_STATUS_CHANGE:" + computerName(c));
         log("NODE_TEMPORARILY_OFFLINE", c, formatCause(cause));
     }
 
