@@ -54,10 +54,11 @@ public class AuditNodeListener extends NodeListener {
                 return;
             }
 
-            // Suppress NODE_UPDATED if this node was just marked offline/online by AuditComputerListener
+            // Suppress NODE_UPDATED if this node was just marked online/offline by AuditComputerListener
             if ("NODE_UPDATED".equals(action)) {
                 if (StartupPhaseManager.wasRecentlyLogged("COMPUTER:NODE_TEMPORARILY_OFFLINE:" + nodeName)
-                        || StartupPhaseManager.wasRecentlyLogged("COMPUTER:NODE_TEMPORARILY_ONLINE:" + nodeName)) {
+                        || StartupPhaseManager.wasRecentlyLogged("COMPUTER:NODE_TEMPORARILY_ONLINE:" + nodeName)
+                        || StartupPhaseManager.wasRecentlyLogged("COMPUTER:NODE_ONLINE:" + nodeName)) {
                     LOGGER.log(Level.FINE, "Suppressing NODE_UPDATED because status change was already logged for: {0}", nodeName);
                     return;
                 }
@@ -75,7 +76,7 @@ public class AuditNodeListener extends NodeListener {
                     : String.format(detailsTemplate, nodeName, username);
             AuditLogEntry entry = new AuditLogEntry(username, action, nodeName, details);
             if ("NODE_UPDATED".equals(action)) {
-                entry.setSeverity("MEDIUM");
+                entry.setSeverity("INFO"); // Blue badge for NODE_UPDATED configuration changes
             }
             AuditLogStorage.getInstance().addEntry(entry);
         } catch (RuntimeException e) {

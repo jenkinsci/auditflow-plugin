@@ -34,7 +34,7 @@ public class AuditComputerListener extends ComputerListener {
 
     @Override
     public void onTemporarilyOnline(Computer c) {
-        log("NODE_TEMPORARILY_ONLINE", c, null);
+        log("NODE_ONLINE", c, null);
     }
 
     @Override
@@ -70,14 +70,12 @@ public class AuditComputerListener extends ComputerListener {
                 details = causeMsg != null && !causeMsg.isEmpty()
                         ? String.format("Node taken offline: %s (Reason: %s) by %s", nodeName, causeMsg, username)
                         : String.format("Node taken offline: %s by %s", nodeName, username);
-            } else if ("NODE_TEMPORARILY_ONLINE".equals(action)) {
+            } else if ("NODE_ONLINE".equals(action) || "NODE_TEMPORARILY_ONLINE".equals(action)) {
                 details = String.format("Node brought online: %s by %s", nodeName, username);
             } else if ("NODE_OFFLINE".equals(action)) {
                 details = causeMsg != null && !causeMsg.isEmpty()
                         ? String.format("Node offline: %s (Reason: %s)", nodeName, causeMsg)
                         : String.format("Node offline: %s", nodeName);
-            } else if ("NODE_ONLINE".equals(action)) {
-                details = String.format("Node online: %s", nodeName);
             } else if ("NODE_LAUNCH_FAILURE".equals(action)) {
                 details = String.format("Node launch failed: %s", nodeName);
             } else {
@@ -87,8 +85,8 @@ public class AuditComputerListener extends ComputerListener {
             AuditLogEntry entry = new AuditLogEntry(username, action, nodeName, details);
             if ("NODE_TEMPORARILY_OFFLINE".equals(action) || "NODE_OFFLINE".equals(action) || "NODE_LAUNCH_FAILURE".equals(action)) {
                 entry.setSeverity("HIGH");
-            } else if ("NODE_TEMPORARILY_ONLINE".equals(action)) {
-                entry.setSeverity("MEDIUM");
+            } else if ("NODE_ONLINE".equals(action) || "NODE_TEMPORARILY_ONLINE".equals(action)) {
+                entry.setSeverity("LOW"); // Low severity renders as GREEN badge in AuditFlow UI
             } else {
                 entry.setSeverity("LOW");
             }
