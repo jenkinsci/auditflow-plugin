@@ -26,6 +26,11 @@ public class AuditNodeListener extends NodeListener {
 
     @Override
     public void onUpdated(Node oldNode, Node newNode) {
+        // Suppress NODE_UPDATED if this update is triggered as part of an offline/online status toggle
+        if (isStatusToggleRequest()) {
+            LOGGER.log(Level.FINE, "Suppressing NODE_UPDATED because status toggle request is active");
+            return;
+        }
         log("NODE_UPDATED", newNode,
                 "Node configuration updated: %s by %s");
     }
@@ -34,6 +39,22 @@ public class AuditNodeListener extends NodeListener {
     public void onDeleted(Node node) {
         log("NODE_DELETED", node,
                 "Node deleted: %s by %s");
+    }
+
+    private static boolean isStatusToggleRequest() {
+        for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
+            String method = element.getMethodName();
+            if ("setTemporarilyOffline".equals(method)
+                    || "toggleOffline".equals(method)
+                    || "doToggleOffline".equals(method)
+                    || "changeOfflineCause".equals(method)
+                    || "doChangeOfflineCause".equals(method)
+                    || "bringOnline".equals(method)
+                    || "doBringOnline".equals(method)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void log(String action, Node node, String detailsTemplate) {
