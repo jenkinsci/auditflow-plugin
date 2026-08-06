@@ -47,12 +47,20 @@ public class AuditNodeListener extends NodeListener {
             String nodeName = nodeName(node);
 
             // Suppress non-real user events ONLY during startup or non-HTTP background processing.
-            // If an HTTP or Stapler request is active (UI / REST API action), it is user-initiated.
             boolean hasRequest = RequestHolder.get() != null || Stapler.getCurrentRequest2() != null;
             if (!isRealUser(username) && (!hasRequest || StartupPhaseManager.isInStartupGracePeriod())) {
                 LOGGER.log(Level.FINE, "Suppressing non-real user node event: {0} on {1}",
                         new Object[]{action, nodeName});
                 return;
+            }
+
+            // Suppress NODE_UPDATED if this node was just marked offline/online by AuditComputerListener
+            if ("NODE_UPDATED".equals(action)) {
+                if (StartupPhaseManager.wasRecentlyLogged("COMPUTER:NODE_TEMPORARILY_OFFLINE:" + nodeName)
+                        || StartupPhaseManager.wasRecentlyLogged("COMPUTER:NODE_TEMPORARILY_ONLINE:" + nodeName)) {
+                    LOGGER.log(Level.FINE, "Suppressing NODE_UPDATED because status change was already logged for: {0}", nodeName);
+                    return;
+                }
             }
 
             String duplicateKey = "NODE:" + action + ":" + nodeName;

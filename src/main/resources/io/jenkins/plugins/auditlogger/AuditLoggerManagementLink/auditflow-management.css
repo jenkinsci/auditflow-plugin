@@ -452,11 +452,11 @@
 }
 
 .badge-high {
-    background: var(--warning-color);
+    background: #f97316;
 }
 
 .badge-medium {
-    background: var(--link-color);
+    background: #f59e0b;
 }
 
 .badge-low {
@@ -464,7 +464,7 @@
 }
 
 .badge-info {
-    background: var(--text-color-secondary);
+    background: var(--link-color);
 }
 
 .insights-badge {

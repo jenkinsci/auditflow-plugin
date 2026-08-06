@@ -68,13 +68,13 @@ public class AuditComputerListener extends ComputerListener {
             String details;
             if ("NODE_TEMPORARILY_OFFLINE".equals(action)) {
                 details = causeMsg != null && !causeMsg.isEmpty()
-                        ? String.format("Node taken offline: %s (cause: %s) by %s", nodeName, causeMsg, username)
+                        ? String.format("Node taken offline: %s (Reason: %s) by %s", nodeName, causeMsg, username)
                         : String.format("Node taken offline: %s by %s", nodeName, username);
             } else if ("NODE_TEMPORARILY_ONLINE".equals(action)) {
                 details = String.format("Node brought online: %s by %s", nodeName, username);
             } else if ("NODE_OFFLINE".equals(action)) {
                 details = causeMsg != null && !causeMsg.isEmpty()
-                        ? String.format("Node offline: %s (cause: %s)", nodeName, causeMsg)
+                        ? String.format("Node offline: %s (Reason: %s)", nodeName, causeMsg)
                         : String.format("Node offline: %s", nodeName);
             } else if ("NODE_ONLINE".equals(action)) {
                 details = String.format("Node online: %s", nodeName);
@@ -108,6 +108,12 @@ public class AuditComputerListener extends ComputerListener {
 
     private static String formatCause(OfflineCause cause) {
         if (cause == null) return "";
+        if (cause instanceof OfflineCause.UserCause userCause) {
+            String reason = userCause.getReason();
+            if (reason != null && !reason.isBlank()) {
+                return reason.trim();
+            }
+        }
         String msg = cause.toString();
         if (msg == null || msg.isBlank()) return "";
         return msg.trim();
