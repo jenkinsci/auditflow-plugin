@@ -55,7 +55,7 @@ class AuditComputerListenerTest {
 
         List<AuditLogEntry> computerEvents = storage.getAllEntries().stream()
                 .filter(entry -> entry.getTarget().equals("agent-status-test"))
-                .filter(entry -> entry.getAction().startsWith("NODE_TEMPORARILY_"))
+                .filter(entry -> entry.getAction().equals("NODE_TEMPORARILY_OFFLINE") || entry.getAction().equals("NODE_ONLINE"))
                 .toList();
 
         assertFalse(computerEvents.isEmpty(), "Should record computer temporarily offline/online events");
@@ -68,7 +68,7 @@ class AuditComputerListenerTest {
         assertTrue(offlineEntry.getDetails().contains("Maintenance window"));
 
         AuditLogEntry onlineEntry = computerEvents.stream()
-                .filter(e -> "NODE_TEMPORARILY_ONLINE".equals(e.getAction()))
+                .filter(e -> "NODE_ONLINE".equals(e.getAction()))
                 .findFirst()
                 .orElseThrow();
         assertEquals("admin", onlineEntry.getUsername());
