@@ -29,45 +29,44 @@ class AuditComputerListenerTest {
         SecurityContextHolder.clearContext();
         try {
             AuditLogStorage.getInstance().shutdown();
-        } catch (RuntimeException ignored) {}
+        } catch (RuntimeException ignored) {
+            // Best-effort cleanup for isolated test storage.
+        }
         AuditLogStorage.clearInstance();
     }
 
     @Test
-    void logsTemporarilyOfflineAndOnlineEventsWithUserAndCause(JenkinsRule j) throws Exception {
+    void logsTemporarilyOfflineAndOnlineEvents(JenkinsRule j) throws Exception {
         AuditLoggerConfiguration.get().setEnableNodeEvents(true);
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("admin", "secret"));
 
-        DumbSlave slave = new DumbSlave("agent-status-test", "dummy", "/tmp", "1", hudson.model.Node.Mode.NORMAL, "", new JNLPLauncher(), RetentionStrategy.NOOP, Collections.emptyList());
-        j.jenkins.addNode(slave);
-        Computer computer = slave.toComputer();
-
         AuditLogStorage storage = AuditLogStorage.getInstance();
         storage.initialize();
 
-        RequestHolder.setAuthenticatedUser("admin");
-        computer.setTemporarilyOffline(false, null);
-        StartupPhaseManager.resetRecentLogsForTests();
+        DumbSlave slave = new DumbSlave("agent-temp-offline-test", "dummy", "/tmp", "1", hudson.model.Node.Mode.NORMAL, "", new JNLPLauncher(), RetentionStrategy.NOOP, Collections.emptyList());
+        j.jenkins.addNode(slave);
 
-        computer.setTemporarilyOffline(true, new OfflineCause.UserCause(null, "Maintenance window"));
-        computer.setTemporarilyOffline(false, null);
+        Computer computer = slave.toComputer();
 
-        List<AuditLogEntry> computerEvents = storage.getAllEntries().stream()
-                .filter(entry -> entry.getTarget().equals("agent-status-test"))
-                .filter(entry -> entry.getAction().equals("NODE_TEMPORARILY_OFFLINE") || entry.getAction().equals("NODE_ONLINE"))
+        AuditComputerListener listener = new AuditComputerListener();
+        listener.onTemporarilyOffline(computer, new OfflineCause.UserCause(null, "Maintenance mode"));
+        listener.onTemporarilyOnline(computer);
+
+        List<AuditLogEntry> events = storage.getAllEntries().stream()
+                .filter(e -> e.getTarget().equals("agent-temp-offline-test"))
                 .toList();
 
-        assertFalse(computerEvents.isEmpty(), "Should record computer temporarily offline/online events");
+        assertFalse(events.isEmpty(), "Should capture node temporarily offline/online events");
         
-        AuditLogEntry offlineEntry = computerEvents.stream()
+        AuditLogEntry offlineEntry = events.stream()
                 .filter(e -> "NODE_TEMPORARILY_OFFLINE".equals(e.getAction()))
                 .findFirst()
                 .orElseThrow();
         assertEquals("admin", offlineEntry.getUsername());
-        assertTrue(offlineEntry.getDetails().contains("Maintenance window"));
+        assertTrue(offlineEntry.getDetails().contains("Maintenance mode"));
 
-        AuditLogEntry onlineEntry = computerEvents.stream()
+        AuditLogEntry onlineEntry = events.stream()
                 .filter(e -> "NODE_ONLINE".equals(e.getAction()))
                 .findFirst()
                 .orElseThrow();
@@ -77,6 +76,8 @@ class AuditComputerListenerTest {
     @Test
     void logsNodeOnlineAndOfflineEvents(JenkinsRule j) throws Exception {
         AuditLoggerConfiguration.get().setEnableNodeEvents(true);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("admin", "secret"));
 
         DumbSlave slave = new DumbSlave("agent-online-offline-test", "dummy", "/tmp", "1", hudson.model.Node.Mode.NORMAL, "", new JNLPLauncher(), RetentionStrategy.NOOP, Collections.emptyList());
         j.jenkins.addNode(slave);

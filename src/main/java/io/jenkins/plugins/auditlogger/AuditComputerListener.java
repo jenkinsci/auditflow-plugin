@@ -57,6 +57,23 @@ public class AuditComputerListener extends ComputerListener {
             }
 
             String nodeName = computerName(c);
+            String username = currentUser();
+
+            // Suppress non-real user events (SYSTEM background loading) ONLY during startup grace period when no request is active
+            boolean hasRequest = RequestHolder.get() != null || Stapler.getCurrentRequest2() != null;
+            if (!isRealUser(username) && (!hasRequest && StartupPhaseManager.isInStartupGracePeriod())) {
+                LOGGER.log(Level.FINE, "Suppressing non-real user computer event: {0} on {1}",
+                        new Object[]{action, nodeName});
+                return;
+            }
+
+            // Suppress automatic NODE_ONLINE following a node configuration save
+            if ("NODE_ONLINE".equals(action)) {
+                if (StartupPhaseManager.wasRecentlyLogged("NODE_UPDATED_RECENT:" + nodeName)) {
+                    LOGGER.log(Level.FINE, "Suppressing automatic NODE_ONLINE following node configuration update for: {0}", nodeName);
+                    return;
+                }
+            }
 
             String duplicateKey = "COMPUTER:" + action + ":" + nodeName;
             if (StartupPhaseManager.wasRecentlyLogged(duplicateKey)) {
@@ -64,8 +81,6 @@ public class AuditComputerListener extends ComputerListener {
                 return;
             }
             StartupPhaseManager.markAsLogged(duplicateKey);
-
-            String username = currentUser();
 
             String details;
             if ("NODE_TEMPORARILY_OFFLINE".equals(action)) {
@@ -85,10 +100,12 @@ public class AuditComputerListener extends ComputerListener {
             }
 
             AuditLogEntry entry = new AuditLogEntry(username, action, nodeName, details);
-            if ("NODE_TEMPORARILY_OFFLINE".equals(action) || "NODE_OFFLINE".equals(action) || "NODE_LAUNCH_FAILURE".equals(action)) {
-                entry.setSeverity("HIGH");
+            if ("NODE_LAUNCH_FAILURE".equals(action)) {
+                entry.setSeverity("CRITICAL"); // Red badge for agent launch failures
+            } else if ("NODE_TEMPORARILY_OFFLINE".equals(action) || "NODE_OFFLINE".equals(action)) {
+                entry.setSeverity("HIGH"); // Orange badge
             } else if ("NODE_ONLINE".equals(action) || "NODE_TEMPORARILY_ONLINE".equals(action)) {
-                entry.setSeverity("LOW"); // Low severity renders as GREEN badge in AuditFlow UI
+                entry.setSeverity("LOW"); // Green badge
             } else {
                 entry.setSeverity("LOW");
             }

@@ -22,7 +22,7 @@ public class AuditLogEntry implements Serializable {
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneOffset.UTC);
     private static final DateTimeFormatter READABLE_FMT =
             DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm:ss").withZone(ZoneOffset.UTC);
-        private static final Map<String, DateTimeFormatter> READABLE_FORMATTERS = new ConcurrentHashMap<>();
+    private static final Map<String, DateTimeFormatter> READABLE_FORMATTERS = new ConcurrentHashMap<>();
 
     private final long timestamp;
     private final String username;
@@ -131,7 +131,7 @@ public class AuditLogEntry implements Serializable {
         if (action == null) return "INFO";
         // CRITICAL: security-breaking or irreversible actions
         if (action.contains("FAILED") || action.contains("DENIED") || action.contains("RESTART")
-                || action.contains("SECURITY_CONFIG")
+                || action.contains("SECURITY_CONFIG") || "NODE_LAUNCH_FAILURE".equals(action)
                 || "CREDENTIAL_DELETED".equals(action) || "CREDENTIAL_CREATED".equals(action)
                 || "JOB_DELETED".equals(action) || "BUILDS_PURGED".equals(action)
                 || "AUTH_STRATEGY_CHANGED".equals(action) || "PLUGIN_REMOVED".equals(action)) return "CRITICAL";
@@ -140,16 +140,18 @@ public class AuditLogEntry implements Serializable {
                 || "BUILD_FAILED".equals(action) || "BUILD_ABORTED".equals(action)
                 || "GLOBAL_CONFIG_UPDATED".equals(action)
                 || "PLUGIN_DISABLED".equals(action) || "PLUGIN_ENABLED".equals(action)) return "HIGH";
-        // MEDIUM: authentication and config changes
-        if (action.contains("LOGIN") || action.contains("LOGOUT") || action.contains("AUTH")
-                || "SESSION_TERMINATED".equals(action)) return "MEDIUM";
-        if (action.contains("CONFIG") || action.contains("PLUGIN")) return "MEDIUM";
+        // LOW: successful authentication events, routine build and creation events
+        if ("LOGIN".equals(action) || "LOGIN_SUCCESS".equals(action) || "LOGOUT".equals(action)
+                || "SSO_LOGIN".equals(action) || "API_AUTH".equals(action)) return "LOW";
+        // MEDIUM: configuration changes
+        if (action.contains("SESSION_TERMINATED".equals(action) ? "SESSION_TERMINATED" : "CONFIG")
+                || action.contains("PLUGIN") || "JOB_CONFIG_UPDATED".equals(action) || "JOB_RENAMED".equals(action)) return "MEDIUM";
         // LOW: routine build and creation events
-        if (action.contains("BUILD") || action.contains("CREATED")) return "LOW";
+        if (action.contains("BUILD") || action.contains("CREATED") || action.contains("ONLINE")) return "LOW";
         return "INFO";
     }
 
-    // --- Getters (all fields are effectively final after construction + factory) ---
+    // --- Getters ---
 
     public long getTimestamp()      { return timestamp; }
     public String getUsername()     { return username; }
@@ -163,7 +165,7 @@ public class AuditLogEntry implements Serializable {
     public String getUserAgent()   { return userAgent; }
     public String getSeverity()    { return severity; }
 
-    // --- Setters (used only during entry construction, before stored) ---
+    // --- Setters ---
 
     public void setSourceIp(String sourceIp)      { this.sourceIp = sourceIp; }
     public void setAuthMethod(String authMethod)   { this.authMethod = authMethod; }

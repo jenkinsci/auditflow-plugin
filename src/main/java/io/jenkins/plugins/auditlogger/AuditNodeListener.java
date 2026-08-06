@@ -2,6 +2,7 @@ package io.jenkins.plugins.auditlogger;
 
 import hudson.Extension;
 import hudson.model.Node;
+import hudson.model.Slave;
 import hudson.model.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -9,6 +10,9 @@ import org.kohsuke.stapler.Stapler;
 
 import java.lang.reflect.Method;
 import java.security.Principal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import jenkins.model.NodeListener;
@@ -31,8 +35,7 @@ public class AuditNodeListener extends NodeListener {
             LOGGER.log(Level.FINE, "Suppressing NODE_UPDATED because status toggle request is active");
             return;
         }
-        log("NODE_UPDATED", newNode,
-                "Node configuration updated: %s by %s");
+        logUpdate(oldNode, newNode);
     }
 
     @Override
@@ -57,6 +60,71 @@ public class AuditNodeListener extends NodeListener {
         return false;
     }
 
+    private void logUpdate(Node oldNode, Node newNode) {
+        try {
+            AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+            if (config != null && !config.isEnableNodeEvents()) {
+                return;
+            }
+
+            String username = currentUser();
+            String nodeName = nodeName(newNode);
+
+            boolean hasRequest = RequestHolder.get() != null || Stapler.getCurrentRequest2() != null;
+            if (!isRealUser(username) && (!hasRequest || StartupPhaseManager.isInStartupGracePeriod())) {
+                LOGGER.log(Level.FINE, "Suppressing non-real user node update event on {0}", nodeName);
+                return;
+            }
+
+            String duplicateKey = "NODE:NODE_UPDATED:" + nodeName;
+            if (StartupPhaseManager.wasRecentlyLogged(duplicateKey)) {
+                LOGGER.log(Level.FINE, "Skipping duplicate node update log for: {0}", duplicateKey);
+                return;
+            }
+            StartupPhaseManager.markAsLogged(duplicateKey);
+            StartupPhaseManager.markAsLogged("NODE_UPDATED_RECENT:" + nodeName);
+
+            String details = formatNodeUpdateDetails(oldNode, newNode, username);
+            AuditLogEntry entry = new AuditLogEntry(username, "NODE_UPDATED", nodeName, details);
+            entry.setSeverity("INFO"); // Blue badge for NODE_UPDATED configuration changes
+            AuditLogStorage.getInstance().addEntry(entry);
+            LOGGER.log(Level.INFO, "Node Event: NODE_UPDATED on {0} by {1}", new Object[]{nodeName, username});
+        } catch (RuntimeException e) {
+            LOGGER.log(Level.FINE, "Error recording node update event", e);
+        }
+    }
+
+    private static String formatNodeUpdateDetails(Node oldNode, Node newNode, String username) {
+        String nodeName = nodeName(newNode);
+        if (oldNode == null) {
+            return String.format("Node configuration updated: %s by %s", nodeName, username);
+        }
+        List<String> changes = new ArrayList<>();
+        if (!Objects.equals(oldNode.getNodeDescription(), newNode.getNodeDescription())) {
+            changes.add("description");
+        }
+        if (oldNode.getNumExecutors() != newNode.getNumExecutors()) {
+            changes.add(String.format("executors (%d -> %d)", oldNode.getNumExecutors(), newNode.getNumExecutors()));
+        }
+        if (oldNode instanceof Slave oldSlave && newNode instanceof Slave newSlave) {
+            if (!Objects.equals(oldSlave.getRemoteFS(), newSlave.getRemoteFS())) {
+                changes.add("remote FS");
+            }
+        }
+        if (!Objects.equals(oldNode.getLabelString(), newNode.getLabelString())) {
+            changes.add("labels");
+        }
+        if (!Objects.equals(oldNode.getMode(), newNode.getMode())) {
+            changes.add("usage mode");
+        }
+
+        if (changes.isEmpty()) {
+            return String.format("Node configuration updated: %s by %s", nodeName, username);
+        } else {
+            return String.format("Node configuration updated: %s (%s) by %s", nodeName, String.join(", ", changes), username);
+        }
+    }
+
     private void log(String action, Node node, String detailsTemplate) {
         try {
             AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
@@ -67,20 +135,11 @@ public class AuditNodeListener extends NodeListener {
             String username = currentUser();
             String nodeName = nodeName(node);
 
-            // Suppress non-real user events ONLY during startup or non-HTTP background processing.
             boolean hasRequest = RequestHolder.get() != null || Stapler.getCurrentRequest2() != null;
             if (!isRealUser(username) && (!hasRequest || StartupPhaseManager.isInStartupGracePeriod())) {
                 LOGGER.log(Level.FINE, "Suppressing non-real user node event: {0} on {1}",
                         new Object[]{action, nodeName});
                 return;
-            }
-
-            // Suppress NODE_UPDATED if this node status change was just logged by AuditComputerListener
-            if ("NODE_UPDATED".equals(action)) {
-                if (StartupPhaseManager.wasRecentlyLogged("COMPUTER:RECENT_STATUS_CHANGE:" + nodeName)) {
-                    LOGGER.log(Level.FINE, "Suppressing NODE_UPDATED because status change was already logged for: {0}", nodeName);
-                    return;
-                }
             }
 
             String duplicateKey = "NODE:" + action + ":" + nodeName;
@@ -94,9 +153,6 @@ public class AuditNodeListener extends NodeListener {
                     ? String.format(detailsTemplate, nodeName, node.getClass().getSimpleName(), username)
                     : String.format(detailsTemplate, nodeName, username);
             AuditLogEntry entry = new AuditLogEntry(username, action, nodeName, details);
-            if ("NODE_UPDATED".equals(action)) {
-                entry.setSeverity("INFO"); // Blue badge for NODE_UPDATED configuration changes
-            }
             AuditLogStorage.getInstance().addEntry(entry);
         } catch (RuntimeException e) {
             LOGGER.log(Level.FINE, "Error recording node event: " + action, e);
