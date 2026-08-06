@@ -7,7 +7,7 @@ pom.xml.next
 release.properties
 dependency-reduced-pom.xml
 .flattened-pom.xml
-
+regression/
 # IDE
 .idea/
 *.iml
