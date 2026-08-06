@@ -44,13 +44,23 @@ public class AuditNodeListener extends NodeListener {
             }
 
             String username = currentUser();
-            // Node definitions are loaded during startup under SYSTEM. Suppress those
-            // without hiding genuine administrator changes made during the grace period.
+            String nodeName = nodeName(node);
+
+            // Suppress SYSTEM-initiated node events (startup node loading, automated background tasks)
+            // — consistent with AuditItemListener and AuditSaveableListener compliance filtering.
             if (!isRealUser(username)) {
+                LOGGER.log(Level.FINE, "Suppressing non-real user node event: {0} on {1}",
+                        new Object[]{action, nodeName});
                 return;
             }
 
-            String nodeName = nodeName(node);
+            String duplicateKey = "NODE:" + action + ":" + nodeName;
+            if (StartupPhaseManager.wasRecentlyLogged(duplicateKey)) {
+                LOGGER.log(Level.FINE, "Skipping duplicate node log for: {0}", duplicateKey);
+                return;
+            }
+            StartupPhaseManager.markAsLogged(duplicateKey);
+
             String details = "NODE_CREATED".equals(action)
                     ? String.format(detailsTemplate, nodeName, node.getClass().getSimpleName(), username)
                     : String.format(detailsTemplate, nodeName, username);
@@ -70,11 +80,26 @@ public class AuditNodeListener extends NodeListener {
     }
 
     private static String currentUser() {
+        // 0. Try Basic Auth header from HTTP request
+        try {
+            HttpServletRequest req = RequestHolder.get();
+            if (req != null) {
+                String authHeader = req.getHeader("Authorization");
+                if (authHeader != null && authHeader.startsWith("Basic ")) {
+                    String decoded = new String(java.util.Base64.getDecoder().decode(authHeader.substring(6)), java.nio.charset.StandardCharsets.UTF_8);
+                    String username = decoded.contains(":") ? decoded.substring(0, decoded.indexOf(':')) : decoded;
+                    if (isRealUser(username)) return username;
+                }
+            }
+        } catch (RuntimeException ignored) {}
+
+        // 1. Try pre-chain authenticated user
         String requestUser = RequestHolder.getAuthenticatedUser();
         if (isRealUser(requestUser)) {
             return requestUser;
         }
 
+        // 2. Try session-based Spring Security context or request user
         try {
             HttpServletRequest request = RequestHolder.get();
             if (request != null) {
@@ -105,15 +130,29 @@ public class AuditNodeListener extends NodeListener {
             // Continue through the remaining Jenkins user-resolution mechanisms.
         }
 
+        // 3. Try Stapler request
         try {
             var request = Stapler.getCurrentRequest2();
-            if (request != null && isRealUser(request.getRemoteUser())) {
-                return request.getRemoteUser();
+            if (request != null) {
+                if (isRealUser(request.getRemoteUser())) {
+                    return request.getRemoteUser();
+                }
+                Principal principal = request.getUserPrincipal();
+                if (principal != null && isRealUser(principal.getName())) {
+                    return principal.getName();
+                }
+                String authHeader = request.getHeader("Authorization");
+                if (authHeader != null && authHeader.startsWith("Basic ")) {
+                    String decoded = new String(java.util.Base64.getDecoder().decode(authHeader.substring(6)), java.nio.charset.StandardCharsets.UTF_8);
+                    String username = decoded.contains(":") ? decoded.substring(0, decoded.indexOf(':')) : decoded;
+                    if (isRealUser(username)) return username;
+                }
             }
         } catch (RuntimeException ignored) {
             // No request is expected for some programmatic node changes.
         }
 
+        // 4. Try Jenkins User.current()
         try {
             User user = User.current();
             if (user != null && isRealUser(user.getId())) {
@@ -123,6 +162,7 @@ public class AuditNodeListener extends NodeListener {
             // Fall through to the Spring Security context.
         }
 
+        // 5. Try Spring SecurityContext
         var authentication = org.springframework.security.core.context.SecurityContextHolder
                 .getContext().getAuthentication();
         return authentication != null && isRealUser(authentication.getName())

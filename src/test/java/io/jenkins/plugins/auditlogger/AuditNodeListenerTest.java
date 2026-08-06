@@ -52,4 +52,44 @@ class AuditNodeListenerTest {
         assertTrue(nodeEvents.stream().allMatch(entry -> "admin".equals(entry.getUsername())));
         assertTrue(nodeEvents.stream().allMatch(entry -> nodeName.equals(entry.getTarget())));
     }
+
+    @Test
+    void logsNodeEventsWithPreChainAuthenticatedUser(JenkinsRule j) throws Exception {
+        AuditLoggerConfiguration.get().setEnableNodeEvents(true);
+        RequestHolder.setAuthenticatedUser("admin");
+
+        AuditLogStorage storage = AuditLogStorage.getInstance();
+        storage.initialize();
+
+        DumbSlave node = j.createSlave("pre-chain-agent", new hudson.EnvVars());
+        String nodeName = node.getNodeName();
+
+        List<AuditLogEntry> nodeEvents = storage.getAllEntries().stream()
+                .filter(entry -> entry.getAction().startsWith("NODE_") && nodeName.equals(entry.getTarget()))
+                .toList();
+
+        assertEquals(1, nodeEvents.size());
+        assertEquals("NODE_CREATED", nodeEvents.get(0).getAction());
+        assertEquals("admin", nodeEvents.get(0).getUsername());
+    }
+
+    @Test
+    void nodeSavesDoNotProduceGlobalConfigUpdated(JenkinsRule j) throws Exception {
+        AuditLoggerConfiguration.get().setEnableNodeEvents(true);
+        AuditLoggerConfiguration.get().setEnableSystemConfigEvents(true);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("admin", "secret"));
+
+        AuditLogStorage storage = AuditLogStorage.getInstance();
+        storage.initialize();
+
+        DumbSlave node = j.createSlave("test-node-save", new hudson.EnvVars());
+        node.save();
+
+        List<AuditLogEntry> globalEvents = storage.getAllEntries().stream()
+                .filter(entry -> "GLOBAL_CONFIG_UPDATED".equals(entry.getAction()) && entry.getTarget().contains("Slave"))
+                .toList();
+
+        assertTrue(globalEvents.isEmpty(), "Node saves should not be misclassified as GLOBAL_CONFIG_UPDATED");
+    }
 }

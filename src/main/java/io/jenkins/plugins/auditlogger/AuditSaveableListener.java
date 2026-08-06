@@ -79,6 +79,12 @@ public class AuditSaveableListener extends SaveableListener {
                 return;
             }
 
+            // Node lifecycle events are captured by AuditNodeListener — ignore here to prevent
+            // duplicate or misclassified GLOBAL_CONFIG_UPDATED events for agent saves.
+            if (o instanceof hudson.model.Node) {
+                return;
+            }
+
             if (StartupPhaseManager.isInStartupGracePeriod()) {
                 LOGGER.log(Level.FINE, "Suppressing startup-phase config log for: {0}",
                         o.getClass().getSimpleName());
