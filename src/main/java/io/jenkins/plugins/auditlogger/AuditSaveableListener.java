@@ -116,8 +116,8 @@ public class AuditSaveableListener extends SaveableListener {
 
             String username = currentUser();
 
-            // Suppress non-real user background saves (e.g. SYSTEM background config saves)
-            if (!isRealUser(username) && (StartupPhaseManager.isInStartupGracePeriod() || isSystem)) {
+            // Suppress non-real user (SYSTEM) background saves (e.g. nextBuildNumber updates on build start, automated background job/system saves)
+            if (!isRealUser(username)) {
                 LOGGER.log(Level.FINE, "Suppressing non-real user config save: {0}", o.getClass().getSimpleName());
                 return;
             }
