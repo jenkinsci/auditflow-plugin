@@ -106,10 +106,8 @@ public class AuditComputerListener extends ComputerListener {
                 entry.setSeverity("CRITICAL"); // Red badge for agent launch failures
             } else if ("NODE_TEMPORARILY_OFFLINE".equals(action) || "NODE_OFFLINE".equals(action)) {
                 entry.setSeverity("HIGH"); // Orange badge
-            } else if ("NODE_ONLINE".equals(action) || "NODE_TEMPORARILY_ONLINE".equals(action)) {
-                entry.setSeverity("LOW"); // Green badge
             } else {
-                entry.setSeverity("LOW");
+                entry.setSeverity("LOW"); // Green badge for NODE_ONLINE and other computer events
             }
 
             AuditLogStorage.getInstance().addEntry(entry);

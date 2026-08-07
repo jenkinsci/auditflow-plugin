@@ -3,6 +3,8 @@ package io.jenkins.plugins.auditlogger;
 import hudson.Extension;
 import hudson.XmlFile;
 import hudson.model.Job;
+import hudson.model.Run;
+import hudson.model.Fingerprint;
 import hudson.model.Saveable;
 import hudson.model.User;
 import hudson.model.listeners.SaveableListener;
@@ -86,6 +88,12 @@ public class AuditSaveableListener extends SaveableListener {
                 return;
             }
 
+            // Suppress runtime build execution saveables (WorkflowRun, Run, Fingerprint, FlowNode) —
+            // build events are captured by AuditRunListener and shouldn't pollute global system config logs.
+            if (isRuntimeBuildSaveable(o)) {
+                return;
+            }
+
             if (StartupPhaseManager.isInStartupGracePeriod()) {
                 LOGGER.log(Level.FINE, "Suppressing startup-phase config log for: {0}",
                         o.getClass().getSimpleName());
@@ -108,8 +116,8 @@ public class AuditSaveableListener extends SaveableListener {
 
             String username = currentUser();
 
-            // Suppress non-real user background saves during grace period
-            if (!isRealUser(username) && StartupPhaseManager.isInStartupGracePeriod()) {
+            // Suppress non-real user background saves (e.g. SYSTEM background config saves)
+            if (!isRealUser(username) && (StartupPhaseManager.isInStartupGracePeriod() || isSystem)) {
                 LOGGER.log(Level.FINE, "Suppressing non-real user config save: {0}", o.getClass().getSimpleName());
                 return;
             }
@@ -149,6 +157,21 @@ public class AuditSaveableListener extends SaveableListener {
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error recording saveable change", e);
         }
+    }
+
+    private static boolean isRuntimeBuildSaveable(Saveable o) {
+        if (o == null) return false;
+        if (o instanceof Run || o instanceof Fingerprint) {
+            return true;
+        }
+        String className = o.getClass().getName();
+        return className.contains("WorkflowRun")
+                || className.contains("MatrixRun")
+                || className.contains("Fingerprint")
+                || className.contains("FlowNode")
+                || className.contains("PipelineTest")
+                || className.contains("Run$")
+                || className.contains("Action");
     }
 
     static boolean shouldSuppressThemeUserPreferenceLog(String className, boolean hasRequest, String requestUri, Set<?> paramKeys) {
@@ -297,7 +320,7 @@ public class AuditSaveableListener extends SaveableListener {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (ReflectiveOperationException | RuntimeException e) {
             LOGGER.log(Level.FINE, "Error extracting credential IDs via reflection", e);
         }
         return ids;
@@ -318,7 +341,7 @@ public class AuditSaveableListener extends SaveableListener {
                     break;
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (ReflectiveOperationException | RuntimeException ignored) {}
     }
 
     private static String extractCredentialId(Object cred) {
@@ -327,7 +350,7 @@ public class AuditSaveableListener extends SaveableListener {
             Method getId = cred.getClass().getMethod("getId");
             Object id = getId.invoke(cred);
             return id != null ? id.toString() : null;
-        } catch (Exception e) {
+        } catch (ReflectiveOperationException | RuntimeException e) {
             return null;
         }
     }
@@ -342,7 +365,7 @@ public class AuditSaveableListener extends SaveableListener {
                     hashes.put(id, computeCredentialHash(credObj));
                 }
             }
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             LOGGER.log(Level.FINE, "Error computing credential hashes", e);
         }
         return hashes;
@@ -361,7 +384,7 @@ public class AuditSaveableListener extends SaveableListener {
                     }
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (ReflectiveOperationException | RuntimeException ignored) {}
         return null;
     }
 
@@ -379,7 +402,7 @@ public class AuditSaveableListener extends SaveableListener {
                     }
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (ReflectiveOperationException | RuntimeException ignored) {}
         return null;
     }
 
@@ -396,10 +419,10 @@ public class AuditSaveableListener extends SaveableListener {
                     try {
                         Object val = m.invoke(cred);
                         result = 31 * result + (val != null ? val.hashCode() : 0);
-                    } catch (Exception ignored) {}
+                    } catch (ReflectiveOperationException | RuntimeException ignored) {}
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (RuntimeException ignored) {}
         return result;
     }
 
