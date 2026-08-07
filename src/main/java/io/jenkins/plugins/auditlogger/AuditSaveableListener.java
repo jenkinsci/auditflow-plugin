@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.kohsuke.stapler.Stapler;
 import java.lang.reflect.Method;
+import java.security.Principal;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -98,103 +99,104 @@ public class AuditSaveableListener extends SaveableListener {
             if (isJob && !config.isEnableJobConfigEvents()) return;
             if (isSystem && !config.isEnableSystemConfigEvents()) return;
 
-            String objectType = o.getClass().getSimpleName();
-            String objectName;
-            if (isJob) {
-                objectName = ((Job<?, ?>) o).getFullName();
-            } else if (isUser) {
-                objectName = ((User) o).getId();
-                objectType = "User";
-            } else {
-                objectName = objectType;
-            }
-
-            String requestUri = currentRequestUri();
-            Set<String> requestParameterNames = currentRequestParameterNames();
-            if (shouldSuppressThemeUserPreferenceLog(o.getClass().getName(), isUser, requestUri, requestParameterNames)) {
-                LOGGER.log(Level.FINE, "Suppressing user-scoped theme preference save: {0}", objectName);
+            // Suppress minor user-preference property saves that pollute global audit trail.
+            if (isUserThemePreferenceSave(o)) {
+                LOGGER.log(Level.FINE, "Suppressing theme preference save for user property: {0}",
+                        o.getClass().getName());
                 return;
             }
-
-            if (shouldSuppressRequestScopedSystemConfigSave(isSystem, requestUri)) {
-                LOGGER.log(Level.FINE, "Suppressing request-scoped system config save: {0}", objectName);
-                return;
-            }
-
-            if (StartupPhaseManager.wasRecentlyLogged(objectName)) {
-                LOGGER.log(Level.FINE, "Skipping duplicate config log for: {0}", objectName);
-                return;
-            }
-            StartupPhaseManager.markAsLogged(objectName);
 
             String username = currentUser();
 
-            // Suppress all SYSTEM-initiated config saves (branch indexing, internal syncs,
-            // build rotation, etc.) — not relevant for compliance auditing.
-            if ("SYSTEM".equals(username)) {
-                LOGGER.log(Level.FINE, "Suppressing SYSTEM config save: {0}", objectName);
+            // Suppress non-real user background saves during grace period
+            if (!isRealUser(username) && StartupPhaseManager.isInStartupGracePeriod()) {
+                LOGGER.log(Level.FINE, "Suppressing non-real user config save: {0}", o.getClass().getSimpleName());
                 return;
             }
 
             String action;
+            String target;
             String details;
+
             if (isJob) {
                 action = "JOB_CONFIG_UPDATED";
-                details = String.format("Job configuration updated: %s by %s", objectName, username);
+                target = ((Job<?, ?>) o).getFullName();
+                details = String.format("Job configuration modified: %s by %s", target, username);
             } else if (isUser) {
                 action = "USER_CONFIG_UPDATED";
-                details = String.format("User configuration updated: %s by %s", objectName, username);
+                target = ((User) o).getId();
+                details = String.format("User profile updated: %s by %s", target, username);
             } else {
                 action = "GLOBAL_CONFIG_UPDATED";
-                details = String.format("Global configuration updated: %s (%s) by %s", objectName, objectType, username);
+                target = o.getClass().getSimpleName();
+                details = String.format("Global system configuration updated: %s by %s", target, username);
             }
 
-            AuditLogStorage.getInstance().addEntry(
-                    new AuditLogEntry(username, action, objectName, details));
+            // Deduplicate: Jenkins often calls save() multiple times in quick succession for a single save form submit
+            String duplicateKey = action + ":" + target;
+            if (StartupPhaseManager.wasRecentlyLogged(duplicateKey)) {
+                LOGGER.log(Level.FINE, "Skipping duplicate save log for: {0}", duplicateKey);
+                return;
+            }
+            StartupPhaseManager.markAsLogged(duplicateKey);
+
+            AuditLogEntry entry = new AuditLogEntry(username, action, target, details);
+            if (isSystem) {
+                entry.setSeverity("MEDIUM"); // Amber badge for system configuration updates
+            }
+            AuditLogStorage.getInstance().addEntry(entry);
+            LOGGER.log(Level.INFO, "{0}: target={1} by user={2}", new Object[]{action, target, username});
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Error recording config change", e);
+            LOGGER.log(Level.WARNING, "Error recording saveable change", e);
         }
     }
 
-    /**
-     * Detect credential stores via reflection (avoids hard dependency on credentials plugin).
-     * Matches: SystemCredentialsProvider, FolderCredentialsProvider, UserCredentialsProvider, etc.
-     */
+    static boolean shouldSuppressThemeUserPreferenceLog(String className, boolean hasRequest, String requestUri, Set<?> paramKeys) {
+        if ("io.jenkins.plugins.thememanager.ThemeUserProperty".equals(className)) {
+            return true;
+        }
+        if (hasRequest && requestUri != null && requestUri.contains("/theme/set")) {
+            return true;
+        }
+        return false;
+    }
+
+    static boolean shouldSuppressRequestScopedSystemConfigSave(boolean isSystem, String requestUri) {
+        if (!isSystem || requestUri == null) return false;
+        return requestUri.endsWith("/configure") || requestUri.contains("/configure");
+    }
+
+    private static boolean isUserThemePreferenceSave(Saveable o) {
+        if (o == null) return false;
+        String className = o.getClass().getName();
+        return USER_THEME_SAVEABLE_CLASS_NAMES.contains(className);
+    }
+
     private static boolean isCredentialStore(Saveable o) {
-        String className = o.getClass().getName().toLowerCase();
-        return className.contains("credential");
+        if (o == null) return false;
+        String className = o.getClass().getName();
+        return className.contains("CredentialsStore")
+                || className.contains("CredentialsProvider")
+                || className.contains("SystemCredentialsProvider")
+                || className.contains("UserCredentialsProvider");
     }
 
-    private static void primeCredentialSnapshot(Saveable store) {
-        String cacheKey = store.getClass().getName();
-        Set<String> ids = new HashSet<>(extractCredentialIdSet(store));
-        credentialCache.put(cacheKey, ids);
-        credentialHashCache.put(cacheKey, buildCredentialHashes(store));
-        LOGGER.log(Level.INFO, "Primed credential cache for {0}: {1} entries",
-                new Object[]{cacheKey, ids.size()});
-    }
-
-    /**
-     * Log credential store changes. Compares current credential IDs with a cached snapshot
-     * to detect individual credential creates, deletes, and modifications.
-     */
     private void logCredentialChange(Saveable o, XmlFile file) {
         try {
             String username = currentUser();
             String storeName = o.getClass().getSimpleName();
-            String cacheKey = o.getClass().getName();
 
-            // Get current credential IDs from the store
+            // Extract set of all credential IDs in this store currently
             Set<String> currentIds = extractCredentialIdSet(o);
-            Set<String> previousIds = credentialCache.getOrDefault(cacheKey, null);
+            // Extract map of credential ID → content hash
+            Map<String, Integer> currentHashes = extractCredentialHashes(o);
 
-            // Build hash snapshot for change detection — save previous before overwriting
-            Map<String, Integer> previousHashes = credentialHashCache.getOrDefault(cacheKey, java.util.Collections.emptyMap());
-            Map<String, Integer> currentHashes = buildCredentialHashes(o);
+            Set<String> previousIds = credentialCache.get(storeName);
+            Map<String, Integer> previousHashes = credentialHashCache.get(storeName);
 
-            // Update cache for next comparison
-            credentialCache.put(cacheKey, new HashSet<>(currentIds));
-            credentialHashCache.put(cacheKey, currentHashes);
+            // Update caches FIRST for next check
+            credentialCache.put(storeName, currentIds);
+            credentialHashCache.put(storeName, currentHashes);
 
             if (previousIds == null) {
                 // First time we see this store — snapshot only, don't log (likely startup)
@@ -209,7 +211,7 @@ public class AuditSaveableListener extends SaveableListener {
             for (String id : added) {
                 AuditLogEntry entry = new AuditLogEntry(username, "CREDENTIAL_CREATED",
                         id, String.format("Credential created: %s by %s", id, username));
-                entry.setSeverity("CRITICAL");
+                entry.setSeverity("INFO"); // Blue badge for creation
                 AuditLogStorage.getInstance().addEntry(entry);
                 LOGGER.log(Level.INFO, "CREDENTIAL_CREATED: id={0} by user={1}",
                         new Object[]{id, username});
@@ -221,7 +223,7 @@ public class AuditSaveableListener extends SaveableListener {
             for (String id : removed) {
                 AuditLogEntry entry = new AuditLogEntry(username, "CREDENTIAL_DELETED",
                         id, String.format("Credential deleted: %s by %s", id, username));
-                entry.setSeverity("CRITICAL");
+                entry.setSeverity("HIGH"); // Dark Orange badge for deletion
                 AuditLogStorage.getInstance().addEntry(entry);
                 LOGGER.log(Level.INFO, "CREDENTIAL_DELETED: id={0} by user={1}",
                         new Object[]{id, username});
@@ -244,7 +246,7 @@ public class AuditSaveableListener extends SaveableListener {
                     AuditLogEntry entry = new AuditLogEntry(username, "CREDENTIAL_UPDATED",
                             credId,
                             String.format("Credential updated: %s by %s", credId, username));
-                    entry.setSeverity("HIGH");
+                    entry.setSeverity("MEDIUM"); // Amber badge for updates
                     AuditLogStorage.getInstance().addEntry(entry);
                     LOGGER.log(Level.INFO, "CREDENTIAL_UPDATED: id={0} by user={1}",
                             new Object[]{credId, username});
@@ -255,25 +257,15 @@ public class AuditSaveableListener extends SaveableListener {
         }
     }
 
-    /**
-     * Extract credential IDs from a credential store as a Set, via reflection.
-     * Handles multiple credential store layouts:
-     *   - getCredentials() returning List<Credentials>
-     *   - getDomainCredentialsMap() returning List<DomainCredentials> (SystemCredentialsProvider)
-     *   - getCredentials(Domain) with parameter
-     */
     private static Set<String> extractCredentialIdSet(Saveable o) {
         Set<String> ids = new HashSet<>();
         try {
-            // 1. Try getDomainCredentialsMap() — used by SystemCredentialsProvider
-            //    Returns List<DomainCredentials>, each has getCredentials() → List<Credentials>
             boolean found = false;
             for (Method m : o.getClass().getMethods()) {
                 if ("getDomainCredentialsMap".equals(m.getName()) && m.getParameterCount() == 0) {
                     Object domainMap = m.invoke(o);
                     if (domainMap instanceof Iterable) {
                         for (Object domainCreds : (Iterable<?>) domainMap) {
-                            // Each DomainCredentials has getCredentials()
                             extractCredentialIdsFromContainer(domainCreds, ids);
                         }
                     } else if (domainMap instanceof java.util.Map) {
@@ -291,7 +283,6 @@ public class AuditSaveableListener extends SaveableListener {
                 }
             }
 
-            // 2. Try zero-param getCredentials() — some stores expose this directly
             if (!found) {
                 for (Method m : o.getClass().getMethods()) {
                     if ("getCredentials".equals(m.getName()) && m.getParameterCount() == 0) {
@@ -302,29 +293,22 @@ public class AuditSaveableListener extends SaveableListener {
                                 if (id != null) ids.add(id);
                             }
                         }
-                        found = true;
                         break;
                     }
                 }
             }
-
-            LOGGER.log(Level.FINE, "Extracted {0} credential IDs from {1}",
-                    new Object[]{ids.size(), o.getClass().getSimpleName()});
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            LOGGER.log(Level.WARNING, "Could not extract credential IDs from {0}: {1}",
-                    new Object[]{o.getClass().getName(), e.getMessage()});
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Error extracting credential IDs via reflection", e);
         }
         return ids;
     }
 
-    /**
-     * Extract credential IDs from a container object (e.g. DomainCredentials) that has getCredentials().
-     */
-    private static void extractCredentialIdsFromContainer(Object container, Set<String> ids) {
+    private static void extractCredentialIdsFromContainer(Object domainCreds, Set<String> ids) {
+        if (domainCreds == null) return;
         try {
-            for (Method m : container.getClass().getMethods()) {
+            for (Method m : domainCreds.getClass().getMethods()) {
                 if ("getCredentials".equals(m.getName()) && m.getParameterCount() == 0) {
-                    Object creds = m.invoke(container);
+                    Object creds = m.invoke(domainCreds);
                     if (creds instanceof Iterable) {
                         for (Object cred : (Iterable<?>) creds) {
                             String id = extractCredentialId(cred);
@@ -334,324 +318,234 @@ public class AuditSaveableListener extends SaveableListener {
                     break;
                 }
             }
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            LOGGER.log(Level.FINE, "Could not extract from container: {0}", container.getClass().getName());
-        }
+        } catch (Exception ignored) {}
     }
 
-    /** Extract the ID from a single credential object via reflection. */
     private static String extractCredentialId(Object cred) {
+        if (cred == null) return null;
         try {
             Method getId = cred.getClass().getMethod("getId");
-            return (String) getId.invoke(cred);
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            try {
-                // Some credentials use getUsername()
-                Method getUsername = cred.getClass().getMethod("getUsername");
-                return "user:" + getUsername.invoke(cred);
-            } catch (ReflectiveOperationException | RuntimeException ignored) {}
+            Object id = getId.invoke(cred);
+            return id != null ? id.toString() : null;
+        } catch (Exception e) {
+            return null;
         }
-        return null;
     }
 
-    /**
-     * Detect which specific credentials were modified by comparing hash codes.
-     */
-    private Set<String> detectModifiedCredentials(Map<String, Integer> currentHashes, Map<String, Integer> previousHashes) {
-        Set<String> changed = new HashSet<>();
+    private static Map<String, Integer> extractCredentialHashes(Saveable o) {
+        Map<String, Integer> hashes = new ConcurrentHashMap<>();
         try {
-            if (previousHashes.isEmpty()) {
-                return changed;
-            }
-            for (Map.Entry<String, Integer> entry : currentHashes.entrySet()) {
-                String id = entry.getKey();
-                Integer currentHash = entry.getValue();
-                Integer previousHash = previousHashes.get(id);
-                if (previousHash != null && !previousHash.equals(currentHash)) {
-                    changed.add(id);
+            Set<String> ids = extractCredentialIdSet(o);
+            for (String id : ids) {
+                Object credObj = findCredentialObjectById(o, id);
+                if (credObj != null) {
+                    hashes.put(id, computeCredentialHash(credObj));
                 }
             }
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Could not detect modified credential", e);
+            LOGGER.log(Level.FINE, "Error computing credential hashes", e);
         }
-        return changed;
+        return hashes;
     }
 
-    /**
-     * Build a map of credential ID → content-based hash for detecting modifications.
-     */
-    private static Map<String, Integer> buildCredentialHashes(Saveable o) {
-        Map<String, Integer> hashes = new java.util.HashMap<>();
+    private static Object findCredentialObjectById(Saveable o, String targetId) {
         try {
             for (Method m : o.getClass().getMethods()) {
                 if ("getDomainCredentialsMap".equals(m.getName()) && m.getParameterCount() == 0) {
                     Object domainMap = m.invoke(o);
                     if (domainMap instanceof Iterable) {
                         for (Object domainCreds : (Iterable<?>) domainMap) {
-                            buildHashesFromContainer(domainCreds, hashes);
-                        }
-                    } else if (domainMap instanceof java.util.Map) {
-                        // CopyOnWriteMap$Hash: Map<Domain, List<Credentials>>
-                        for (Object value : ((java.util.Map<?, ?>) domainMap).values()) {
-                            if (value instanceof Iterable) {
-                                for (Object cred : (Iterable<?>) value) {
-                                    String id = extractCredentialId(cred);
-                                    if (id != null) hashes.put(id, computeCredentialHash(cred));
-                                }
-                            }
+                            Object found = findCredInContainer(domainCreds, targetId);
+                            if (found != null) return found;
                         }
                     }
-                    return hashes;
                 }
             }
-            // Fallback: try getCredentials()
-            for (Method m : o.getClass().getMethods()) {
-                if ("getCredentials".equals(m.getName()) && m.getParameterCount() == 0) {
-                    Object creds = m.invoke(o);
-                    if (creds instanceof Iterable) {
-                        for (Object cred : (Iterable<?>) creds) {
-                            String id = extractCredentialId(cred);
-                            if (id != null) hashes.put(id, computeCredentialHash(cred));
-                        }
-                    }
-                    break;
-                }
-            }
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Could not build credential hashes: {0}", e.getMessage());
-        }
-        return hashes;
+        } catch (Exception ignored) {}
+        return null;
     }
 
-    private static void buildHashesFromContainer(Object container, Map<String, Integer> hashes) {
+    private static Object findCredInContainer(Object domainCreds, String targetId) {
+        if (domainCreds == null) return null;
         try {
-            for (Method m : container.getClass().getMethods()) {
+            for (Method m : domainCreds.getClass().getMethods()) {
                 if ("getCredentials".equals(m.getName()) && m.getParameterCount() == 0) {
-                    Object creds = m.invoke(container);
+                    Object creds = m.invoke(domainCreds);
                     if (creds instanceof Iterable) {
                         for (Object cred : (Iterable<?>) creds) {
                             String id = extractCredentialId(cred);
-                            if (id != null) hashes.put(id, computeCredentialHash(cred));
+                            if (targetId.equals(id)) return cred;
                         }
                     }
-                    break;
                 }
             }
-        } catch (ReflectiveOperationException | RuntimeException ignored) {}
+        } catch (Exception ignored) {}
+        return null;
     }
 
-    /**
-     * Compute a content-based hash for a credential object using its public getter values.
-     * Uses only stable identity fields to avoid non-deterministic getters (Descriptor, etc.).
-     */
     private static int computeCredentialHash(Object cred) {
+        if (cred == null) return 0;
+        int result = 17;
         try {
-            StringBuilder sb = new StringBuilder();
-            // Collect all getter names and sort for determinism
-            java.util.List<Method> getters = new java.util.ArrayList<>();
             for (Method m : cred.getClass().getMethods()) {
-                if (m.getParameterCount() == 0 && m.getDeclaringClass() != Object.class) {
-                    String name = m.getName();
-                    if (name.startsWith("get") && !name.equals("getClass")) {
-                        // Skip getters that return complex non-deterministic objects
-                        Class<?> ret = m.getReturnType();
-                        if (ret == String.class || ret.isPrimitive() || ret == Boolean.class
-                                || ret == Integer.class || ret == Long.class
-                                || ret.getName().equals("hudson.util.Secret")
-                                || ret.isEnum()) {
-                            getters.add(m);
-                        }
-                    }
+                String name = m.getName();
+                if ((name.startsWith("get") || name.startsWith("is"))
+                        && m.getParameterCount() == 0
+                        && !name.equals("getClass")
+                        && !name.equals("getDescriptor")) {
+                    try {
+                        Object val = m.invoke(cred);
+                        result = 31 * result + (val != null ? val.hashCode() : 0);
+                    } catch (Exception ignored) {}
                 }
             }
-            getters.sort(java.util.Comparator.comparing(Method::getName));
-            for (Method m : getters) {
-                try {
-                    Object val = m.invoke(cred);
-                    sb.append(m.getName()).append('=');
-                    sb.append(stringifyCredentialValue(val));
-                    sb.append(';');
-                } catch (ReflectiveOperationException | RuntimeException e) {
-                    LOGGER.log(Level.FINE, "Failed to read credential getter for hashing: {0}", m.getName());
-                }
-            }
-            int hash = sb.toString().hashCode();
-            LOGGER.log(Level.FINE, "Credential hash for {0}: {1}",
-                    new Object[]{extractCredentialId(cred), hash});
-            return hash;
-        } catch (RuntimeException e) {
-            return cred.hashCode();
+        } catch (Exception ignored) {}
+        return result;
+    }
+
+    static void primeCredentialSnapshot(Saveable o) {
+        if (o == null) return;
+        try {
+            String storeName = o.getClass().getSimpleName();
+            Set<String> ids = extractCredentialIdSet(o);
+            Map<String, Integer> hashes = extractCredentialHashes(o);
+            credentialCache.put(storeName, ids);
+            credentialHashCache.put(storeName, hashes);
+            LOGGER.log(Level.INFO, "Primed credential cache for {0}: {1} entries",
+                    new Object[]{storeName, ids.size()});
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Failed to prime credential snapshot for " + o.getClass().getSimpleName(), e);
         }
     }
 
-    private static String stringifyCredentialValue(Object value) {
-        if (value == null) {
-            return "null";
-        }
-        if ("hudson.util.Secret".equals(value.getClass().getName())) {
-            try {
-                Method getEncryptedValue = value.getClass().getMethod("getEncryptedValue");
-                Object encryptedValue = getEncryptedValue.invoke(value);
-                return encryptedValue != null ? encryptedValue.toString() : "null";
-            } catch (ReflectiveOperationException e) {
-                LOGGER.log(Level.FINE, "Failed to read encrypted Secret value for credential hashing", e);
+    private static Set<String> detectModifiedCredentials(Map<String, Integer> currentHashes,
+                                                         Map<String, Integer> previousHashes) {
+        Set<String> modified = new HashSet<>();
+        if (previousHashes == null) return modified;
+
+        for (Map.Entry<String, Integer> entry : currentHashes.entrySet()) {
+            String id = entry.getKey();
+            Integer currentHash = entry.getValue();
+            Integer prevHash = previousHashes.get(id);
+            if (prevHash != null && !prevHash.equals(currentHash)) {
+                modified.add(id);
             }
         }
-        return value.toString();
+        return modified;
     }
 
     private static String currentUser() {
-        // 1. Try pre-chain authenticated user (captured by PluginServletFilter BEFORE
-        //    Jenkins impersonates SYSTEM for save operations) — most reliable source
-        try {
-            String preChain = RequestHolder.getAuthenticatedUser();
-            if (isRealUser(preChain)) {
-                LOGGER.log(Level.FINE, "currentUser from pre-chain ThreadLocal: {0}", preChain);
-                return preChain;
-            }
-        } catch (Exception ignored) {}
-        // 2. Try session-based Spring Security context — preserves original
-        //    logged-in user even when Jenkins impersonates SYSTEM internally
+        // 0. Try Basic Auth header from HTTP request
         try {
             HttpServletRequest req = RequestHolder.get();
             if (req != null) {
-                HttpSession session = req.getSession(false);
+                String authHeader = req.getHeader("Authorization");
+                if (authHeader != null && authHeader.startsWith("Basic ")) {
+                    String decoded = new String(java.util.Base64.getDecoder().decode(authHeader.substring(6)), java.nio.charset.StandardCharsets.UTF_8);
+                    String username = decoded.contains(":") ? decoded.substring(0, decoded.indexOf(':')) : decoded;
+                    if (isRealUser(username)) return username;
+                }
+            }
+        } catch (RuntimeException ignored) {}
+
+        // 1. Try pre-chain authenticated user
+        String requestUser = RequestHolder.getAuthenticatedUser();
+        if (isRealUser(requestUser)) {
+            return requestUser;
+        }
+
+        // 2. Try session-based Spring Security context or request user
+        try {
+            HttpServletRequest request = RequestHolder.get();
+            if (request != null) {
+                HttpSession session = request.getSession(false);
                 if (session != null) {
-                    Object ctx = session.getAttribute("SPRING_SECURITY_CONTEXT");
-                    if (ctx != null) {
-                        Method getAuth = ctx.getClass().getMethod("getAuthentication");
-                        Object auth = getAuth.invoke(ctx);
-                        if (auth != null) {
-                            Method getName = auth.getClass().getMethod("getName");
-                            String name = (String) getName.invoke(auth);
-                            if (isRealUser(name)) {
-                                LOGGER.log(Level.FINE, "currentUser from session SecurityContext: {0}", name);
-                                return name;
-                            }
-                        }
+                    String sessionUser = extractUserFromSession(session);
+                    if (isRealUser(sessionUser)) {
+                        return sessionUser;
                     }
                 }
-                // 3. Try getRemoteUser() — servlet container auth
-                String remoteUser = req.getRemoteUser();
-                if (isRealUser(remoteUser)) {
-                    LOGGER.log(Level.FINE, "currentUser from remoteUser: {0}", remoteUser);
-                    return remoteUser;
+                if (isRealUser(request.getRemoteUser())) {
+                    return request.getRemoteUser();
                 }
-                // 4. Try getUserPrincipal()
-                java.security.Principal p = req.getUserPrincipal();
-                if (p != null && isRealUser(p.getName())) {
-                    LOGGER.log(Level.FINE, "currentUser from principal: {0}", p.getName());
-                    return p.getName();
+                Principal principal = request.getUserPrincipal();
+                if (principal != null && isRealUser(principal.getName())) {
+                    return principal.getName();
                 }
             }
-        } catch (Exception e) {
-            LOGGER.log(Level.FINE, "RequestHolder user lookup failed", e);
-        }
-        // 5. Try Stapler request
+        } catch (RuntimeException ignored) {}
+
+        // 3. Try Stapler request
         try {
-            org.kohsuke.stapler.StaplerRequest2 req = Stapler.getCurrentRequest2();
-            if (req != null) {
-                String remoteUser = req.getRemoteUser();
-                if (isRealUser(remoteUser)) return remoteUser;
-                java.security.Principal p = req.getUserPrincipal();
-                if (p != null && isRealUser(p.getName())) return p.getName();
+            var request = Stapler.getCurrentRequest2();
+            if (request != null) {
+                if (isRealUser(request.getRemoteUser())) {
+                    return request.getRemoteUser();
+                }
+                Principal principal = request.getUserPrincipal();
+                if (principal != null && isRealUser(principal.getName())) {
+                    return principal.getName();
+                }
+                String authHeader = request.getHeader("Authorization");
+                if (authHeader != null && authHeader.startsWith("Basic ")) {
+                    String decoded = new String(java.util.Base64.getDecoder().decode(authHeader.substring(6)), java.nio.charset.StandardCharsets.UTF_8);
+                    String username = decoded.contains(":") ? decoded.substring(0, decoded.indexOf(':')) : decoded;
+                    if (isRealUser(username)) return username;
+                }
+                if (request.getSession(false) != null) {
+                    String sessionUser = extractUserFromSession(request.getSession(false));
+                    if (isRealUser(sessionUser)) return sessionUser;
+                }
             }
-        } catch (Exception ignored) {}
-        // 6. Try Jenkins User.current() — may return SYSTEM if impersonated
+        } catch (RuntimeException ignored) {}
+
+        // 4. Try Jenkins User.current()
         try {
-            User u = User.current();
-            if (u != null && isRealUser(u.getId())) return u.getId();
-        } catch (Exception ignored) {}
-        // 7. Try Spring SecurityContext (thread-local — may be impersonated)
-        try {
-            org.springframework.security.core.Authentication auth =
-                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && isRealUser(auth.getName())) {
-                return auth.getName();
+            User user = User.current();
+            if (user != null && isRealUser(user.getId())) {
+                return user.getId();
             }
-        } catch (Exception ignored) {}
+        } catch (RuntimeException ignored) {}
+
+        // 5. Try Spring SecurityContext
+        try {
+            var authentication = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication();
+            if (authentication != null && isRealUser(authentication.getName())) {
+                return authentication.getName();
+            }
+        } catch (RuntimeException ignored) {}
+
         return "SYSTEM";
     }
 
-    private static boolean isRealUser(String name) {
-        return name != null && !name.isEmpty()
-                && !"SYSTEM".equalsIgnoreCase(name)
-                && !"anonymous".equalsIgnoreCase(name)
-                && !"anonymousUser".equals(name);
+    private static String extractUserFromSession(HttpSession session) {
+        if (session == null) return null;
+        String[] contextKeys = {"SPRING_SECURITY_CONTEXT", "ACEGI_SECURITY_CONTEXT"};
+        for (String key : contextKeys) {
+            try {
+                Object context = session.getAttribute(key);
+                if (context != null) {
+                    Method getAuthentication = context.getClass().getMethod("getAuthentication");
+                    Object authentication = getAuthentication.invoke(context);
+                    if (authentication != null) {
+                        Method getName = authentication.getClass().getMethod("getName");
+                        String name = (String) getName.invoke(authentication);
+                        if (isRealUser(name)) {
+                            return name;
+                        }
+                    }
+                }
+            } catch (ReflectiveOperationException | RuntimeException ignored) {}
+        }
+        return null;
     }
 
-    static boolean shouldSuppressThemeUserPreferenceLog(String className,
-                                                        boolean isUserSave,
-                                                        String requestUri,
-                                                        Set<String> parameterNames) {
-        if (className == null || className.isEmpty()) {
-            return false;
-        }
-
-        if (USER_THEME_SAVEABLE_CLASS_NAMES.contains(className)) {
-            return true;
-        }
-
-        if (!isUserSave) {
-            return false;
-        }
-
-        String normalizedUri = requestUri == null ? "" : requestUri.toLowerCase(java.util.Locale.ENGLISH);
-        if (normalizedUri.startsWith("/theme/") || normalizedUri.contains("/theme/")) {
-            return true;
-        }
-
-        for (String parameterName : parameterNames) {
-            String normalizedName = parameterName.toLowerCase(java.util.Locale.ENGLISH);
-            if (normalizedName.contains("theme") || normalizedName.contains("appearance")) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    static boolean shouldSuppressRequestScopedSystemConfigSave(boolean isSystemSave, String requestUri) {
-        return isSystemSave && RouteAwareUrlMatcher.isConfigurationChange(requestUri);
-    }
-
-    private static String currentRequestUri() {
-        try {
-            HttpServletRequest request = RequestHolder.get();
-            if (request != null && request.getRequestURI() != null) {
-                return request.getRequestURI();
-            }
-        } catch (Exception ignored) {
-        }
-
-        try {
-            var request = Stapler.getCurrentRequest2();
-            if (request != null && request.getRequestURI() != null) {
-                return request.getRequestURI();
-            }
-        } catch (Exception ignored) {
-        }
-
-        return "";
-    }
-
-    private static Set<String> currentRequestParameterNames() {
-        try {
-            HttpServletRequest request = RequestHolder.get();
-            if (request != null) {
-                return request.getParameterMap().keySet();
-            }
-        } catch (Exception ignored) {
-        }
-
-        try {
-            var request = Stapler.getCurrentRequest2();
-            if (request != null) {
-                return request.getParameterMap().keySet();
-            }
-        } catch (Exception ignored) {
-        }
-
-        return Collections.emptySet();
+    private static boolean isRealUser(String username) {
+        return username != null
+                && !username.isEmpty()
+                && !"SYSTEM".equalsIgnoreCase(username)
+                && !"anonymous".equalsIgnoreCase(username)
+                && !"anonymousUser".equalsIgnoreCase(username);
     }
 }

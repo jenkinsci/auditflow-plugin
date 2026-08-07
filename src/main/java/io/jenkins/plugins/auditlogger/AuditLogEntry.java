@@ -127,27 +127,47 @@ public class AuditLogEntry implements Serializable {
         return "unknown";
     }
 
+    /**
+     * Strict 5-tier severity derivation schema:
+     * - CRITICAL (Red #ef4444): Failed logins, system restarts, agent launch failures, security breaches
+     * - HIGH (Dark Orange #f97316): Deletions, offline events, build failures, build aborts
+     * - MEDIUM (Amber #f59e0b): Configuration changes, job updates, node updates, credential updates
+     * - LOW (Green #10b981): Successful authentications, node online, build success
+     * - INFO (Blue #3b82f6): Informational creation events, job created, node created, build started
+     */
     private static String deriveSeverity(String action) {
         if (action == null) return "INFO";
-        // CRITICAL: security-breaking or irreversible actions
-        if (action.contains("FAILED") || action.contains("DENIED") || action.contains("RESTART")
-                || action.contains("SECURITY_CONFIG") || "NODE_LAUNCH_FAILURE".equals(action)
-                || "CREDENTIAL_DELETED".equals(action) || "CREDENTIAL_CREATED".equals(action)
-                || "JOB_DELETED".equals(action) || "BUILDS_PURGED".equals(action)
-                || "AUTH_STRATEGY_CHANGED".equals(action) || "PLUGIN_REMOVED".equals(action)) return "CRITICAL";
-        // HIGH: impactful changes requiring attention
-        if (action.contains("DELETE") || action.contains("CREDENTIAL")
-                || "BUILD_FAILED".equals(action) || "BUILD_ABORTED".equals(action)
-                || "GLOBAL_CONFIG_UPDATED".equals(action)
-                || "PLUGIN_DISABLED".equals(action) || "PLUGIN_ENABLED".equals(action)) return "HIGH";
-        // LOW: successful authentication events, routine build and creation events
-        if ("LOGIN".equals(action) || "LOGIN_SUCCESS".equals(action) || "LOGOUT".equals(action)
-                || "SSO_LOGIN".equals(action) || "API_AUTH".equals(action)) return "LOW";
-        // MEDIUM: configuration changes
-        if (action.contains("SESSION_TERMINATED".equals(action) ? "SESSION_TERMINATED" : "CONFIG")
-                || action.contains("PLUGIN") || "JOB_CONFIG_UPDATED".equals(action) || "JOB_RENAMED".equals(action)) return "MEDIUM";
-        // LOW: routine build and creation events
-        if (action.contains("BUILD") || action.contains("CREATED") || action.contains("ONLINE")) return "LOW";
+        String u = action.toUpperCase();
+
+        // 1. CRITICAL: Security failures, failed logins, system restarts, launch failures
+        if (u.contains("FAILED_LOGIN") || u.contains("LOGIN_FAILED") || u.contains("DENIED") || u.contains("RESTART")
+                || u.contains("SECURITY_CONFIG") || "NODE_LAUNCH_FAILURE".equals(u) || "AUTH_STRATEGY_CHANGED".equals(u)) {
+            return "CRITICAL";
+        }
+
+        // 2. HIGH: Impactful/destructive actions (deletions, offline agents, failed/aborted builds)
+        if (u.contains("DELETED") || u.contains("DELETE") || u.contains("OFFLINE")
+                || "BUILD_FAILURE".equals(u) || "BUILD_FAILED".equals(u) || "BUILD_ABORTED".equals(u)) {
+            return "HIGH";
+        }
+
+        // 3. MEDIUM: Configuration updates and status warnings
+        if (u.contains("UPDATED") || u.contains("CONFIG") || u.contains("RENAMED")
+                || u.contains("PLUGIN") || "BUILD_UNSTABLE".equals(u)) {
+            return "MEDIUM";
+        }
+
+        // 4. LOW: Successful logins, node brought online, successful builds
+        if (u.contains("LOGIN") || u.contains("LOGOUT") || u.contains("AUTH")
+                || "NODE_ONLINE".equals(u) || "BUILD_SUCCESS".equals(u)) {
+            return "LOW";
+        }
+
+        // 5. INFO: Routine creation and start events
+        if (u.contains("CREATED") || u.contains("COPIED") || u.contains("STARTED") || "SESSION_TIMEOUT".equals(u)) {
+            return "INFO";
+        }
+
         return "INFO";
     }
 

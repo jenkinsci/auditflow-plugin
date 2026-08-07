@@ -86,7 +86,7 @@ public class AuditNodeListener extends NodeListener {
 
             String details = formatNodeUpdateDetails(oldNode, newNode, username);
             AuditLogEntry entry = new AuditLogEntry(username, "NODE_UPDATED", nodeName, details);
-            entry.setSeverity("INFO"); // Blue badge for NODE_UPDATED configuration changes
+            entry.setSeverity("MEDIUM"); // Amber badge for NODE_UPDATED configuration changes
             AuditLogStorage.getInstance().addEntry(entry);
             LOGGER.log(Level.INFO, "Node Event: NODE_UPDATED on {0} by {1}", new Object[]{nodeName, username});
         } catch (RuntimeException e) {
@@ -153,6 +153,11 @@ public class AuditNodeListener extends NodeListener {
                     ? String.format(detailsTemplate, nodeName, node.getClass().getSimpleName(), username)
                     : String.format(detailsTemplate, nodeName, username);
             AuditLogEntry entry = new AuditLogEntry(username, action, nodeName, details);
+            if ("NODE_CREATED".equals(action)) {
+                entry.setSeverity("INFO"); // Blue badge for NODE_CREATED
+            } else if ("NODE_DELETED".equals(action)) {
+                entry.setSeverity("HIGH"); // Dark Orange badge for NODE_DELETED
+            }
             AuditLogStorage.getInstance().addEntry(entry);
         } catch (RuntimeException e) {
             LOGGER.log(Level.FINE, "Error recording node event: " + action, e);
