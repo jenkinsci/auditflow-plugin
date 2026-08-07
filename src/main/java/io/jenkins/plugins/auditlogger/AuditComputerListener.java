@@ -91,10 +91,12 @@ public class AuditComputerListener extends ComputerListener {
                 details = String.format("Node brought online: %s by %s", nodeName, username);
             } else if ("NODE_OFFLINE".equals(action)) {
                 details = causeMsg != null && !causeMsg.isEmpty()
-                        ? String.format("Node offline: %s (Reason: %s)", nodeName, causeMsg)
-                        : String.format("Node offline: %s", nodeName);
+                        ? String.format("Node disconnected: %s (Reason: %s)", nodeName, causeMsg)
+                        : String.format("Node disconnected: %s", nodeName);
             } else if ("NODE_LAUNCH_FAILURE".equals(action)) {
-                details = String.format("Node launch failed: %s", nodeName);
+                details = causeMsg != null && !causeMsg.isEmpty()
+                        ? String.format("Node launch failed: %s (%s)", nodeName, causeMsg)
+                        : String.format("Node launch failed: %s", nodeName);
             } else {
                 details = String.format("%s: %s", action, nodeName);
             }
