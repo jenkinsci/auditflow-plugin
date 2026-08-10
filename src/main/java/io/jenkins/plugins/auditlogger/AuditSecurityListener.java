@@ -72,6 +72,9 @@ public class AuditSecurityListener extends jenkins.security.SecurityListener {
             String detail = buildAuthenticationDetail(authMethod, userAgent, isApiAuth, isSsoAuth);
 
             AuditLogEntry entry = AuditLogEntry.withAuth(username, action, "Jenkins", detail, ip, authMethod);
+            if ("API_AUTH".equals(action)) {
+                entry.setSeverity("MEDIUM");
+            }
             RequestHolder.cacheUserIp(username, ip);
             String sessionId = extractSessionId();
             entry.setSessionId(sessionId);

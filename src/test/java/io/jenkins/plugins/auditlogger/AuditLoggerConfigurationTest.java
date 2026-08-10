@@ -182,30 +182,24 @@ class AuditLoggerConfigurationTest {
         HtmlPage page = webClient.goTo("configure");
         String html = page.getWebResponse().getContentAsString();
 
-        assertTrue(html.contains("General"));
-        assertTrue(html.contains("System Change Monitoring"));
-        assertTrue(html.contains("Operational Monitoring"));
+        assertTrue(html.contains("Event Logging Controls"));
+        assertTrue(html.contains("Operational Monitoring &amp; Export"));
         assertTrue(html.contains("Display Time Zone"));
         assertTrue(html.contains("Notifications"));
-        assertTrue(html.contains("Anomaly Detection"));
-        assertTrue(html.contains("Export and API"));
+        assertTrue(html.contains("Export and Integrations"));
         assertTrue(html.contains("Advanced"));
         assertTrue(html.contains("Enter a valid HTTP webhook endpoint"));
         assertTrue(html.contains("https://hooks.slack.com/services/T000/B000/XXXX"));
-        assertTrue(html.contains("Configure anomaly rules such as authentication anomalies here"));
-        assertTrue(html.contains("Failed login anomaly detection"));
-        assertTrue(html.contains("Raise an alert for repeated failed logins on the same account."));
+        assertTrue(html.contains("/auditflow/api"));
 
-        int operationalIndex = html.indexOf("Operational Monitoring");
+        int operationalIndex = html.indexOf("Operational Monitoring &amp; Export");
         int timeZoneIndex = html.indexOf("Display Time Zone");
         int notificationsIndex = html.indexOf("Notifications");
-        int anomalyIndex = html.indexOf("Anomaly Detection");
-        int exportIndex = html.indexOf("Export and API");
+        int exportIndex = html.indexOf("Export and Integrations");
 
         assertTrue(operationalIndex < timeZoneIndex);
         assertTrue(timeZoneIndex < notificationsIndex);
-        assertTrue(notificationsIndex < anomalyIndex);
-        assertTrue(anomalyIndex < exportIndex);
+        assertTrue(notificationsIndex < exportIndex);
     }
 
     private static JSONObject findOption(JSONArray options, String id) {

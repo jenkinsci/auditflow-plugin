@@ -41,14 +41,6 @@ public class AuditLogRestApi implements RootAction {
 
     @GET
     public void doApi(StaplerRequest2 req, StaplerResponse2 resp) throws IOException, ServletException {
-        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
-        if (config == null || !config.isEnableAuditApi()) {
-            resp.setStatus(403);
-            resp.setContentType("application/json; charset=UTF-8");
-            resp.getWriter().write("{\"error\": \"Audit API is disabled\"}");
-            return;
-        }
-
         Jenkins jenkins = Jenkins.getInstanceOrNull();
         if (jenkins == null || !jenkins.hasPermission(Jenkins.ADMINISTER)) {
             resp.setStatus(403);
