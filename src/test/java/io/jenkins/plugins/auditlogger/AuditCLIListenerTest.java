@@ -94,4 +94,25 @@ class AuditCLIListenerTest {
         
         assertTrue(entries.isEmpty());
     }
+
+    @Test
+    void cliCommandExecutionHighSeverity(JenkinsRule j) {
+        if (AuditLoggerConfiguration.get() == null) {
+            j.getInstance().getExtensionList(AuditLoggerConfiguration.class).add(new AuditLoggerConfiguration());
+        }
+        AuditLoggerConfiguration.get().setEnableSystemConfigEvents(true);
+        AuditLogStorage.clearInstance();
+        AuditLogStorage.getInstance().initialize();
+        long startTime = System.currentTimeMillis();
+
+        CLIContext context = new CLIContext("delete-job", List.of("my-job"), null);
+        new AuditCLIListener().onCompleted(context, 0);
+
+        List<AuditLogEntry> entries = AuditLogStorage.getInstance().filterEntries(
+            null, AuditCLIListener.CLI_EXECUTION_ACTION, startTime, null);
+        
+        assertFalse(entries.isEmpty());
+        AuditLogEntry latest = entries.get(entries.size() - 1);
+        assertEquals("HIGH", latest.getSeverity());
+    }
 }

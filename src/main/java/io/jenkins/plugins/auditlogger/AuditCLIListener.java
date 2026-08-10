@@ -31,7 +31,7 @@ public class AuditCLIListener implements CLIListener {
 
             String target = "CLI: " + command;
             AuditLogEntry entry = new AuditLogEntry(username, CLI_EXECUTION_ACTION, target, details);
-            entry.setSeverity(exitCode == 0 ? "LOW" : "MEDIUM");
+            entry.setSeverity(determineSeverity(command, exitCode));
 
             AuditLogStorage.getInstance().addEntry(entry);
 
@@ -54,5 +54,54 @@ public class AuditCLIListener implements CLIListener {
             }
         }
         return "SYSTEM";
+    }
+
+    private String determineSeverity(String command, int exitCode) {
+        if (exitCode != 0) {
+            return "MEDIUM";
+        }
+        
+        if (command == null) {
+            return "LOW";
+        }
+        
+        switch (command.toLowerCase()) {
+            case "delete-job":
+            case "delete-node":
+            case "delete-builds":
+            case "delete-credentials":
+            case "delete-view":
+            case "install-plugin":
+            case "uninstall-plugin":
+            case "restart":
+            case "safe-restart":
+            case "quiet-down":
+            case "cancel-quiet-down":
+            case "groovy":
+            case "groovysh":
+                return "HIGH";
+                
+            case "build":
+            case "create-job":
+            case "create-node":
+            case "create-view":
+            case "create-credentials":
+            case "update-job":
+            case "update-node":
+            case "update-view":
+            case "update-credentials":
+            case "reload-configuration":
+            case "enable-job":
+            case "disable-job":
+            case "offline-node":
+            case "online-node":
+            case "clear-queue":
+            case "set-external-build-result":
+            case "keep-build":
+                return "MEDIUM";
+                
+            default:
+                return "LOW";
+        }
     }
 }
