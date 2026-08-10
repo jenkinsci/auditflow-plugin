@@ -41,8 +41,6 @@ public class AuditLogRestApi implements RootAction {
 
     @GET
     public void doApi(StaplerRequest2 req, StaplerResponse2 resp) throws IOException, ServletException {
-        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
-
         Jenkins jenkins = Jenkins.getInstanceOrNull();
         if (jenkins == null || !jenkins.hasPermission(Jenkins.ADMINISTER)) {
             resp.setStatus(403);
