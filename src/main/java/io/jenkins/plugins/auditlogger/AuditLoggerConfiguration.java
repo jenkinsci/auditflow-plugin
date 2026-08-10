@@ -660,7 +660,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isEnableJsonExport() { return enableJsonExport; }
     public boolean isEnablePdfExport() { return enablePdfExport; }
 
-    public boolean isEnableAuditApi() { return enableAuditApi; }
+    public boolean isEnableAuditApi() { return true; }
 
     /** Return anomaly detection rules as a JSON string for dashboard JS consumption. */
     public String getAnomalyConfigJson() {

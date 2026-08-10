@@ -83,12 +83,6 @@ public class AuditLoggerManagementLink extends ManagementLink {
     public void doApi(StaplerRequest2 req, StaplerResponse2 res) throws IOException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
-        if (config != null && !config.isEnableAuditApi()) {
-            res.setStatus(403);
-            res.setContentType("application/json; charset=UTF-8");
-            res.getWriter().write("{\"error\":\"Audit API is disabled in configuration\",\"logs\":[]}");
-            return;
-        }
 
         try {
             ZoneId displayZone = resolveDisplayZone(config);
