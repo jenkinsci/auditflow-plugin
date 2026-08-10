@@ -52,18 +52,18 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private static final List<String> AVAILABLE_DISPLAY_TIME_ZONES = buildAvailableDisplayTimeZoneIds();
 
     // Event Categories
-    private boolean enableAuthenticationEvents = true;
-    private boolean enableBuildEvents = true;
-    private boolean enableJobConfigEvents = true;
+    private Boolean enableAuthenticationEvents = true;
+    private Boolean enableBuildEvents = true;
+    private Boolean enableJobConfigEvents = true;
     private boolean enablePipelineEvents = true;
-    private boolean enableCredentialEvents = true;
-    private boolean enablePluginEvents = true;
-    private boolean enableSystemConfigEvents = true;
-    private boolean enableNodeEvents = true;
+    private Boolean enableCredentialEvents = true;
+    private Boolean enablePluginEvents = true;
+    private Boolean enableSystemConfigEvents = true;
+    private Boolean enableNodeEvents = true;
     private boolean enableApiEvents = false;
 
     // Risk Detection — temporarily disabled to keep the write path lightweight.
-    private boolean anomalyFailedLogins = false;
+    private Boolean anomalyFailedLogins = false;
     private int anomalyFailedLoginsThreshold = 5;
     private int anomalyFailedLoginsWindowMinutes = 15;
 
@@ -100,7 +100,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     // Log Retention
     private int logRetentionDays = 90;
     private int maxLogFileSizeMB = 50;
-    private boolean enableLogRotation = true;
+    private Boolean enableLogRotation = true;
 
     // Startup
     private int startupGracePeriodSeconds = 120;
@@ -113,16 +113,16 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private int batchFlushIntervalSeconds = 5;
 
     // Privacy
-    private boolean maskTokens = true;
-    private boolean maskEmailAddresses = false;
-    private boolean maskCreditCards = true;
+    private Boolean maskTokens = true;
+    private Boolean maskEmailAddresses = false;
+    private Boolean maskCreditCards = true;
 
     // Alerts
     private boolean enableAlertEngine = false;
-    private boolean enableEmailAlerts = false;
+    private Boolean enableEmailAlerts = false;
     private String alertEmailAddresses = "";
     private boolean enableComplianceReports = false;
-    private boolean enableWebhookAlerts = false;
+    private Boolean enableWebhookAlerts = false;
     private String webhookUrl = "";
 
     // UI
@@ -131,26 +131,56 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private boolean enableTimelineView = false;
     private boolean enableSensitiveEventsPanel = false;
     private boolean enableDashboardMetrics = false;
-    private boolean enableDashboardStats = true;
+    private Boolean enableDashboardStats = true;
     private boolean enableAnomalyRow = false;
     private String displayTimeZoneId = canonicalizeTimeZoneId(ZoneId.systemDefault().getId());
-    private boolean showMetricTotal = true;
-    private boolean showMetricLogins = true;
-    private boolean showMetricFailedLogins = true;
-    private boolean showMetricBuilds = true;
-    private boolean showMetricJobs = true;
-    private boolean showMetricConfig = true;
+    private Boolean showMetricTotal = true;
+    private Boolean showMetricLogins = true;
+    private Boolean showMetricFailedLogins = true;
+    private Boolean showMetricBuilds = true;
+    private Boolean showMetricJobs = true;
+    private Boolean showMetricConfig = true;
 
     // Export
-    private boolean enableCsvExport = true;
-    private boolean enableJsonExport = true;
+    private Boolean enableCsvExport = true;
+    private Boolean enableJsonExport = true;
     private boolean enablePdfExport = false;
 
     // REST API
-    private boolean enableAuditApi = true;
+    private Boolean enableAuditApi = true;
+
+    
+    protected Object readResolve() {
+        if (enableAuthenticationEvents == null) enableAuthenticationEvents = true;
+        if (enableBuildEvents == null) enableBuildEvents = true;
+        if (enableJobConfigEvents == null) enableJobConfigEvents = true;
+        if (enableCredentialEvents == null) enableCredentialEvents = true;
+        if (enablePluginEvents == null) enablePluginEvents = true;
+        if (enableSystemConfigEvents == null) enableSystemConfigEvents = true;
+        if (enableNodeEvents == null) enableNodeEvents = true;
+        if (anomalyFailedLogins == null) anomalyFailedLogins = true;
+        if (enableLogRotation == null) enableLogRotation = true;
+        if (maskTokens == null) maskTokens = true;
+        if (maskEmailAddresses == null) maskEmailAddresses = false;
+        if (maskCreditCards == null) maskCreditCards = true;
+        if (enableEmailAlerts == null) enableEmailAlerts = false;
+        if (enableWebhookAlerts == null) enableWebhookAlerts = false;
+        if (enableDashboardStats == null) enableDashboardStats = true;
+        if (showMetricTotal == null) showMetricTotal = true;
+        if (showMetricLogins == null) showMetricLogins = true;
+        if (showMetricFailedLogins == null) showMetricFailedLogins = true;
+        if (showMetricBuilds == null) showMetricBuilds = true;
+        if (showMetricJobs == null) showMetricJobs = true;
+        if (showMetricConfig == null) showMetricConfig = true;
+        if (enableCsvExport == null) enableCsvExport = true;
+        if (enableJsonExport == null) enableJsonExport = true;
+        if (enableAuditApi == null) enableAuditApi = true;
+        return this;
+    }
 
     public AuditLoggerConfiguration() {
         load();
+        readResolve();
         displayTimeZoneId = sanitizeTimeZoneId(displayTimeZoneId);
     }
 
