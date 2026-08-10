@@ -5,84 +5,46 @@
     <f:section title="AuditFlow Configuration">
         <f:block>
             <div class="jenkins-section__description">
-                Configure what AuditFlow records, how alerts are delivered, and which dashboard and export features stay visible to admins.
+                Configure what AuditFlow records, delivery options, and display time zone settings.
             </div>
         </f:block>
     </f:section>
 
-    <f:section title="General">
+    <f:section title="Event Logging Controls">
         <f:block>
             <div class="jenkins-section__description">
-                Core AuditFlow settings that control what is recorded and how the main dashboard is presented to administrators.
+                Core audit logging scope across system activities and user operations.
             </div>
         </f:block>
-        <f:entry title="Authentication events (log login, logout, failed login, and API authentication activity)">
+        <f:entry title="Authentication &amp; Sessions (logins, logouts, failures, and API auth)">
             <f:checkbox name="enableAuthenticationEvents" checked="${descriptor.isEnableAuthenticationEvents()}"/>
         </f:entry>
-        <f:entry title="Build events (log build start, completion, failure, abort, and delete activity)">
+        <f:entry title="Build Lifecycles (build starts, completions, failures, and deletes)">
             <f:checkbox name="enableBuildEvents" checked="${descriptor.isEnableBuildEvents()}"/>
         </f:entry>
-        <f:entry title="Risk level badges (display Low, Medium, High, and Critical labels beside events)">
-            <f:checkbox name="enableRiskLevels" checked="${descriptor.isEnableRiskLevels()}"/>
-        </f:entry>
-    </f:section>
-
-    <f:section title="System Change Monitoring">
-        <f:block>
-            <div class="jenkins-section__description">
-                Track high-impact administrative changes that are often important during audits, incident response, and compliance reviews.
-            </div>
-        </f:block>
-        <f:entry title="Job change events (log job create, rename, copy, move, delete, and configuration update actions)">
+        <f:entry title="Job Configurations (job CRUD and configuration updates)">
             <f:checkbox name="enableJobConfigEvents" checked="${descriptor.isEnableJobConfigEvents()}"/>
         </f:entry>
-        <f:entry title="Credential events (log credential create, update, delete, and build-time usage)">
+        <f:entry title="Credentials &amp; Secrets (credential CRUD and build-time usage)">
             <f:checkbox name="enableCredentialEvents" checked="${descriptor.isEnableCredentialEvents()}"/>
         </f:entry>
-        <f:entry title="Plugin events (log plugin install, update, removal, enable, and disable actions)">
+        <f:entry title="Plugin Management (installs, updates, removals, enables, and disables)">
             <f:checkbox name="enablePluginEvents" checked="${descriptor.isEnablePluginEvents()}"/>
         </f:entry>
-        <f:entry title="Global and security configuration saves (log Configure System and security-related saves)">
+        <f:entry title="System &amp; Security (global system and security configuration saves)">
             <f:checkbox name="enableSystemConfigEvents" checked="${descriptor.isEnableSystemConfigEvents()}"/>
         </f:entry>
-        <f:entry title="Node events (log agent creation, configuration updates, and deletion)">
+        <f:entry title="Node &amp; Agent Lifecycles (agent creation, configuration updates, and deletion)">
             <f:checkbox name="enableNodeEvents" checked="${descriptor.isEnableNodeEvents()}"/>
         </f:entry>
     </f:section>
 
-    <f:section title="Operational Monitoring">
+    <f:section title="Operational Monitoring &amp; Export">
         <f:block>
             <div class="jenkins-section__description">
-                Dashboard counters and export options used for day-to-day monitoring, reporting, and integrations.
+                Display time zone and export options for reporting and external integrations.
             </div>
         </f:block>
-        <f:optionalBlock title="Metric cards (show the dashboard summary counters above the event list)"
-                         name="enableDashboardStats"
-                         checked="${descriptor.isEnableDashboardStats()}">
-            <f:block>
-                <div class="jenkins-section__description">
-                    Choose which counters appear in the dashboard stats row.
-                </div>
-            </f:block>
-            <f:entry title="Total events (show the total number of audit records captured by AuditFlow)">
-                <f:checkbox name="showMetricTotal" checked="${descriptor.isShowMetricTotal()}"/>
-            </f:entry>
-            <f:entry title="Logins (show successful login activity in the stats row)">
-                <f:checkbox name="showMetricLogins" checked="${descriptor.isShowMetricLogins()}"/>
-            </f:entry>
-            <f:entry title="Failed logins (show failed authentication attempts in the stats row)">
-                <f:checkbox name="showMetricFailedLogins" checked="${descriptor.isShowMetricFailedLogins()}"/>
-            </f:entry>
-            <f:entry title="Build events (show build-related audit activity in the stats row)">
-                <f:checkbox name="showMetricBuilds" checked="${descriptor.isShowMetricBuilds()}"/>
-            </f:entry>
-            <f:entry title="Job events (show job and pipeline change activity in the stats row)">
-                <f:checkbox name="showMetricJobs" checked="${descriptor.isShowMetricJobs()}"/>
-            </f:entry>
-            <f:entry title="Configuration changes (show global and security configuration changes in the stats row)">
-                <f:checkbox name="showMetricConfig" checked="${descriptor.isShowMetricConfig()}"/>
-            </f:entry>
-        </f:optionalBlock>
         <f:block>
             <h4>Display Time Zone</h4>
             <div class="jenkins-section__description">
@@ -124,7 +86,7 @@
         <f:block>
             <h4>Notifications</h4>
             <div class="jenkins-section__description">
-                Configure how AuditFlow sends anomaly alerts after a new alert is created. These settings do not change detection logic.
+                Configure notification destinations for audit and alert delivery.
             </div>
         </f:block>
         <f:optionalBlock title="Email notifications (send anomaly alerts through Jenkins mail settings)"
@@ -135,41 +97,18 @@
                 <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
             </f:entry>
         </f:optionalBlock>
-        <f:optionalBlock title="Webhook notifications (send anomaly alerts to a webhook endpoint using the same JSON payload)"
+        <f:optionalBlock title="Webhook notifications (send anomaly alerts to a webhook endpoint using JSON payload)"
                          name="enableWebhookAlerts"
                          checked="${descriptor.isEnableWebhookAlerts()}">
             <f:entry title="Webhook URL"
-                     description="Enter a valid HTTP webhook endpoint such as Slack, Microsoft Teams, or another supported service. AuditFlow sends a JSON payload whenever a new anomaly alert is detected. Example: https://hooks.slack.com/services/T000/B000/XXXX">
+                     description="Enter a valid HTTP webhook endpoint such as Slack, Microsoft Teams, or another supported service. AuditFlow sends a JSON payload whenever an alert is created. Example: https://hooks.slack.com/services/T000/B000/XXXX">
                 <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
             </f:entry>
         </f:optionalBlock>
         <f:block>
-            <h4>Anomaly Detection</h4>
+            <h4>Export and Integrations</h4>
             <div class="jenkins-section__description">
-                Configure anomaly rules such as authentication anomalies here. Shared threshold and time-window patterns keep future detections consistent as more anomaly types are added.
-            </div>
-        </f:block>
-        <f:optionalBlock title="Failed login anomaly detection"
-                         name="anomalyFailedLogins"
-                         checked="${descriptor.isAnomalyFailedLogins()}">
-            <f:block>
-                <div class="jenkins-section__description">
-                    Raise an alert for repeated failed logins on the same account.
-                </div>
-            </f:block>
-            <f:entry title="Authentication alert threshold"
-                     description="Number of failed login attempts required before an authentication anomaly alert is raised.">
-                <f:number name="anomalyFailedLoginsThreshold" value="${descriptor.getAnomalyFailedLoginsThreshold()}"/>
-            </f:entry>
-            <f:entry title="Authentication detection window (minutes)"
-                     description="Rolling time window used when counting failed logins toward the alert threshold.">
-                <f:number name="anomalyFailedLoginsWindowMinutes" value="${descriptor.getAnomalyFailedLoginsWindowMinutes()}"/>
-            </f:entry>
-        </f:optionalBlock>
-        <f:block>
-            <h4>Export and API</h4>
-            <div class="jenkins-section__description">
-                Control which export and integration endpoints are available. These settings do not change what AuditFlow records.
+                Download audit log data or integrate with downstream tools.
             </div>
         </f:block>
         <f:entry title="CSV export (enable spreadsheet-based review or downstream reporting)">
@@ -178,15 +117,17 @@
         <f:entry title="JSON export (enable automation, scripting, or external data processing)">
             <f:checkbox name="enableJsonExport" checked="${descriptor.isEnableJsonExport()}"/>
         </f:entry>
-        <f:entry title="REST API endpoint (/auditflow/api) (expose AuditFlow data for dashboards and scripts)">
-            <f:checkbox name="enableAuditApi" checked="${descriptor.isEnableAuditApi()}"/>
-        </f:entry>
+        <f:block>
+            <div class="jenkins-section__description">
+                AuditFlow REST API endpoint is available by default at <code>/auditflow/api</code>.
+            </div>
+        </f:block>
     </f:section>
 
     <f:advanced title="Advanced">
         <f:block>
             <div class="jenkins-section__description">
-                Retention, performance, and masking settings for installations that need more control. Existing behavior remains unchanged unless you modify these values.
+                Retention, performance, and privacy settings. Existing behavior remains unchanged unless modified.
             </div>
         </f:block>
         <f:block>
@@ -199,9 +140,6 @@
         <f:entry title="Max log file size (MB)"
                  description="Rotate to a new audit log file after the current file reaches this size. This helps keep files manageable for backup and support tasks.">
             <f:number name="maxLogFileSizeMB" value="${descriptor.getMaxLogFileSizeMB()}"/>
-        </f:entry>
-        <f:entry title="Auto-rotate when size exceeded (automatically create a new audit log file at the size limit)">
-            <f:checkbox name="enableLogRotation" checked="${descriptor.isEnableLogRotation()}"/>
         </f:entry>
         <f:block>
             <h4>Performance</h4>
@@ -223,9 +161,6 @@
         </f:block>
         <f:entry title="Mask tokens and secrets (redact API tokens, secret values, and similar credentials)">
             <f:checkbox name="maskTokens" checked="${descriptor.isMaskTokens()}"/>
-        </f:entry>
-        <f:entry title="Mask email addresses (reduce personally identifiable information in stored audit messages)">
-            <f:checkbox name="maskEmailAddresses" checked="${descriptor.isMaskEmailAddresses()}"/>
         </f:entry>
         <f:entry title="Mask credit card numbers (reduce accidental sensitive-data exposure in stored audit messages)">
             <f:checkbox name="maskCreditCards" checked="${descriptor.isMaskCreditCards()}"/>
