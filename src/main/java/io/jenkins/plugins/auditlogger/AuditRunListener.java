@@ -102,10 +102,18 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
             }
 
             String params = extractParameters(run);
-            String details = String.format("Build #%d started | Trigger: %s | Causes: [%s]%s",
+            
+            AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(jobName, System.currentTimeMillis());
+            String cliSuffix = "";
+            if (cliAction != null && cliAction.username.equals(user)) {
+                cliSuffix = String.format(" [via CLI: %s]", cliAction.command);
+            }
+
+            String details = String.format("Build #%d started | Trigger: %s | Causes: [%s]%s%s",
                     buildNum, triggerType,
                     String.join("; ", triggerDetails),
-                    params.isEmpty() ? "" : " | Params: " + params);
+                    params.isEmpty() ? "" : " | Params: " + params,
+                    cliSuffix);
 
             AuditLogEntry entry = AuditLogEntry.withTrigger(user, "BUILD_STARTED", jobName, details, triggerType);
 

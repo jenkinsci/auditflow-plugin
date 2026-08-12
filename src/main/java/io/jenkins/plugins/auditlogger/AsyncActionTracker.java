@@ -27,22 +27,27 @@ public class AsyncActionTracker {
         LOGGER.log(Level.FINE, "Registered CLI action for {0}: {1}", new Object[]{username, command});
     }
 
-    public String resolveUser(String affectedObject, long now) {
+    public CliAction resolveAction(String affectedObject, long now) {
         cleanExpired(now);
-        String matchedUser = null;
+        CliAction matchedAction = null;
 
         for (CliAction action : recentActions) {
             if (action.timestamp > now - TTL_MS) {
                 if (matches(action, affectedObject)) {
-                    if (matchedUser != null && !matchedUser.equals(action.username)) {
+                    if (matchedAction != null && !matchedAction.username.equals(action.username)) {
                         LOGGER.log(Level.FINE, "Ambiguous match for {0}, returning null", affectedObject);
                         return null; // Ambiguous match -> give up
                     }
-                    matchedUser = action.username;
+                    matchedAction = action;
                 }
             }
         }
-        return matchedUser;
+        return matchedAction;
+    }
+
+    public String resolveUser(String affectedObject, long now) {
+        CliAction action = resolveAction(affectedObject, now);
+        return action != null ? action.username : null;
     }
 
     private boolean matches(CliAction action, String affectedObject) {
@@ -60,11 +65,11 @@ public class AsyncActionTracker {
         recentActions.removeIf(action -> action.timestamp <= now - TTL_MS);
     }
 
-    private static class CliAction {
-        final String username;
-        final String command;
-        final List<String> args;
-        final long timestamp;
+    public static class CliAction {
+        public final String username;
+        public final String command;
+        public final List<String> args;
+        public final long timestamp;
 
         CliAction(String username, String command, List<String> args, long timestamp) {
             this.username = username;

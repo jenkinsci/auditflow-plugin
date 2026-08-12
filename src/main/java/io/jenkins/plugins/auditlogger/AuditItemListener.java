@@ -21,16 +21,24 @@ public class AuditItemListener extends ItemListener {
     public void onCreated(Item item) {
         String target = item.getFullName();
         String user = currentUser(target);
-        log("JOB_CREATED", target,
-                String.format("Job created: %s (type: %s) by %s", target, item.getClass().getSimpleName(), user), user);
+        String details = String.format("Job created: %s (type: %s) by %s", target, item.getClass().getSimpleName(), user);
+        AsyncActionTracker.CliAction action = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
+        if (action != null && action.username.equals(user)) {
+            details += String.format(" [via CLI: %s]", action.command);
+        }
+        log("JOB_CREATED", target, details, user);
     }
 
     @Override
     public void onDeleted(Item item) {
         String target = item.getFullName();
         String user = currentUser(target);
-        log("JOB_DELETED", target,
-                String.format("Job deleted: %s by %s", target, user), user);
+        String details = String.format("Job deleted: %s by %s", target, user);
+        AsyncActionTracker.CliAction action = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
+        if (action != null && action.username.equals(user)) {
+            details += String.format(" [via CLI: %s]", action.command);
+        }
+        log("JOB_DELETED", target, details, user);
     }
 
     @Override
