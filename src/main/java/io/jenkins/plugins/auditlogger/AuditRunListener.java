@@ -105,8 +105,10 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
             
             AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(jobName, System.currentTimeMillis());
             String cliSuffix = "";
+            String actionName = "BUILD_STARTED";
             if (cliAction != null && cliAction.username.equals(user)) {
                 cliSuffix = String.format(" [via CLI: %s]", cliAction.command);
+                actionName = "[CLI] BUILD_STARTED";
             }
 
             String details = String.format("Build #%d started | Trigger: %s | Causes: [%s]%s%s",
@@ -115,7 +117,7 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
                     params.isEmpty() ? "" : " | Params: " + params,
                     cliSuffix);
 
-            AuditLogEntry entry = AuditLogEntry.withTrigger(user, "BUILD_STARTED", jobName, details, triggerType);
+            AuditLogEntry entry = AuditLogEntry.withTrigger(user, actionName, jobName, details, triggerType);
 
             // Capture source IP from RemoteCause (remote API triggers)
             for (Cause cause : run.getCauses()) {

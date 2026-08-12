@@ -145,6 +145,7 @@ public class AuditSaveableListener extends SaveableListener {
             AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
             if (actionObj != null && actionObj.username.equals(username)) {
                 details += String.format(" [via CLI: %s]", actionObj.command);
+                action = "[CLI] " + action;
             }
 
             
@@ -239,24 +240,38 @@ public class AuditSaveableListener extends SaveableListener {
             Set<String> added = new HashSet<>(currentIds);
             added.removeAll(previousIds);
             for (String id : added) {
-                AuditLogEntry entry = new AuditLogEntry(username, "CREDENTIAL_CREATED",
-                        id, String.format("Credential created: %s by %s", id, username));
+                String actionName = "CREDENTIAL_CREATED";
+                String details = String.format("Credential created: %s by %s", id, username);
+                AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(id, System.currentTimeMillis());
+                if (cliAction != null && cliAction.username.equals(username)) {
+                    details += String.format(" [via CLI: %s]", cliAction.command);
+                    actionName = "[CLI] " + actionName;
+                }
+                AuditLogEntry entry = new AuditLogEntry(username, actionName,
+                        id, details);
                 entry.setSeverity("INFO"); // Blue badge for creation
                 AuditLogStorage.getInstance().addEntry(entry);
-                LOGGER.log(Level.INFO, "CREDENTIAL_CREATED: id={0} by user={1}",
-                        new Object[]{id, username});
+                LOGGER.log(Level.INFO, "{0}: id={1} by user={2}",
+                        new Object[]{actionName, id, username});
             }
 
             // Detect removed credentials
             Set<String> removed = new HashSet<>(previousIds);
             removed.removeAll(currentIds);
             for (String id : removed) {
-                AuditLogEntry entry = new AuditLogEntry(username, "CREDENTIAL_DELETED",
-                        id, String.format("Credential deleted: %s by %s", id, username));
+                String actionName = "CREDENTIAL_DELETED";
+                String details = String.format("Credential deleted: %s by %s", id, username);
+                AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(id, System.currentTimeMillis());
+                if (cliAction != null && cliAction.username.equals(username)) {
+                    details += String.format(" [via CLI: %s]", cliAction.command);
+                    actionName = "[CLI] " + actionName;
+                }
+                AuditLogEntry entry = new AuditLogEntry(username, actionName,
+                        id, details);
                 entry.setSeverity("HIGH"); // Dark Orange badge for deletion
                 AuditLogStorage.getInstance().addEntry(entry);
-                LOGGER.log(Level.INFO, "CREDENTIAL_DELETED: id={0} by user={1}",
-                        new Object[]{id, username});
+                LOGGER.log(Level.INFO, "{0}: id={1} by user={2}",
+                        new Object[]{actionName, id, username});
             }
 
             // If no adds/removes but store was saved, credentials were modified.
@@ -273,13 +288,19 @@ public class AuditSaveableListener extends SaveableListener {
                     changedCreds = currentIds;
                 }
                 for (String credId : changedCreds) {
-                    AuditLogEntry entry = new AuditLogEntry(username, "CREDENTIAL_UPDATED",
-                            credId,
-                            String.format("Credential updated: %s by %s", credId, username));
+                    String actionName = "CREDENTIAL_UPDATED";
+                    String details = String.format("Credential updated: %s by %s", credId, username);
+                    AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(credId, System.currentTimeMillis());
+                    if (cliAction != null && cliAction.username.equals(username)) {
+                        details += String.format(" [via CLI: %s]", cliAction.command);
+                        actionName = "[CLI] " + actionName;
+                    }
+                    AuditLogEntry entry = new AuditLogEntry(username, actionName,
+                            credId, details);
                     entry.setSeverity("MEDIUM"); // Amber badge for updates
                     AuditLogStorage.getInstance().addEntry(entry);
-                    LOGGER.log(Level.INFO, "CREDENTIAL_UPDATED: id={0} by user={1}",
-                            new Object[]{credId, username});
+                    LOGGER.log(Level.INFO, "{0}: id={1} by user={2}",
+                            new Object[]{actionName, credId, username});
                 }
             }
         } catch (Exception e) {

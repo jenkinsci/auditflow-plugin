@@ -101,6 +101,12 @@ public class AuditComputerListener extends ComputerListener {
                 details = String.format("%s: %s", action, nodeName);
             }
 
+            AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(nodeName, System.currentTimeMillis());
+            if (cliAction != null && cliAction.username.equals(username)) {
+                details += String.format(" [via CLI: %s]", cliAction.command);
+                action = "[CLI] " + action;
+            }
+
             AuditLogEntry entry = new AuditLogEntry(username, action, nodeName, details);
             if ("NODE_LAUNCH_FAILURE".equals(action)) {
                 entry.setSeverity("CRITICAL"); // Red badge for agent launch failures

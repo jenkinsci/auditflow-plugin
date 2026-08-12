@@ -22,11 +22,13 @@ public class AuditItemListener extends ItemListener {
         String target = item.getFullName();
         String user = currentUser(target);
         String details = String.format("Job created: %s (type: %s) by %s", target, item.getClass().getSimpleName(), user);
+        String actionName = "JOB_CREATED";
         AsyncActionTracker.CliAction action = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
         if (action != null && action.username.equals(user)) {
             details += String.format(" [via CLI: %s]", action.command);
+            actionName = "[CLI] " + actionName;
         }
-        log("JOB_CREATED", target, details, user);
+        log(actionName, target, details, user);
     }
 
     @Override
@@ -34,11 +36,13 @@ public class AuditItemListener extends ItemListener {
         String target = item.getFullName();
         String user = currentUser(target);
         String details = String.format("Job deleted: %s by %s", target, user);
+        String actionName = "JOB_DELETED";
         AsyncActionTracker.CliAction action = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
         if (action != null && action.username.equals(user)) {
             details += String.format(" [via CLI: %s]", action.command);
+            actionName = "[CLI] " + actionName;
         }
-        log("JOB_DELETED", target, details, user);
+        log(actionName, target, details, user);
     }
 
     @Override

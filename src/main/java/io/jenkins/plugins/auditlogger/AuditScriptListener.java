@@ -42,6 +42,11 @@ public class AuditScriptListener implements ScriptListener {
                     username
             );
 
+            if ("GroovyCLI".equals(target)) {
+                action = "[CLI] " + action;
+                details += " [via CLI: groovy]";
+            }
+
             AuditLogEntry entry = new AuditLogEntry(username, action, target, details);
             entry.setSeverity(initScriptExecution ? "LOW" : "CRITICAL");
             AuditLogStorage.getInstance().addEntry(entry);

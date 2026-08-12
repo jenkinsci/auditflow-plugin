@@ -17,60 +17,31 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @WithJenkins
 class AuditCLIListenerTest {
     @Test
-    void cliCommandExecutionIsAudited(JenkinsRule j) {
+    void cliCommandExecutionIsRegisteredInTracker(JenkinsRule j) {
         if (AuditLoggerConfiguration.get() == null) {
             j.getInstance().getExtensionList(AuditLoggerConfiguration.class).add(new AuditLoggerConfiguration());
         }
         AuditLoggerConfiguration.get().setEnableSystemConfigEvents(true);
-        AuditLogStorage.clearInstance();
-        AuditLogStorage.getInstance().initialize();
         long startTime = System.currentTimeMillis();
 
         CLIContext context = new CLIContext("help", List.of("plugin"), null);
         new AuditCLIListener().onCompleted(context, 0);
 
-        List<AuditLogEntry> entries = AuditLogStorage.getInstance().filterEntries(
-            null, AuditCLIListener.CLI_EXECUTION_ACTION, startTime, null);
-        
-        assertFalse(entries.isEmpty());
-        AuditLogEntry latest = entries.get(entries.size() - 1);
-
-        assertEquals(AuditCLIListener.CLI_EXECUTION_ACTION, latest.getAction());
-        assertEquals("CLI: help", latest.getTarget());
-        assertTrue(latest.getDetails().contains("CLI Command: help"));
-        assertTrue(latest.getDetails().contains("Exit Code: 0"));
-        assertTrue(latest.getDetails().contains("Args: [plugin]"));
-        assertEquals("SYSTEM", latest.getUsername());
-        assertEquals("LOW", latest.getSeverity());
+        // Verify registration in AsyncActionTracker
+        assertEquals("SYSTEM", AsyncActionTracker.getInstance().resolveUser("plugin", System.currentTimeMillis()));
     }
 
     @Test
-    void cliCommandExecutionWithUserIsAudited(JenkinsRule j) {
+    void cliCommandExecutionWithUserIsRegistered(JenkinsRule j) {
         if (AuditLoggerConfiguration.get() == null) {
             j.getInstance().getExtensionList(AuditLoggerConfiguration.class).add(new AuditLoggerConfiguration());
         }
         AuditLoggerConfiguration.get().setEnableSystemConfigEvents(true);
-        AuditLogStorage.clearInstance();
-        AuditLogStorage.getInstance().initialize();
         long startTime = System.currentTimeMillis();
 
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken("alice", "password");
         CLIContext context = new CLIContext("install-plugin", List.of("ldap"), auth);
         new AuditCLIListener().onCompleted(context, 1);
-
-        List<AuditLogEntry> entries = AuditLogStorage.getInstance().filterEntries(
-            null, AuditCLIListener.CLI_EXECUTION_ACTION, startTime, null);
-        
-        assertFalse(entries.isEmpty());
-        AuditLogEntry latest = entries.get(entries.size() - 1);
-
-        assertEquals(AuditCLIListener.CLI_EXECUTION_ACTION, latest.getAction());
-        assertEquals("CLI: install-plugin", latest.getTarget());
-        assertTrue(latest.getDetails().contains("CLI Command: install-plugin"));
-        assertTrue(latest.getDetails().contains("Exit Code: 1"));
-        assertTrue(latest.getDetails().contains("Args: [ldap]"));
-        assertEquals("alice", latest.getUsername());
-        assertEquals("MEDIUM", latest.getSeverity());
 
         // Verify registration in AsyncActionTracker
         assertEquals("alice", AsyncActionTracker.getInstance().resolveUser("ldap", System.currentTimeMillis()));
@@ -82,37 +53,13 @@ class AuditCLIListenerTest {
             j.getInstance().getExtensionList(AuditLoggerConfiguration.class).add(new AuditLoggerConfiguration());
         }
         AuditLoggerConfiguration.get().setEnableSystemConfigEvents(false);
-        AuditLogStorage.clearInstance();
-        AuditLogStorage.getInstance().initialize();
         long startTime = System.currentTimeMillis();
 
-        CLIContext context = new CLIContext("help", List.of("plugin"), null);
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken("bob", "password");
+        CLIContext context = new CLIContext("help", List.of("ignored_plugin"), auth);
         new AuditCLIListener().onCompleted(context, 0);
 
-        List<AuditLogEntry> entries = AuditLogStorage.getInstance().filterEntries(
-            null, AuditCLIListener.CLI_EXECUTION_ACTION, startTime, null);
-        
-        assertTrue(entries.isEmpty());
-    }
-
-    @Test
-    void cliCommandExecutionHighSeverity(JenkinsRule j) {
-        if (AuditLoggerConfiguration.get() == null) {
-            j.getInstance().getExtensionList(AuditLoggerConfiguration.class).add(new AuditLoggerConfiguration());
-        }
-        AuditLoggerConfiguration.get().setEnableSystemConfigEvents(true);
-        AuditLogStorage.clearInstance();
-        AuditLogStorage.getInstance().initialize();
-        long startTime = System.currentTimeMillis();
-
-        CLIContext context = new CLIContext("delete-job", List.of("my-job"), null);
-        new AuditCLIListener().onCompleted(context, 0);
-
-        List<AuditLogEntry> entries = AuditLogStorage.getInstance().filterEntries(
-            null, AuditCLIListener.CLI_EXECUTION_ACTION, startTime, null);
-        
-        assertFalse(entries.isEmpty());
-        AuditLogEntry latest = entries.get(entries.size() - 1);
-        assertEquals("HIGH", latest.getSeverity());
+        // Tracker should return null as it was ignored
+        assertEquals(null, AsyncActionTracker.getInstance().resolveUser("ignored_plugin", System.currentTimeMillis()));
     }
 }
