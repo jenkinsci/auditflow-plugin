@@ -142,7 +142,7 @@ public class AuditSaveableListener extends SaveableListener {
                 details = String.format("Global system configuration updated: %s by %s", target, username);
             }
 
-            AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
+            AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(target, action, System.currentTimeMillis());
             if (actionObj != null && (username == null || actionObj.username.equals(username))) {
                 if (!details.contains("[via CLI:")) {
                     details += String.format(" [via CLI: %s]", actionObj.command);

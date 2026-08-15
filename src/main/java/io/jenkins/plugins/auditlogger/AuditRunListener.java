@@ -103,7 +103,7 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
 
             String params = extractParameters(run);
             
-            AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(jobName, System.currentTimeMillis());
+            AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(jobName, "BUILD_STARTED", System.currentTimeMillis());
             String cliSuffix = "";
             String actionName = "BUILD_STARTED";
             if (cliAction != null && (user == null || cliAction.username.equals(user))) {

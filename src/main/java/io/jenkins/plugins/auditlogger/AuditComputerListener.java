@@ -101,7 +101,7 @@ public class AuditComputerListener extends ComputerListener {
                 details = String.format("%s: %s", action, nodeName);
             }
 
-            AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(nodeName, System.currentTimeMillis());
+            AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(nodeName, action, System.currentTimeMillis());
             String baseAction = action;
             if (cliAction != null && (username == null || cliAction.username.equals(username))) {
                 if (!details.contains("[via CLI:")) {

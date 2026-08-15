@@ -86,7 +86,7 @@ public class AuditNodeListener extends NodeListener {
 
             String details = formatNodeUpdateDetails(oldNode, newNode, username);
             String actionName = "NODE_UPDATED";
-            AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(nodeName, System.currentTimeMillis());
+            AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(nodeName, actionName, System.currentTimeMillis());
             if (actionObj != null && (username == null || actionObj.username.equals(username))) {
                 if (!details.contains("[via CLI:")) {
                     details += String.format(" [via CLI: %s]", actionObj.command);
@@ -162,7 +162,7 @@ public class AuditNodeListener extends NodeListener {
                     ? String.format(detailsTemplate, nodeName, node.getClass().getSimpleName(), username)
                     : String.format(detailsTemplate, nodeName, username);
 
-            AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(nodeName, System.currentTimeMillis());
+            AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(nodeName, baseAction, System.currentTimeMillis());
             if (actionObj != null && (username == null || actionObj.username.equals(username))) {
                 if (!details.contains("[via CLI:")) {
                     details += String.format(" [via CLI: %s]", actionObj.command);

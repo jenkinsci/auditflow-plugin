@@ -57,7 +57,7 @@ public class AuditItemListener extends ItemListener {
     }
 
     private void checkCliAndLog(String actionName, String target, String details, String user) {
-        AsyncActionTracker.CliAction action = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
+        AsyncActionTracker.CliAction action = AsyncActionTracker.getInstance().resolveAction(target, actionName, System.currentTimeMillis());
         if (action != null && (user == null || action.username.equals(user))) {
             if (!details.contains("[via CLI:")) {
                 details += String.format(" [via CLI: %s]", action.command);
