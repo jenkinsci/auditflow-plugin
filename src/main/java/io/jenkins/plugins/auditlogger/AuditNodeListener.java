@@ -85,7 +85,33 @@ public class AuditNodeListener extends NodeListener {
             StartupPhaseManager.markAsLogged("NODE_UPDATED_RECENT:" + nodeName);
 
             String details = formatNodeUpdateDetails(oldNode, newNode, username);
-            AuditLogEntry entry = new AuditLogEntry(username, "NODE_UPDATED", nodeName, details);
+            String actionName = "NODE_UPDATED";
+            boolean isCli = false;
+            String cliCmdName = null;
+
+            try {
+                hudson.cli.CLICommand currentCmd = hudson.cli.CLICommand.getCurrent();
+                if (currentCmd != null) {
+                    isCli = true;
+                    cliCmdName = currentCmd.getName();
+                }
+            } catch (Throwable ignored) {}
+
+            if (!isCli) {
+                AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(nodeName, actionName, System.currentTimeMillis());
+                if (actionObj != null && (username == null || actionObj.username.equals(username))) {
+                    isCli = true;
+                    cliCmdName = actionObj.command;
+                }
+            }
+
+            if (isCli) {
+                if (cliCmdName != null && !details.contains("[via CLI:")) {
+                    details += String.format(" [via CLI: %s]", cliCmdName);
+                }
+                actionName = "[CLI] " + actionName;
+            }
+            AuditLogEntry entry = new AuditLogEntry(username, actionName, nodeName, details);
             entry.setSeverity("MEDIUM"); // Amber badge for NODE_UPDATED configuration changes
             AuditLogStorage.getInstance().addEntry(entry);
             LOGGER.log(Level.INFO, "Node Event: NODE_UPDATED on {0} by {1}", new Object[]{nodeName, username});
@@ -149,13 +175,41 @@ public class AuditNodeListener extends NodeListener {
             }
             StartupPhaseManager.markAsLogged(duplicateKey);
 
-            String details = "NODE_CREATED".equals(action)
+            String baseAction = action;
+            String details = "NODE_CREATED".equals(baseAction)
                     ? String.format(detailsTemplate, nodeName, node.getClass().getSimpleName(), username)
                     : String.format(detailsTemplate, nodeName, username);
+
+            boolean isCli = false;
+            String cliCmdName = null;
+
+            try {
+                hudson.cli.CLICommand currentCmd = hudson.cli.CLICommand.getCurrent();
+                if (currentCmd != null) {
+                    isCli = true;
+                    cliCmdName = currentCmd.getName();
+                }
+            } catch (Throwable ignored) {}
+
+            if (!isCli) {
+                AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(nodeName, baseAction, System.currentTimeMillis());
+                if (actionObj != null && (username == null || actionObj.username.equals(username))) {
+                    isCli = true;
+                    cliCmdName = actionObj.command;
+                }
+            }
+
+            if (isCli) {
+                if (cliCmdName != null && !details.contains("[via CLI:")) {
+                    details += String.format(" [via CLI: %s]", cliCmdName);
+                }
+                action = "[CLI] " + action;
+            }
+
             AuditLogEntry entry = new AuditLogEntry(username, action, nodeName, details);
-            if ("NODE_CREATED".equals(action)) {
+            if ("NODE_CREATED".equals(baseAction)) {
                 entry.setSeverity("INFO"); // Blue badge for NODE_CREATED
-            } else if ("NODE_DELETED".equals(action)) {
+            } else if ("NODE_DELETED".equals(baseAction)) {
                 entry.setSeverity("HIGH"); // Dark Orange badge for NODE_DELETED
             }
             AuditLogStorage.getInstance().addEntry(entry);

@@ -102,12 +102,40 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
             }
 
             String params = extractParameters(run);
-            String details = String.format("Build #%d started | Trigger: %s | Causes: [%s]%s",
+            
+            boolean isCli = false;
+            String cliCmdName = null;
+
+            try {
+                hudson.cli.CLICommand currentCmd = hudson.cli.CLICommand.getCurrent();
+                if (currentCmd != null) {
+                    isCli = true;
+                    cliCmdName = currentCmd.getName();
+                }
+            } catch (Throwable ignored) {}
+
+            if (!isCli) {
+                AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(jobName, "BUILD_STARTED", System.currentTimeMillis());
+                if (cliAction != null && (user == null || cliAction.username.equals(user))) {
+                    isCli = true;
+                    cliCmdName = cliAction.command;
+                }
+            }
+
+            String cliSuffix = "";
+            String actionName = "BUILD_STARTED";
+            if (isCli) {
+                cliSuffix = cliCmdName != null ? String.format(" [via CLI: %s]", cliCmdName) : " [via CLI]";
+                actionName = "[CLI] BUILD_STARTED";
+            }
+
+            String details = String.format("Build #%d started | Trigger: %s | Causes: [%s]%s%s",
                     buildNum, triggerType,
                     String.join("; ", triggerDetails),
-                    params.isEmpty() ? "" : " | Params: " + params);
+                    params.isEmpty() ? "" : " | Params: " + params,
+                    cliSuffix);
 
-            AuditLogEntry entry = AuditLogEntry.withTrigger(user, "BUILD_STARTED", jobName, details, triggerType);
+            AuditLogEntry entry = AuditLogEntry.withTrigger(user, actionName, jobName, details, triggerType);
 
             // Capture source IP from RemoteCause (remote API triggers)
             for (Cause cause : run.getCauses()) {

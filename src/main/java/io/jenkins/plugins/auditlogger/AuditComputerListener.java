@@ -101,10 +101,39 @@ public class AuditComputerListener extends ComputerListener {
                 details = String.format("%s: %s", action, nodeName);
             }
 
+            boolean isCli = false;
+            String cliCmdName = null;
+
+            try {
+                hudson.cli.CLICommand currentCmd = hudson.cli.CLICommand.getCurrent();
+                if (currentCmd != null) {
+                    isCli = true;
+                    cliCmdName = currentCmd.getName();
+                }
+            } catch (Throwable ignored) {}
+
+            if (!isCli) {
+                AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(nodeName, action, System.currentTimeMillis());
+                if (cliAction != null && (username == null || cliAction.username.equals(username))) {
+                    isCli = true;
+                    cliCmdName = cliAction.command;
+                }
+            }
+
+            String baseAction = action;
+            if (isCli) {
+                if (cliCmdName != null && !details.contains("[via CLI:")) {
+                    details += String.format(" [via CLI: %s]", cliCmdName);
+                }
+                if (!action.startsWith("[CLI] ")) {
+                    action = "[CLI] " + action;
+                }
+            }
+
             AuditLogEntry entry = new AuditLogEntry(username, action, nodeName, details);
-            if ("NODE_LAUNCH_FAILURE".equals(action)) {
+            if ("NODE_LAUNCH_FAILURE".equals(baseAction)) {
                 entry.setSeverity("CRITICAL"); // Red badge for agent launch failures
-            } else if ("NODE_TEMPORARILY_OFFLINE".equals(action) || "NODE_OFFLINE".equals(action)) {
+            } else if ("NODE_TEMPORARILY_OFFLINE".equals(baseAction) || "NODE_OFFLINE".equals(baseAction)) {
                 entry.setSeverity("HIGH"); // Orange badge
             } else {
                 entry.setSeverity("LOW"); // Green badge for NODE_ONLINE and other computer events
