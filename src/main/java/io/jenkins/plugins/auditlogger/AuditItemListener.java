@@ -22,13 +22,7 @@ public class AuditItemListener extends ItemListener {
         String target = item.getFullName();
         String user = currentUser(target);
         String details = String.format("Job created: %s (type: %s) by %s", target, item.getClass().getSimpleName(), user);
-        String actionName = "JOB_CREATED";
-        AsyncActionTracker.CliAction action = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
-        if (action != null && action.username.equals(user)) {
-            details += String.format(" [via CLI: %s]", action.command);
-            actionName = "[CLI] " + actionName;
-        }
-        log(actionName, target, details, user);
+        checkCliAndLog("JOB_CREATED", target, details, user);
     }
 
     @Override
@@ -36,36 +30,60 @@ public class AuditItemListener extends ItemListener {
         String target = item.getFullName();
         String user = currentUser(target);
         String details = String.format("Job deleted: %s by %s", target, user);
-        String actionName = "JOB_DELETED";
-        AsyncActionTracker.CliAction action = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
-        if (action != null && action.username.equals(user)) {
-            details += String.format(" [via CLI: %s]", action.command);
-            actionName = "[CLI] " + actionName;
-        }
-        log(actionName, target, details, user);
+        checkCliAndLog("JOB_DELETED", target, details, user);
     }
 
     @Override
     public void onRenamed(Item item, String oldName, String newName) {
         String target = item.getFullName();
         String user = currentUser(target);
-        log("JOB_RENAMED", target,
-                String.format("Job renamed from '%s' to '%s' by %s", oldName, newName, user), user);
+        String details = String.format("Job renamed from '%s' to '%s' by %s", oldName, newName, user);
+        checkCliAndLog("JOB_RENAMED", target, details, user);
     }
 
     @Override
     public void onCopied(Item src, Item copy) {
         String target = copy.getFullName();
         String user = currentUser(target);
-        log("JOB_COPIED", target,
-                String.format("Job copied from '%s' by %s", src.getFullName(), user), user);
+        String details = String.format("Job copied from '%s' by %s", src.getFullName(), user);
+        checkCliAndLog("JOB_COPIED", target, details, user);
     }
 
     @Override
     public void onLocationChanged(Item item, String oldFullName, String newFullName) {
         String user = currentUser(newFullName);
-        log("JOB_MOVED", newFullName,
-                String.format("Job moved from '%s' by %s", oldFullName, user), user);
+        String details = String.format("Job moved from '%s' by %s", oldFullName, user);
+        checkCliAndLog("JOB_MOVED", newFullName, details, user);
+    }
+
+    private void checkCliAndLog(String actionName, String target, String details, String user) {
+        boolean isCli = false;
+        String cliCmdName = null;
+        try {
+            jenkins.cli.CLICommand cliCmd = jenkins.cli.CLICommand.getCLICommand();
+            if (cliCmd != null) {
+                isCli = true;
+                cliCmdName = cliCmd.getName();
+            }
+        } catch (Throwable ignored) {}
+
+        if (!isCli) {
+            AsyncActionTracker.CliAction action = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
+            if (action != null && (user == null || action.username.equals(user))) {
+                isCli = true;
+                cliCmdName = action.command;
+            }
+        }
+
+        if (isCli) {
+            if (cliCmdName != null && !details.contains("[via CLI:")) {
+                details += String.format(" [via CLI: %s]", cliCmdName);
+            }
+            if (!actionName.startsWith("[CLI] ")) {
+                actionName = "[CLI] " + actionName;
+            }
+        }
+        log(actionName, target, details, user);
     }
 
     private void log(String action, String target, String details, String username) {
