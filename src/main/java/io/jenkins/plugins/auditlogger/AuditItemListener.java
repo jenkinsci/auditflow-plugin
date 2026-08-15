@@ -57,27 +57,10 @@ public class AuditItemListener extends ItemListener {
     }
 
     private void checkCliAndLog(String actionName, String target, String details, String user) {
-        boolean isCli = false;
-        String cliCmdName = null;
-        try {
-            hudson.cli.CLICommand cliCmd = hudson.cli.CLICommand.getCLICommand();
-            if (cliCmd != null) {
-                isCli = true;
-                cliCmdName = cliCmd.getName();
-            }
-        } catch (Throwable ignored) {}
-
-        if (!isCli) {
-            AsyncActionTracker.CliAction action = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
-            if (action != null && (user == null || action.username.equals(user))) {
-                isCli = true;
-                cliCmdName = action.command;
-            }
-        }
-
-        if (isCli) {
-            if (cliCmdName != null && !details.contains("[via CLI:")) {
-                details += String.format(" [via CLI: %s]", cliCmdName);
+        AsyncActionTracker.CliAction action = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
+        if (action != null && (user == null || action.username.equals(user))) {
+            if (!details.contains("[via CLI:")) {
+                details += String.format(" [via CLI: %s]", action.command);
             }
             if (!actionName.startsWith("[CLI] ")) {
                 actionName = "[CLI] " + actionName;

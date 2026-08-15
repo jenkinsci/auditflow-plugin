@@ -101,28 +101,11 @@ public class AuditComputerListener extends ComputerListener {
                 details = String.format("%s: %s", action, nodeName);
             }
 
-            boolean isCli = false;
-            String cliCmdName = null;
-            try {
-                hudson.cli.CLICommand cliCmd = hudson.cli.CLICommand.getCLICommand();
-                if (cliCmd != null) {
-                    isCli = true;
-                    cliCmdName = cliCmd.getName();
-                }
-            } catch (Throwable ignored) {}
-
-            if (!isCli) {
-                AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(nodeName, System.currentTimeMillis());
-                if (cliAction != null && (username == null || cliAction.username.equals(username))) {
-                    isCli = true;
-                    cliCmdName = cliAction.command;
-                }
-            }
-
+            AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(nodeName, System.currentTimeMillis());
             String baseAction = action;
-            if (isCli) {
-                if (cliCmdName != null && !details.contains("[via CLI:")) {
-                    details += String.format(" [via CLI: %s]", cliCmdName);
+            if (cliAction != null && (username == null || cliAction.username.equals(username))) {
+                if (!details.contains("[via CLI:")) {
+                    details += String.format(" [via CLI: %s]", cliAction.command);
                 }
                 if (!action.startsWith("[CLI] ")) {
                     action = "[CLI] " + action;

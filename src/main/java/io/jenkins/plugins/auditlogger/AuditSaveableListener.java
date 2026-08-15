@@ -142,27 +142,10 @@ public class AuditSaveableListener extends SaveableListener {
                 details = String.format("Global system configuration updated: %s by %s", target, username);
             }
 
-            boolean isCli = false;
-            String cliCmdName = null;
-            try {
-                hudson.cli.CLICommand cliCmd = hudson.cli.CLICommand.getCLICommand();
-                if (cliCmd != null) {
-                    isCli = true;
-                    cliCmdName = cliCmd.getName();
-                }
-            } catch (Throwable ignored) {}
-
-            if (!isCli) {
-                AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
-                if (actionObj != null && (username == null || actionObj.username.equals(username))) {
-                    isCli = true;
-                    cliCmdName = actionObj.command;
-                }
-            }
-
-            if (isCli) {
-                if (cliCmdName != null && !details.contains("[via CLI:")) {
-                    details += String.format(" [via CLI: %s]", cliCmdName);
+            AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(target, System.currentTimeMillis());
+            if (actionObj != null && (username == null || actionObj.username.equals(username))) {
+                if (!details.contains("[via CLI:")) {
+                    details += String.format(" [via CLI: %s]", actionObj.command);
                 }
                 action = "[CLI] " + action;
             }
