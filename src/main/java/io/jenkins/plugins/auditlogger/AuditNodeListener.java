@@ -86,10 +86,28 @@ public class AuditNodeListener extends NodeListener {
 
             String details = formatNodeUpdateDetails(oldNode, newNode, username);
             String actionName = "NODE_UPDATED";
-            AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(nodeName, actionName, System.currentTimeMillis());
-            if (actionObj != null && (username == null || actionObj.username.equals(username))) {
-                if (!details.contains("[via CLI:")) {
-                    details += String.format(" [via CLI: %s]", actionObj.command);
+            boolean isCli = false;
+            String cliCmdName = null;
+
+            try {
+                hudson.cli.CLICommand currentCmd = hudson.cli.CLICommand.getCurrent();
+                if (currentCmd != null) {
+                    isCli = true;
+                    cliCmdName = currentCmd.getName();
+                }
+            } catch (Throwable ignored) {}
+
+            if (!isCli) {
+                AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(nodeName, actionName, System.currentTimeMillis());
+                if (actionObj != null && (username == null || actionObj.username.equals(username))) {
+                    isCli = true;
+                    cliCmdName = actionObj.command;
+                }
+            }
+
+            if (isCli) {
+                if (cliCmdName != null && !details.contains("[via CLI:")) {
+                    details += String.format(" [via CLI: %s]", cliCmdName);
                 }
                 actionName = "[CLI] " + actionName;
             }
@@ -162,10 +180,28 @@ public class AuditNodeListener extends NodeListener {
                     ? String.format(detailsTemplate, nodeName, node.getClass().getSimpleName(), username)
                     : String.format(detailsTemplate, nodeName, username);
 
-            AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(nodeName, baseAction, System.currentTimeMillis());
-            if (actionObj != null && (username == null || actionObj.username.equals(username))) {
-                if (!details.contains("[via CLI:")) {
-                    details += String.format(" [via CLI: %s]", actionObj.command);
+            boolean isCli = false;
+            String cliCmdName = null;
+
+            try {
+                hudson.cli.CLICommand currentCmd = hudson.cli.CLICommand.getCurrent();
+                if (currentCmd != null) {
+                    isCli = true;
+                    cliCmdName = currentCmd.getName();
+                }
+            } catch (Throwable ignored) {}
+
+            if (!isCli) {
+                AsyncActionTracker.CliAction actionObj = AsyncActionTracker.getInstance().resolveAction(nodeName, baseAction, System.currentTimeMillis());
+                if (actionObj != null && (username == null || actionObj.username.equals(username))) {
+                    isCli = true;
+                    cliCmdName = actionObj.command;
+                }
+            }
+
+            if (isCli) {
+                if (cliCmdName != null && !details.contains("[via CLI:")) {
+                    details += String.format(" [via CLI: %s]", cliCmdName);
                 }
                 action = "[CLI] " + action;
             }

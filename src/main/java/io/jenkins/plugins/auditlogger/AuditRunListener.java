@@ -103,11 +103,29 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
 
             String params = extractParameters(run);
             
-            AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(jobName, "BUILD_STARTED", System.currentTimeMillis());
+            boolean isCli = false;
+            String cliCmdName = null;
+
+            try {
+                hudson.cli.CLICommand currentCmd = hudson.cli.CLICommand.getCurrent();
+                if (currentCmd != null) {
+                    isCli = true;
+                    cliCmdName = currentCmd.getName();
+                }
+            } catch (Throwable ignored) {}
+
+            if (!isCli) {
+                AsyncActionTracker.CliAction cliAction = AsyncActionTracker.getInstance().resolveAction(jobName, "BUILD_STARTED", System.currentTimeMillis());
+                if (cliAction != null && (user == null || cliAction.username.equals(user))) {
+                    isCli = true;
+                    cliCmdName = cliAction.command;
+                }
+            }
+
             String cliSuffix = "";
             String actionName = "BUILD_STARTED";
-            if (cliAction != null && (user == null || cliAction.username.equals(user))) {
-                cliSuffix = String.format(" [via CLI: %s]", cliAction.command);
+            if (isCli) {
+                cliSuffix = cliCmdName != null ? String.format(" [via CLI: %s]", cliCmdName) : " [via CLI]";
                 actionName = "[CLI] BUILD_STARTED";
             }
 
