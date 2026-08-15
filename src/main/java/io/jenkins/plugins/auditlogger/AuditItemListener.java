@@ -60,7 +60,7 @@ public class AuditItemListener extends ItemListener {
         boolean isCli = false;
         String cliCmdName = null;
         try {
-            jenkins.cli.CLICommand cliCmd = jenkins.cli.CLICommand.getCLICommand();
+            hudson.cli.CLICommand cliCmd = hudson.cli.CLICommand.getCLICommand();
             if (cliCmd != null) {
                 isCli = true;
                 cliCmdName = cliCmd.getName();
