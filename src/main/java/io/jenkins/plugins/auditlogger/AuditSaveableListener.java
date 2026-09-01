@@ -114,12 +114,25 @@ public class AuditSaveableListener extends SaveableListener {
             String action;
             String target;
 
+            boolean isSecurityConfig = isSystem && (
+                o.getClass().getName().toLowerCase().contains("security") ||
+                o.getClass().getName().toLowerCase().contains("authorization") ||
+                o.getClass().getName().toLowerCase().contains("realm") ||
+                o.getClass().getName().toLowerCase().contains("permission") ||
+                o.getClass().getName().toLowerCase().contains("matrix") ||
+                o.getClass().getName().toLowerCase().contains("role")
+            );
+
             if (isJob) {
                 action = "JOB_CONFIG_UPDATED";
                 target = ((Job<?, ?>) o).getFullName();
             } else if (isUser) {
-                action = "USER_CONFIG_UPDATED";
                 target = ((User) o).getId();
+                boolean isNewUser = file != null && !file.exists();
+                action = isNewUser ? "USER_CREATED" : "USER_CONFIG_UPDATED";
+            } else if (isSecurityConfig) {
+                action = "SECURITY_CONFIG_UPDATED";
+                target = o.getClass().getSimpleName();
             } else {
                 action = "GLOBAL_CONFIG_UPDATED";
                 target = o.getClass().getSimpleName();

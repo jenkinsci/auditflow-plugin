@@ -88,6 +88,22 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private boolean anomalyBuildFailures = false;
     private int anomalyBuildFailuresThreshold = 5;
 
+    // Phase 2 — Expanded Security Anomaly Detection
+    private boolean anomalyUnusualIp = false;
+    private int anomalyUnusualIpWindowMinutes = 60;
+
+    private boolean anomalyMultiIpLogin = false;
+    private int anomalyMultiIpLoginThreshold = 2;
+    private int anomalyMultiIpLoginWindowMinutes = 15;
+
+    private boolean anomalySuspiciousAuth = false;
+
+    private boolean anomalyAdminPrivilegeChanges = false;
+
+    private boolean anomalyUserLifecycle = false;
+    private int anomalyUserLifecycleThreshold = 1;
+    private int anomalyUserLifecycleWindowMinutes = 15;
+
     // Backward-compat aliases (kept for code that still reads old names)
     private boolean enableFailedLoginDetection = true;
     private int failedLoginThreshold = 5;
@@ -227,6 +243,37 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         }
         if (failedLoginConfig.has("anomalyFailedLoginsWindowMinutes")) {
             setAnomalyFailedLoginsWindowMinutes(failedLoginConfig.optInt("anomalyFailedLoginsWindowMinutes", anomalyFailedLoginsWindowMinutes));
+        }
+
+        // Phase 2 Anomaly Detection Blocks
+        JSONObject unusualIpBlock = getOptionalBlock(json, "anomalyUnusualIp");
+        setAnomalyUnusualIp(isOptionalBlockEnabled(json, "anomalyUnusualIp"));
+        JSONObject unusualIpConfig = unusualIpBlock != null ? unusualIpBlock : json;
+        if (unusualIpConfig.has("anomalyUnusualIpWindowMinutes")) {
+            setAnomalyUnusualIpWindowMinutes(unusualIpConfig.optInt("anomalyUnusualIpWindowMinutes", anomalyUnusualIpWindowMinutes));
+        }
+
+        JSONObject multiIpBlock = getOptionalBlock(json, "anomalyMultiIpLogin");
+        setAnomalyMultiIpLogin(isOptionalBlockEnabled(json, "anomalyMultiIpLogin"));
+        JSONObject multiIpConfig = multiIpBlock != null ? multiIpBlock : json;
+        if (multiIpConfig.has("anomalyMultiIpLoginThreshold")) {
+            setAnomalyMultiIpLoginThreshold(multiIpConfig.optInt("anomalyMultiIpLoginThreshold", anomalyMultiIpLoginThreshold));
+        }
+        if (multiIpConfig.has("anomalyMultiIpLoginWindowMinutes")) {
+            setAnomalyMultiIpLoginWindowMinutes(multiIpConfig.optInt("anomalyMultiIpLoginWindowMinutes", anomalyMultiIpLoginWindowMinutes));
+        }
+
+        setAnomalySuspiciousAuth(json.optBoolean("anomalySuspiciousAuth", false));
+        setAnomalyAdminPrivilegeChanges(json.optBoolean("anomalyAdminPrivilegeChanges", false));
+
+        JSONObject userLifecycleBlock = getOptionalBlock(json, "anomalyUserLifecycle");
+        setAnomalyUserLifecycle(isOptionalBlockEnabled(json, "anomalyUserLifecycle"));
+        JSONObject userLifecycleConfig = userLifecycleBlock != null ? userLifecycleBlock : json;
+        if (userLifecycleConfig.has("anomalyUserLifecycleThreshold")) {
+            setAnomalyUserLifecycleThreshold(userLifecycleConfig.optInt("anomalyUserLifecycleThreshold", anomalyUserLifecycleThreshold));
+        }
+        if (userLifecycleConfig.has("anomalyUserLifecycleWindowMinutes")) {
+            setAnomalyUserLifecycleWindowMinutes(userLifecycleConfig.optInt("anomalyUserLifecycleWindowMinutes", anomalyUserLifecycleWindowMinutes));
         }
 
         // ── Dashboard display toggles ──
@@ -386,6 +433,56 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     @DataBoundSetter
     public void setAnomalyFailedLoginsWindowMinutes(int anomalyFailedLoginsWindowMinutes) {
         this.anomalyFailedLoginsWindowMinutes = clamp(anomalyFailedLoginsWindowMinutes, 1, 1440);
+    }
+
+    @DataBoundSetter
+    public void setAnomalyUnusualIp(boolean anomalyUnusualIp) {
+        this.anomalyUnusualIp = anomalyUnusualIp;
+    }
+
+    @DataBoundSetter
+    public void setAnomalyUnusualIpWindowMinutes(int anomalyUnusualIpWindowMinutes) {
+        this.anomalyUnusualIpWindowMinutes = clamp(anomalyUnusualIpWindowMinutes, 1, 1440);
+    }
+
+    @DataBoundSetter
+    public void setAnomalyMultiIpLogin(boolean anomalyMultiIpLogin) {
+        this.anomalyMultiIpLogin = anomalyMultiIpLogin;
+    }
+
+    @DataBoundSetter
+    public void setAnomalyMultiIpLoginThreshold(int anomalyMultiIpLoginThreshold) {
+        this.anomalyMultiIpLoginThreshold = clamp(anomalyMultiIpLoginThreshold, 2, 100);
+    }
+
+    @DataBoundSetter
+    public void setAnomalyMultiIpLoginWindowMinutes(int anomalyMultiIpLoginWindowMinutes) {
+        this.anomalyMultiIpLoginWindowMinutes = clamp(anomalyMultiIpLoginWindowMinutes, 1, 1440);
+    }
+
+    @DataBoundSetter
+    public void setAnomalySuspiciousAuth(boolean anomalySuspiciousAuth) {
+        this.anomalySuspiciousAuth = anomalySuspiciousAuth;
+    }
+
+    @DataBoundSetter
+    public void setAnomalyAdminPrivilegeChanges(boolean anomalyAdminPrivilegeChanges) {
+        this.anomalyAdminPrivilegeChanges = anomalyAdminPrivilegeChanges;
+    }
+
+    @DataBoundSetter
+    public void setAnomalyUserLifecycle(boolean anomalyUserLifecycle) {
+        this.anomalyUserLifecycle = anomalyUserLifecycle;
+    }
+
+    @DataBoundSetter
+    public void setAnomalyUserLifecycleThreshold(int anomalyUserLifecycleThreshold) {
+        this.anomalyUserLifecycleThreshold = clamp(anomalyUserLifecycleThreshold, 1, 100);
+    }
+
+    @DataBoundSetter
+    public void setAnomalyUserLifecycleWindowMinutes(int anomalyUserLifecycleWindowMinutes) {
+        this.anomalyUserLifecycleWindowMinutes = clamp(anomalyUserLifecycleWindowMinutes, 1, 1440);
     }
 
 
@@ -585,6 +682,18 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public int getAnomalyBuildFailuresThreshold() { return anomalyBuildFailuresThreshold; }
     public boolean isEnableAdminOffHoursAlert() { return enableAdminOffHoursAlert; }
 
+    // Phase 2 getters
+    public boolean isAnomalyUnusualIp() { return anomalyUnusualIp; }
+    public int getAnomalyUnusualIpWindowMinutes() { return anomalyUnusualIpWindowMinutes; }
+    public boolean isAnomalyMultiIpLogin() { return anomalyMultiIpLogin; }
+    public int getAnomalyMultiIpLoginThreshold() { return anomalyMultiIpLoginThreshold; }
+    public int getAnomalyMultiIpLoginWindowMinutes() { return anomalyMultiIpLoginWindowMinutes; }
+    public boolean isAnomalySuspiciousAuth() { return anomalySuspiciousAuth; }
+    public boolean isAnomalyAdminPrivilegeChanges() { return anomalyAdminPrivilegeChanges; }
+    public boolean isAnomalyUserLifecycle() { return anomalyUserLifecycle; }
+    public int getAnomalyUserLifecycleThreshold() { return anomalyUserLifecycleThreshold; }
+    public int getAnomalyUserLifecycleWindowMinutes() { return anomalyUserLifecycleWindowMinutes; }
+
     public int getLogRetentionDays() { return logRetentionDays; }
     public int getMaxLogFileSizeMB() { return maxLogFileSizeMB; }
     public long getMaxLogFileSizeBytes() { return (long) maxLogFileSizeMB * 1024L * 1024L; }
@@ -672,6 +781,16 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         anomalyConfig.put("jobConfigChangesThreshold", anomalyJobConfigChangesThreshold);
         anomalyConfig.put("securityConfigChangesThreshold", anomalySecurityConfigChangesThreshold);
         anomalyConfig.put("buildFailuresThreshold", anomalyBuildFailuresThreshold);
+        anomalyConfig.put("unusualIpEnabled", anomalyUnusualIp);
+        anomalyConfig.put("unusualIpWindowMinutes", anomalyUnusualIpWindowMinutes);
+        anomalyConfig.put("multiIpLoginEnabled", anomalyMultiIpLogin);
+        anomalyConfig.put("multiIpLoginThreshold", anomalyMultiIpLoginThreshold);
+        anomalyConfig.put("multiIpLoginWindowMinutes", anomalyMultiIpLoginWindowMinutes);
+        anomalyConfig.put("suspiciousAuthEnabled", anomalySuspiciousAuth);
+        anomalyConfig.put("adminPrivilegeChangesEnabled", anomalyAdminPrivilegeChanges);
+        anomalyConfig.put("userLifecycleEnabled", anomalyUserLifecycle);
+        anomalyConfig.put("userLifecycleThreshold", anomalyUserLifecycleThreshold);
+        anomalyConfig.put("userLifecycleWindowMinutes", anomalyUserLifecycleWindowMinutes);
         return new com.google.gson.Gson().toJson(anomalyConfig);
     }
 

@@ -44,8 +44,15 @@ public class AnomalyDetector {
     private static final Logger LOGGER = Logger.getLogger(AnomalyDetector.class.getName());
 
     public enum AnomalyType {
-        BRUTE_FORCE_LOGIN, UNUSUAL_IP, MASS_CHANGES,
-        AFTER_HOURS_ADMIN, CREDENTIAL_EXPOSURE
+        BRUTE_FORCE_LOGIN,
+        UNUSUAL_IP,
+        MULTI_IP_LOGIN,
+        SUSPICIOUS_AUTH_PATTERN,
+        ADMIN_PRIVILEGE_CHANGE,
+        USER_LIFECYCLE_ANOMALY,
+        MASS_CHANGES,
+        AFTER_HOURS_ADMIN,
+        CREDENTIAL_EXPOSURE
     }
 
     public static class AnomalyAlert {
@@ -90,7 +97,30 @@ public class AnomalyDetector {
         private long lastObserved;
     }
 
+    private static final class LoginRecord {
+        final String ip;
+        final long timestamp;
+        LoginRecord(String ip, long timestamp) {
+            this.ip = ip;
+            this.timestamp = timestamp;
+        }
+    }
+
+    private static final class LoginWindow {
+        final ArrayDeque<LoginRecord> records = new ArrayDeque<>();
+        long lastObserved;
+    }
+
+    private static final class LifecycleWindow {
+        final ArrayDeque<Long> timestamps = new ArrayDeque<>();
+        long lastObserved;
+    }
+
     private final ConcurrentHashMap<String, FailedLoginWindow> failedLogins = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, java.util.Set<String>> userIpHistory = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, LoginWindow> recentLogins = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, LifecycleWindow> userLifecycleEvents = new ConcurrentHashMap<>();
+
     private final CopyOnWriteArrayList<AnomalyAlert> activeAlerts = new CopyOnWriteArrayList<>();
     private final AtomicLong lastCleanup = new AtomicLong(0L);
 
@@ -99,15 +129,30 @@ public class AnomalyDetector {
     }
 
     public void analyze(AuditLogEntry entry, AuditLoggerConfiguration config) {
-        if (entry == null || !"FAILED_LOGIN".equals(entry.getAction())) {
+        if (entry == null) {
             return;
         }
 
-        // Anomaly detection is DISABLED by default; only enable if explicitly configured
+        AuditLoggerConfiguration currentConfig = config != null ? config : AuditLoggerConfiguration.get();
+        long eventTime = entry.getTimestamp();
+
+        analyzeFailedLogins(entry, currentConfig);
+        analyzeUnusualIp(entry, currentConfig);
+        analyzeMultiIpLogin(entry, currentConfig);
+        analyzeSuspiciousAuthPattern(entry, currentConfig);
+        analyzeAdminPrivilegeChange(entry, currentConfig);
+        analyzeUserLifecycle(entry, currentConfig);
+
+        maybeCleanup(eventTime, 60);
+    }
+
+    private void analyzeFailedLogins(AuditLogEntry entry, AuditLoggerConfiguration config) {
+        if (!"FAILED_LOGIN".equals(entry.getAction())) {
+            return;
+        }
+
         boolean detectionEnabled = config != null && config.isAnomalyFailedLogins();
         if (!detectionEnabled) {
-            maybeCleanup(entry.getTimestamp(),
-                    config != null ? config.getAnomalyFailedLoginsWindowMinutes() : DEFAULT_FAILED_LOGIN_WINDOW_MINUTES);
             return;
         }
 
@@ -143,20 +188,204 @@ public class AnomalyDetector {
                                 + recentFailures + " attempts in "
                                 + windowMinutes + " minute" + (windowMinutes == 1 ? "" : "s") + ").",
                             "CRITICAL");
-                    activeAlerts.add(alert);
-                    trimAlerts();
+                    addAlert(alert, config);
+                }
+            }
+        }
+    }
 
-                    if (config != null && config.isEnableEmailAlerts()) {
-                        sendEmailNotification(alert, config.getAlertEmailAddresses());
-                    }
-                    if (config != null && config.isEnableWebhookAlerts()) {
-                        sendWebhookNotification(alert, config.getWebhookUrl());
+    private void analyzeUnusualIp(AuditLogEntry entry, AuditLoggerConfiguration config) {
+        if (config == null || !config.isAnomalyUnusualIp()) {
+            return;
+        }
+
+        String user = entry.getUsername();
+        String ip = entry.getSourceIp();
+        if (!isRealUser(user) || !isValidIp(ip)) {
+            return;
+        }
+
+        java.util.Set<String> history = userIpHistory.computeIfAbsent(user, k -> Collections.newSetFromMap(new ConcurrentHashMap<>()));
+        synchronized (history) {
+            if (!history.isEmpty() && !history.contains(ip)) {
+                if (!hasActiveOpenAlert(user, AnomalyType.UNUSUAL_IP)) {
+                    AnomalyAlert alert = new AnomalyAlert(
+                            AnomalyType.UNUSUAL_IP,
+                            user,
+                            "Unusual IP address activity: User \"" + user + "\" connected from new IP address (" + ip + ").",
+                            "HIGH");
+                    addAlert(alert, config);
+                }
+            }
+            history.add(ip);
+            if (history.size() > 100) {
+                history.clear();
+                history.add(ip);
+            }
+        }
+    }
+
+    private void analyzeMultiIpLogin(AuditLogEntry entry, AuditLoggerConfiguration config) {
+        if (config == null || !config.isAnomalyMultiIpLogin()) {
+            return;
+        }
+
+        String action = entry.getAction();
+        if (!isAuthAction(action)) {
+            return;
+        }
+
+        String user = entry.getUsername();
+        String ip = entry.getSourceIp();
+        if (!isRealUser(user) || !isValidIp(ip)) {
+            return;
+        }
+
+        int threshold = Math.max(2, config.getAnomalyMultiIpLoginThreshold());
+        int windowMinutes = Math.max(1, config.getAnomalyMultiIpLoginWindowMinutes());
+        long eventTime = entry.getTimestamp();
+        long cutoff = eventTime - windowMinutes * 60_000L;
+
+        LoginWindow window = recentLogins.computeIfAbsent(user, k -> new LoginWindow());
+        synchronized (window) {
+            window.lastObserved = eventTime;
+            while (!window.records.isEmpty() && window.records.peekFirst().timestamp <= cutoff) {
+                window.records.removeFirst();
+            }
+            window.records.addLast(new LoginRecord(ip, eventTime));
+
+            java.util.Set<String> distinctIps = new java.util.LinkedHashSet<>();
+            for (LoginRecord r : window.records) {
+                distinctIps.add(r.ip);
+            }
+
+            if (distinctIps.size() >= threshold) {
+                if (!hasActiveOpenAlert(user, AnomalyType.MULTI_IP_LOGIN)) {
+                    AnomalyAlert alert = new AnomalyAlert(
+                            AnomalyType.MULTI_IP_LOGIN,
+                            user,
+                            "Multiple logins detected for user \"" + user + "\" from " + distinctIps.size()
+                                + " distinct IP addresses (" + String.join(", ", distinctIps) + ") within "
+                                + windowMinutes + " minute" + (windowMinutes == 1 ? "" : "s") + ".",
+                            "HIGH");
+                    addAlert(alert, config);
+                }
+            }
+        }
+    }
+
+    private void analyzeSuspiciousAuthPattern(AuditLogEntry entry, AuditLoggerConfiguration config) {
+        if (config == null || !config.isAnomalySuspiciousAuth()) {
+            return;
+        }
+
+        String action = entry.getAction();
+        if (!isAuthAction(action)) {
+            return;
+        }
+
+        String user = entry.getUsername();
+        if (!isRealUser(user)) {
+            return;
+        }
+
+        FailedLoginWindow window = failedLogins.get(user);
+        if (window != null) {
+            int failures;
+            synchronized (window) {
+                failures = window.timestamps.size();
+            }
+            if (failures >= 3) {
+                if (!hasActiveOpenAlert(user, AnomalyType.SUSPICIOUS_AUTH_PATTERN)) {
+                    AnomalyAlert alert = new AnomalyAlert(
+                            AnomalyType.SUSPICIOUS_AUTH_PATTERN,
+                            user,
+                            "Suspicious authentication pattern: User \"" + user + "\" successfully logged in immediately after "
+                                + failures + " failed login attempt" + (failures == 1 ? "" : "s") + " (potential credential compromise).",
+                            "CRITICAL");
+                    addAlert(alert, config);
+                }
+            }
+        }
+    }
+
+    private void analyzeAdminPrivilegeChange(AuditLogEntry entry, AuditLoggerConfiguration config) {
+        if (config == null || !config.isAnomalyAdminPrivilegeChanges()) {
+            return;
+        }
+
+        String action = entry.getAction() != null ? entry.getAction().toUpperCase() : "";
+        if (action.contains("ADMIN_PRIVILEGE") || action.contains("SECURITY_CONFIG") || action.contains("AUTH_STRATEGY") || action.contains("ROLE_CONFIG")) {
+            String user = entry.getUsername() != null ? entry.getUsername() : "UNKNOWN";
+            if (!hasActiveOpenAlert(user, AnomalyType.ADMIN_PRIVILEGE_CHANGE)) {
+                AnomalyAlert alert = new AnomalyAlert(
+                        AnomalyType.ADMIN_PRIVILEGE_CHANGE,
+                        user,
+                        "Administrative permission or security configuration change detected: " + entry.getDetails(),
+                        "CRITICAL");
+                addAlert(alert, config);
+            }
+        }
+    }
+
+    private void analyzeUserLifecycle(AuditLogEntry entry, AuditLoggerConfiguration config) {
+        if (config == null || !config.isAnomalyUserLifecycle()) {
+            return;
+        }
+
+        String action = entry.getAction() != null ? entry.getAction().toUpperCase() : "";
+        if (action.contains("USER_CREATED") || action.contains("USER_DELETED")) {
+            String user = entry.getUsername() != null ? entry.getUsername() : "UNKNOWN";
+            int threshold = Math.max(1, config.getAnomalyUserLifecycleThreshold());
+            int windowMinutes = Math.max(1, config.getAnomalyUserLifecycleWindowMinutes());
+            long eventTime = entry.getTimestamp();
+            long cutoff = eventTime - windowMinutes * 60_000L;
+
+            LifecycleWindow window = userLifecycleEvents.computeIfAbsent(user, k -> new LifecycleWindow());
+            synchronized (window) {
+                window.lastObserved = eventTime;
+                while (!window.timestamps.isEmpty() && window.timestamps.peekFirst() <= cutoff) {
+                    window.timestamps.removeFirst();
+                }
+                window.timestamps.addLast(eventTime);
+
+                if (window.timestamps.size() >= threshold) {
+                    if (!hasActiveOpenAlert(user, AnomalyType.USER_LIFECYCLE_ANOMALY)) {
+                        AnomalyAlert alert = new AnomalyAlert(
+                                AnomalyType.USER_LIFECYCLE_ANOMALY,
+                                user,
+                                "User account lifecycle activity: " + entry.getDetails(),
+                                "HIGH");
+                        addAlert(alert, config);
                     }
                 }
             }
         }
+    }
 
-        maybeCleanup(eventTime, windowMinutes);
+    private void addAlert(AnomalyAlert alert, AuditLoggerConfiguration config) {
+        activeAlerts.add(alert);
+        trimAlerts();
+
+        if (config != null && config.isEnableEmailAlerts()) {
+            sendEmailNotification(alert, config.getAlertEmailAddresses());
+        }
+        if (config != null && config.isEnableWebhookAlerts()) {
+            sendWebhookNotification(alert, config.getWebhookUrl());
+        }
+    }
+
+    private static boolean isAuthAction(String action) {
+        return "LOGIN".equals(action) || "SSO_LOGIN".equals(action) || "API_AUTH".equals(action);
+    }
+
+    private static boolean isRealUser(String user) {
+        return user != null && !user.trim().isEmpty() && !"SYSTEM".equalsIgnoreCase(user)
+                && !"anonymous".equalsIgnoreCase(user) && !"anonymousUser".equalsIgnoreCase(user);
+    }
+
+    private static boolean isValidIp(String ip) {
+        return ip != null && !ip.trim().isEmpty() && !"N/A".equalsIgnoreCase(ip) && !"-".equals(ip);
     }
 
     public List<AnomalyAlert> getAlerts(int limit) {
@@ -470,7 +699,15 @@ public class AnomalyDetector {
             case BRUTE_FORCE_LOGIN:
                 return "Suspicious Login Attempts (Brute Force)";
             case UNUSUAL_IP:
-                return "Unusual IP Address";
+                return "Unusual IP Address Activity";
+            case MULTI_IP_LOGIN:
+                return "Multiple Logins from Different IPs";
+            case SUSPICIOUS_AUTH_PATTERN:
+                return "Suspicious Authentication Pattern";
+            case ADMIN_PRIVILEGE_CHANGE:
+                return "Admin Privilege / Security Change";
+            case USER_LIFECYCLE_ANOMALY:
+                return "User Account Creation / Deletion";
             case MASS_CHANGES:
                 return "Mass Configuration Changes";
             case AFTER_HOURS_ADMIN:
