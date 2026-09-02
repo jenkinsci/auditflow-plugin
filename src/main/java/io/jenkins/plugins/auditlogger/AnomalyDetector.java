@@ -301,7 +301,7 @@ public class AnomalyDetector {
                             AnomalyType.SUSPICIOUS_AUTH_PATTERN,
                             user,
                             "Suspicious authentication pattern: User \"" + user + "\" successfully logged in immediately after "
-                                + failures + " failed login attempt" + (failures == 1 ? "" : "s") + " (potential credential compromise).",
+                                + failures + " failed login attempts (potential credential compromise).",
                             "CRITICAL");
                     addAlert(alert, config);
                 }
@@ -477,6 +477,26 @@ public class AnomalyDetector {
         long staleWindowCutoff = now - Math.max(1, windowMinutes) * 60_000L;
         failedLogins.entrySet().removeIf(entry -> {
             FailedLoginWindow window = entry.getValue();
+            synchronized (window) {
+                while (!window.timestamps.isEmpty() && window.timestamps.peekFirst() <= staleWindowCutoff) {
+                    window.timestamps.removeFirst();
+                }
+                return window.timestamps.isEmpty() && window.lastObserved <= staleWindowCutoff;
+            }
+        });
+
+        recentLogins.entrySet().removeIf(entry -> {
+            LoginWindow window = entry.getValue();
+            synchronized (window) {
+                while (!window.records.isEmpty() && window.records.peekFirst().timestamp <= staleWindowCutoff) {
+                    window.records.removeFirst();
+                }
+                return window.records.isEmpty() && window.lastObserved <= staleWindowCutoff;
+            }
+        });
+
+        userLifecycleEvents.entrySet().removeIf(entry -> {
+            LifecycleWindow window = entry.getValue();
             synchronized (window) {
                 while (!window.timestamps.isEmpty() && window.timestamps.peekFirst() <= staleWindowCutoff) {
                     window.timestamps.removeFirst();
