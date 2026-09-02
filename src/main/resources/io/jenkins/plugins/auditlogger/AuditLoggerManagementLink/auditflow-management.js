@@ -68,7 +68,6 @@
             return [];
         }
         var dismissedMap = getDismissedAlertIds();
-        var dismissedUntil = parseAnomalyTimestamp(sessionStorage.getItem(anomalyDismissedTimestampKey));
 
         var result = [];
         for (var i = 0; i < anomalies.length; i++) {
@@ -76,10 +75,6 @@
             if (!candidate) continue;
             var alertId = candidate.alertId || ('auditflow-' + (candidate.type || '') + '-' + (candidate.user || '') + '-' + (candidate.timestamp || ''));
             if (dismissedMap[alertId]) {
-                continue;
-            }
-            var ts = parseAnomalyTimestamp(candidate.timestamp);
-            if (dismissedUntil > 0 && ts <= dismissedUntil) {
                 continue;
             }
             result.push(candidate);
@@ -443,7 +438,7 @@
 
         activeAnomalies = getUndismissedAnomalies(anomalies);
 
-        if (activeAnomalies.length > 0 && !anomalyDismissed) {
+        if (activeAnomalies.length > 0) {
             box.classList.remove('jenkins-hidden');
             box.classList.add('anomaly-alert');
             box.classList.remove('anomaly-dismissed');
