@@ -474,4 +474,25 @@ class AnomalyDetectorTest {
     void testDismissAlertReturnsFalseForUnknownId(JenkinsRule j) {
         assertEquals(false, detector.dismissAlert("nonexistent-id"), "Dismiss should return false for unknown alert id");
     }
+
+    @Test
+    void testDismissAllAlerts(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+
+        long now = System.currentTimeMillis();
+        detector.analyze(new AuditLogEntry("user1", "FAILED_LOGIN", "jenkins", "", now), config);
+        detector.analyze(new AuditLogEntry("user1", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+        detector.analyze(new AuditLogEntry("user2", "FAILED_LOGIN", "jenkins", "", now + 2000), config);
+        detector.analyze(new AuditLogEntry("user2", "FAILED_LOGIN", "jenkins", "", now + 3000), config);
+
+        List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(10);
+        assertEquals(2, alerts.size(), "Should have 2 open alerts before dismissAll");
+
+        int dismissed = detector.dismissAllAlerts();
+        assertEquals(2, dismissed, "Should dismiss both alerts");
+        assertEquals(0, detector.getAlerts(10).size(), "All alerts should be dismissed");
+    }
 }

@@ -17,9 +17,11 @@
     var defaultDateTo = '';
     var onboardingStorageKey = 'auditflow-onboarded';
     var anomalyDismissedKey = 'auditflow-anomaly-dismissed-id';
+    var anomalyDismissedIdsKey = 'auditflow-anomaly-dismissed-ids';
     var anomalyDismissedTimestampKey = 'auditflow-anomaly-dismissed-until';
     var anomalyDismissed = false;
     var latestAnomaly = null;
+    var activeAnomalies = [];
 
     function setHidden(element, hidden) {
         if (element) {
@@ -32,40 +34,68 @@
         return isFinite(timestamp) && timestamp > 0 ? timestamp : 0;
     }
 
-    function getLatestAnomaly(anomalies) {
-        var latest = null;
-        var latestTimestamp = 0;
-        if (!anomalies || anomalies.length === 0) {
-            return null;
+    function getDismissedAlertIds() {
+        try {
+            var raw = sessionStorage.getItem(anomalyDismissedIdsKey);
+            if (raw) {
+                return JSON.parse(raw) || {};
+            }
+        } catch (e) {}
+        var single = sessionStorage.getItem(anomalyDismissedKey);
+        var res = {};
+        if (single) {
+            res[single] = true;
         }
+        return res;
+    }
 
-        for (var i = 0; i < anomalies.length; i++) {
-            var candidate = anomalies[i];
-            var candidateTimestamp = parseAnomalyTimestamp(candidate && candidate.timestamp);
-            if (!latest || candidateTimestamp >= latestTimestamp) {
-                latest = candidate;
-                latestTimestamp = candidateTimestamp;
+    function saveDismissedAlertIds(ids) {
+        if (!ids || ids.length === 0) return;
+        var map = getDismissedAlertIds();
+        for (var i = 0; i < ids.length; i++) {
+            if (ids[i]) {
+                map[ids[i]] = true;
             }
         }
-        return latest;
+        try {
+            sessionStorage.setItem(anomalyDismissedIdsKey, JSON.stringify(map));
+            sessionStorage.setItem(anomalyDismissedKey, ids[ids.length - 1]);
+        } catch (e) {}
+    }
+
+    function getUndismissedAnomalies(anomalies) {
+        if (!anomalies || anomalies.length === 0) {
+            return [];
+        }
+        var dismissedMap = getDismissedAlertIds();
+        var dismissedUntil = parseAnomalyTimestamp(sessionStorage.getItem(anomalyDismissedTimestampKey));
+
+        var result = [];
+        for (var i = 0; i < anomalies.length; i++) {
+            var candidate = anomalies[i];
+            if (!candidate) continue;
+            var alertId = candidate.alertId || ('auditflow-' + (candidate.type || '') + '-' + (candidate.user || '') + '-' + (candidate.timestamp || ''));
+            if (dismissedMap[alertId]) {
+                continue;
+            }
+            var ts = parseAnomalyTimestamp(candidate.timestamp);
+            if (dismissedUntil > 0 && ts <= dismissedUntil) {
+                continue;
+            }
+            result.push(candidate);
+        }
+        return result;
+    }
+
+    function getLatestAnomaly(anomalies) {
+        var un = getUndismissedAnomalies(anomalies);
+        return un.length > 0 ? un[0] : null;
     }
 
     function refreshAnomalyDismissState(anomalies) {
-        latestAnomaly = getLatestAnomaly(anomalies);
-        if (!latestAnomaly) {
-            anomalyDismissed = false;
-            return;
-        }
-
-        var dismissedId = sessionStorage.getItem(anomalyDismissedKey);
-        if (dismissedId && latestAnomaly.alertId && dismissedId === latestAnomaly.alertId) {
-            anomalyDismissed = true;
-            return;
-        }
-
-        var dismissedUntil = parseAnomalyTimestamp(sessionStorage.getItem(anomalyDismissedTimestampKey));
-        anomalyDismissed = dismissedUntil > 0
-            && parseAnomalyTimestamp(latestAnomaly.timestamp) <= dismissedUntil;
+        activeAnomalies = getUndismissedAnomalies(anomalies);
+        latestAnomaly = activeAnomalies.length > 0 ? activeAnomalies[0] : null;
+        anomalyDismissed = (activeAnomalies.length === 0);
     }
 
     function formatAnomalyStatus(alert) {
@@ -404,31 +434,60 @@
         }
     }
 
-    // displays our real backend anomalies
+    // displays our real backend anomalies - combines all undismissed ones
     function renderServerAnomalies(anomalies) {
         var box = document.getElementById('anomalyBox');
         var status = document.getElementById('anomalyStatus');
+        var dismissBtn = document.getElementById('btnDismiss');
         if (!box || !status) return;
 
-        var latest = getLatestAnomaly(anomalies);
+        activeAnomalies = getUndismissedAnomalies(anomalies);
 
-        if (latest && !anomalyDismissed) {
+        if (activeAnomalies.length > 0 && !anomalyDismissed) {
             box.classList.remove('jenkins-hidden');
             box.classList.add('anomaly-alert');
             box.classList.remove('anomaly-dismissed');
-            status.textContent = formatAnomalyStatus(latest);
-        } else if (latest && anomalyDismissed) {
-            // Anomalies exist but user dismissed them
+
+            if (dismissBtn) {
+                dismissBtn.textContent = activeAnomalies.length > 1 ? 'Dismiss All' : 'Dismiss';
+                dismissBtn.setAttribute('title', activeAnomalies.length > 1 ? 'Dismiss all ' + activeAnomalies.length + ' active anomalies' : 'Dismiss this anomaly');
+            }
+
+            if (activeAnomalies.length === 1) {
+                status.textContent = formatAnomalyStatus(activeAnomalies[0]);
+            } else {
+                var html = '<div class="anomaly-combined-title"><strong>' + activeAnomalies.length + ' Active Anomalies Detected:</strong></div>';
+                html += '<ul class="anomaly-combined-list">';
+                for (var i = 0; i < activeAnomalies.length; i++) {
+                    var alert = activeAnomalies[i];
+                    var sev = alert.severity || 'HIGH';
+                    var sevClass = severityBadgeClass(sev, '');
+                    html += '<li class="anomaly-combined-item">'
+                        + '<span class="badge ' + sevClass + '">' + esc(sev) + '</span> '
+                        + '<span class="anomaly-combined-text">' + esc(formatAnomalyStatus(alert)) + '</span>'
+                        + '</li>';
+                }
+                html += '</ul>';
+                status.innerHTML = html;
+            }
+        } else if (activeAnomalies.length === 0 && anomalyDismissed) {
+            // Anomalies exist on server but user dismissed them all
             box.classList.add('jenkins-hidden');
             box.classList.remove('anomaly-alert');
             box.classList.add('anomaly-dismissed');
             status.textContent = 'No anomaly detected';
+            if (dismissBtn) {
+                dismissBtn.textContent = 'Dismiss';
+            }
         } else {
             // No anomalies at all
             box.classList.add('jenkins-hidden');
             box.classList.remove('anomaly-alert');
             box.classList.remove('anomaly-dismissed');
             status.textContent = 'No anomaly detected';
+            if (dismissBtn) {
+                dismissBtn.textContent = 'Dismiss';
+            }
         }
     }
 
@@ -475,15 +534,32 @@
 
     function dismissAnomaly() {
         anomalyDismissed = true;
-        if (latestAnomaly && latestAnomaly.alertId) {
-            sessionStorage.setItem(anomalyDismissedKey, latestAnomaly.alertId);
-            fetch('dismissAlert?alertId=' + encodeURIComponent(latestAnomaly.alertId))
-                .catch(function() {
-                    // Best-effort dismissal; UI state is preserved locally.
-                });
+        var idsToDismiss = [];
+        if (activeAnomalies && activeAnomalies.length > 0) {
+            for (var i = 0; i < activeAnomalies.length; i++) {
+                var a = activeAnomalies[i];
+                var id = a.alertId || ('auditflow-' + (a.type || '') + '-' + (a.user || '') + '-' + (a.timestamp || ''));
+                if (id) {
+                    idsToDismiss.push(id);
+                }
+            }
         }
+
+        saveDismissedAlertIds(idsToDismiss);
+
+        // Tell server to dismiss all or specific
+        var dismissParam = idsToDismiss.length > 1 ? 'ALL' : (idsToDismiss[0] || 'ALL');
+        fetch('dismissAlert?alertId=' + encodeURIComponent(dismissParam))
+            .catch(function() {
+                // Best-effort dismissal; UI state is preserved locally in sessionStorage.
+            });
+
+        activeAnomalies = [];
+        latestAnomaly = null;
+
         var box = document.getElementById('anomalyBox');
         var status = document.getElementById('anomalyStatus');
+        var dismissBtn = document.getElementById('btnDismiss');
         if (box) {
             box.classList.add('jenkins-hidden');
             box.classList.remove('anomaly-alert');
@@ -491,6 +567,9 @@
         }
         if (status) {
             status.textContent = 'No anomaly detected';
+        }
+        if (dismissBtn) {
+            dismissBtn.textContent = 'Dismiss';
         }
     }
 

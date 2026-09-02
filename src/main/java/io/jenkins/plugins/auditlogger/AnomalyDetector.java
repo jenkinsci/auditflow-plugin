@@ -430,6 +430,17 @@ public class AnomalyDetector {
         return false;
     }
 
+    public int dismissAllAlerts() {
+        int count = 0;
+        for (AnomalyAlert alert : activeAlerts) {
+            if (!alert.isDismissed()) {
+                alert.dismiss();
+                count++;
+            }
+        }
+        return count;
+    }
+
     public void cleanupOldAlerts() {
         cleanupOldAlerts(System.currentTimeMillis(), DEFAULT_FAILED_LOGIN_WINDOW_MINUTES);
     }

@@ -978,7 +978,13 @@ public class AuditLoggerManagementLink extends ManagementLink {
         String alertId = req.getParameter("alertId");
         boolean success = false;
         if (alertId != null && !alertId.trim().isEmpty()) {
-            success = AuditLogStorage.getInstance().getAnomalyDetector().dismissAlert(alertId.trim());
+            String trimmedId = alertId.trim();
+            if ("ALL".equalsIgnoreCase(trimmedId) || "*".equals(trimmedId)) {
+                AuditLogStorage.getInstance().getAnomalyDetector().dismissAllAlerts();
+                success = true;
+            } else {
+                success = AuditLogStorage.getInstance().getAnomalyDetector().dismissAlert(trimmedId);
+            }
         }
 
         res.setContentType("application/json; charset=UTF-8");
