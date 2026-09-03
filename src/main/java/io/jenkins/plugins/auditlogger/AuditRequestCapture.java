@@ -284,6 +284,16 @@ public class AuditRequestCapture {
                     severity = "HIGH";
                 }
             }
+            // ===== USER DELETION =====
+            else if ("POST".equalsIgnoreCase(method) && uri.contains("/user/") && (uri.endsWith("/doDelete") || uri.endsWith("/delete") || uri.contains("/doDeleteSubmit"))) {
+                String targetUser = RouteAwareUrlMatcher.extractUserName(uri);
+                if (targetUser != null && !targetUser.isEmpty()) {
+                    action = "USER_DELETED";
+                    target = targetUser;
+                    details = String.format("User account deleted: %s by %s", targetUser, username);
+                    severity = "HIGH";
+                }
+            }
             if (action != null) {
                 AuditLogEntry entry = new AuditLogEntry(username, action, target, details);
                 entry.setSeverity(severity);

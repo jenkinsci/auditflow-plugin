@@ -69,6 +69,31 @@ public class AuditSaveableListener extends SaveableListener {
     }
 
     @Override
+    public void onDeleted(Saveable o, XmlFile file) {
+        try {
+            AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+            if (config == null) return;
+
+            if (StartupPhaseManager.isInStartupGracePeriod()) {
+                return;
+            }
+
+            if (o instanceof User) {
+                User user = (User) o;
+                String target = user.getId();
+                String username = currentUser(target);
+                String details = String.format("User account deleted: %s by %s", target, username);
+                AuditLogEntry entry = new AuditLogEntry(username, "USER_DELETED", target, details);
+
+                AuditLogStorage.getInstance().addEntry(entry);
+                LOGGER.log(Level.INFO, "AuditLog: USER_DELETED for {0} by {1}", new Object[]{target, username});
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Error auditing Saveable onDeleted", e);
+        }
+    }
+
+    @Override
     public void onChange(Saveable o, XmlFile file) {
         try {
             AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
