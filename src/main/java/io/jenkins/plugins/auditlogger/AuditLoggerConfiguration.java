@@ -144,7 +144,6 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     // UI
     private boolean enableRiskLevels = true;
     private boolean enableAnomalyBanner = true;
-    private String welcomeBannerDismissedVersion = "";
     private boolean enableEventCategories = false;
     private boolean enableTimelineView = false;
     private boolean enableSensitiveEventsPanel = false;
@@ -178,7 +177,6 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         if (enableNodeEvents == null) enableNodeEvents = true;
         if (anomalyFailedLogins == null) anomalyFailedLogins = true;
         if (enableAnomalyDetection == null) enableAnomalyDetection = true;
-        if (welcomeBannerDismissedVersion == null) welcomeBannerDismissedVersion = "";
         if (enableLogRotation == null) enableLogRotation = true;
         if (maskTokens == null) maskTokens = true;
         if (maskEmailAddresses == null) maskEmailAddresses = false;
@@ -286,11 +284,9 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         }
         setEnableAnomalyBanner(anomalyConfig.optBoolean("enableAnomalyBanner", json.optBoolean("enableAnomalyBanner", false)));
 
-        // ── Dashboard display toggles ──
         JSONObject dashboardStatsBlock = getOptionalBlock(json, "enableDashboardStats");
         setEnableDashboardStats(isOptionalBlockEnabled(json, "enableDashboardStats"));
         setEnableRiskLevels(json.optBoolean("enableRiskLevels", false));
-        if (json.has("welcomeBannerDismissedVersion")) setWelcomeBannerDismissedVersion(json.optString("welcomeBannerDismissedVersion", welcomeBannerDismissedVersion));
         if (json.has("displayTimeZoneId")) setDisplayTimeZoneId(json.optString("displayTimeZoneId", displayTimeZoneId));
         JSONObject dashboardStatsConfig = dashboardStatsBlock != null ? dashboardStatsBlock : json;
         setShowMetricTotal(dashboardStatsConfig.optBoolean("showMetricTotal", false));
@@ -520,15 +516,6 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     @DataBoundSetter
     public void setEnableAnomalyBanner(boolean enableAnomalyBanner) {
         this.enableAnomalyBanner = enableAnomalyBanner;
-    }
-
-    public String getWelcomeBannerDismissedVersion() {
-        return welcomeBannerDismissedVersion != null ? welcomeBannerDismissedVersion : "";
-    }
-
-    @DataBoundSetter
-    public void setWelcomeBannerDismissedVersion(String welcomeBannerDismissedVersion) {
-        this.welcomeBannerDismissedVersion = welcomeBannerDismissedVersion != null ? welcomeBannerDismissedVersion : "";
     }
 
 

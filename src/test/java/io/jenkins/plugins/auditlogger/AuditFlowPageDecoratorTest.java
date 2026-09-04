@@ -105,21 +105,4 @@ class AuditFlowPageDecoratorTest {
         config.setEnableAnomalyDetection(true);
         assertTrue(decorator.isBannerVisible(), "Banner should be visible when master anomaly detection is re-enabled");
     }
-
-    @Test
-    void testWelcomeBannerLifecycleAndDismissal(JenkinsRule j) {
-        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
-        config.setWelcomeBannerDismissedVersion("");
-
-        assertTrue(decorator.isWelcomeBannerVisible(), "Welcome banner should be visible when not dismissed for current version");
-
-        // Dismiss welcome banner
-        decorator.doDismissWelcomeBanner();
-        assertFalse(decorator.isWelcomeBannerVisible(), "Welcome banner should be hidden after dismissal");
-        assertEquals(decorator.getCurrentPluginVersion(), config.getWelcomeBannerDismissedVersion(), "Dismissed version should match current version");
-
-        // Simulate plugin version update
-        config.setWelcomeBannerDismissedVersion("2.3.9");
-        assertTrue(decorator.isWelcomeBannerVisible(), "Welcome banner should become visible again on plugin version update");
-    }
 }
