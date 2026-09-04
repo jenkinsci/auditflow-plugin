@@ -29,7 +29,7 @@
                 <div class="onboarding-banner" id="onboardingBanner">
                     <h2>✨ What's New in AuditFlow</h2>
                     <p>
-                        <strong>Enhanced Agent Auditing &amp; Unified Badging:</strong> Track node creations, configuration diffs, deletions, offline reasons, and launch failures. Enjoy a cleaner audit experience with our unified 5-tier severity color system (Red, Dark Orange, Amber, Green, Blue) across your entire log trail!
+                        <strong>Phase 2 Security Anomaly Detection &amp; Risk Insights:</strong> Real-time automated risk tracking for brute-force logins, unusual IP access, multi-IP concurrent logins, suspicious auth patterns, administrative privilege changes, and user account lifecycle events. Easily toggle and configure anomaly rules in System Settings, and view live metrics in your AuditFlow dashboard!
                     </p>
                     <button type="button" class="jenkins-button onboarding-banner__dismiss" id="dismissOnboardingButton">Got it</button>
                 </div>
