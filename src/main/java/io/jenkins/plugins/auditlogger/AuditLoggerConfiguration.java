@@ -123,7 +123,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
 
     // Optimization
     private boolean enableAdvancedIndexing = false;
-    private boolean enableAnomalyDetection = false;
+    private Boolean enableAnomalyDetection = true;
     private boolean enableMetricsCollection = false;
     private int batchWriteSize = 100;
     private int batchFlushIntervalSeconds = 5;
@@ -144,6 +144,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     // UI
     private boolean enableRiskLevels = true;
     private boolean enableAnomalyBanner = true;
+    private String welcomeBannerDismissedVersion = "";
     private boolean enableEventCategories = false;
     private boolean enableTimelineView = false;
     private boolean enableSensitiveEventsPanel = false;
@@ -176,6 +177,8 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         if (enableSystemConfigEvents == null) enableSystemConfigEvents = true;
         if (enableNodeEvents == null) enableNodeEvents = true;
         if (anomalyFailedLogins == null) anomalyFailedLogins = true;
+        if (enableAnomalyDetection == null) enableAnomalyDetection = true;
+        if (welcomeBannerDismissedVersion == null) welcomeBannerDismissedVersion = "";
         if (enableLogRotation == null) enableLogRotation = true;
         if (maskTokens == null) maskTokens = true;
         if (maskEmailAddresses == null) maskEmailAddresses = false;
@@ -236,9 +239,14 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         setEnablePluginEvents(json.optBoolean("enablePluginEvents", false));
         setEnableSystemConfigEvents(json.optBoolean("enableSystemConfigEvents", false));
         setEnableNodeEvents(json.optBoolean("enableNodeEvents", false));
-        JSONObject failedLoginBlock = getOptionalBlock(json, "anomalyFailedLogins");
-        setAnomalyFailedLogins(isOptionalBlockEnabled(json, "anomalyFailedLogins"));
-        JSONObject failedLoginConfig = failedLoginBlock != null ? failedLoginBlock : json;
+        // ── Security Anomaly Detection Master Block ──
+        JSONObject anomalyDetectionBlock = getOptionalBlock(json, "enableAnomalyDetection");
+        setEnableAnomalyDetection(isOptionalBlockEnabled(json, "enableAnomalyDetection"));
+        JSONObject anomalyConfig = anomalyDetectionBlock != null ? anomalyDetectionBlock : json;
+
+        JSONObject failedLoginBlock = getOptionalBlock(anomalyConfig, "anomalyFailedLogins");
+        setAnomalyFailedLogins(isOptionalBlockEnabled(anomalyConfig, "anomalyFailedLogins"));
+        JSONObject failedLoginConfig = failedLoginBlock != null ? failedLoginBlock : anomalyConfig;
         if (failedLoginConfig.has("anomalyFailedLoginsThreshold")) {
             setAnomalyFailedLoginsThreshold(failedLoginConfig.optInt("anomalyFailedLoginsThreshold", anomalyFailedLoginsThreshold));
         }
@@ -247,16 +255,16 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         }
 
         // Phase 2 Anomaly Detection Blocks
-        JSONObject unusualIpBlock = getOptionalBlock(json, "anomalyUnusualIp");
-        setAnomalyUnusualIp(isOptionalBlockEnabled(json, "anomalyUnusualIp"));
-        JSONObject unusualIpConfig = unusualIpBlock != null ? unusualIpBlock : json;
+        JSONObject unusualIpBlock = getOptionalBlock(anomalyConfig, "anomalyUnusualIp");
+        setAnomalyUnusualIp(isOptionalBlockEnabled(anomalyConfig, "anomalyUnusualIp"));
+        JSONObject unusualIpConfig = unusualIpBlock != null ? unusualIpBlock : anomalyConfig;
         if (unusualIpConfig.has("anomalyUnusualIpWindowMinutes")) {
             setAnomalyUnusualIpWindowMinutes(unusualIpConfig.optInt("anomalyUnusualIpWindowMinutes", anomalyUnusualIpWindowMinutes));
         }
 
-        JSONObject multiIpBlock = getOptionalBlock(json, "anomalyMultiIpLogin");
-        setAnomalyMultiIpLogin(isOptionalBlockEnabled(json, "anomalyMultiIpLogin"));
-        JSONObject multiIpConfig = multiIpBlock != null ? multiIpBlock : json;
+        JSONObject multiIpBlock = getOptionalBlock(anomalyConfig, "anomalyMultiIpLogin");
+        setAnomalyMultiIpLogin(isOptionalBlockEnabled(anomalyConfig, "anomalyMultiIpLogin"));
+        JSONObject multiIpConfig = multiIpBlock != null ? multiIpBlock : anomalyConfig;
         if (multiIpConfig.has("anomalyMultiIpLoginThreshold")) {
             setAnomalyMultiIpLoginThreshold(multiIpConfig.optInt("anomalyMultiIpLoginThreshold", anomalyMultiIpLoginThreshold));
         }
@@ -264,24 +272,25 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
             setAnomalyMultiIpLoginWindowMinutes(multiIpConfig.optInt("anomalyMultiIpLoginWindowMinutes", anomalyMultiIpLoginWindowMinutes));
         }
 
-        setAnomalySuspiciousAuth(json.optBoolean("anomalySuspiciousAuth", false));
-        setAnomalyAdminPrivilegeChanges(json.optBoolean("anomalyAdminPrivilegeChanges", false));
+        setAnomalySuspiciousAuth(anomalyConfig.optBoolean("anomalySuspiciousAuth", false));
+        setAnomalyAdminPrivilegeChanges(anomalyConfig.optBoolean("anomalyAdminPrivilegeChanges", false));
 
-        JSONObject userLifecycleBlock = getOptionalBlock(json, "anomalyUserLifecycle");
-        setAnomalyUserLifecycle(isOptionalBlockEnabled(json, "anomalyUserLifecycle"));
-        JSONObject userLifecycleConfig = userLifecycleBlock != null ? userLifecycleBlock : json;
+        JSONObject userLifecycleBlock = getOptionalBlock(anomalyConfig, "anomalyUserLifecycle");
+        setAnomalyUserLifecycle(isOptionalBlockEnabled(anomalyConfig, "anomalyUserLifecycle"));
+        JSONObject userLifecycleConfig = userLifecycleBlock != null ? userLifecycleBlock : anomalyConfig;
         if (userLifecycleConfig.has("anomalyUserLifecycleThreshold")) {
             setAnomalyUserLifecycleThreshold(userLifecycleConfig.optInt("anomalyUserLifecycleThreshold", anomalyUserLifecycleThreshold));
         }
         if (userLifecycleConfig.has("anomalyUserLifecycleWindowMinutes")) {
             setAnomalyUserLifecycleWindowMinutes(userLifecycleConfig.optInt("anomalyUserLifecycleWindowMinutes", anomalyUserLifecycleWindowMinutes));
         }
+        setEnableAnomalyBanner(anomalyConfig.optBoolean("enableAnomalyBanner", json.optBoolean("enableAnomalyBanner", false)));
 
         // ── Dashboard display toggles ──
         JSONObject dashboardStatsBlock = getOptionalBlock(json, "enableDashboardStats");
         setEnableDashboardStats(isOptionalBlockEnabled(json, "enableDashboardStats"));
         setEnableRiskLevels(json.optBoolean("enableRiskLevels", false));
-        setEnableAnomalyBanner(json.optBoolean("enableAnomalyBanner", false));
+        if (json.has("welcomeBannerDismissedVersion")) setWelcomeBannerDismissedVersion(json.optString("welcomeBannerDismissedVersion", welcomeBannerDismissedVersion));
         if (json.has("displayTimeZoneId")) setDisplayTimeZoneId(json.optString("displayTimeZoneId", displayTimeZoneId));
         JSONObject dashboardStatsConfig = dashboardStatsBlock != null ? dashboardStatsBlock : json;
         setShowMetricTotal(dashboardStatsConfig.optBoolean("showMetricTotal", false));
@@ -513,6 +522,15 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         this.enableAnomalyBanner = enableAnomalyBanner;
     }
 
+    public String getWelcomeBannerDismissedVersion() {
+        return welcomeBannerDismissedVersion != null ? welcomeBannerDismissedVersion : "";
+    }
+
+    @DataBoundSetter
+    public void setWelcomeBannerDismissedVersion(String welcomeBannerDismissedVersion) {
+        this.welcomeBannerDismissedVersion = welcomeBannerDismissedVersion != null ? welcomeBannerDismissedVersion : "";
+    }
+
 
     @DataBoundSetter
     public void setDisplayTimeZoneId(String displayTimeZoneId) {
@@ -718,7 +736,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public int getStartupGracePeriodSeconds() { return startupGracePeriodSeconds; }
 
     public boolean isEnableAdvancedIndexing() { return enableAdvancedIndexing; }
-    public boolean isEnableAnomalyDetection() { return enableAnomalyDetection; }
+    public boolean isEnableAnomalyDetection() { return enableAnomalyDetection == null || enableAnomalyDetection; }
     public boolean isEnableMetricsCollection() { return enableMetricsCollection; }
     public int getBatchWriteSize() { return batchWriteSize; }
     public int getBatchFlushIntervalSeconds() { return batchFlushIntervalSeconds; }

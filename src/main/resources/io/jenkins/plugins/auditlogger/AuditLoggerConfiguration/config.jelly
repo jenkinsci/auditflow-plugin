@@ -46,57 +46,62 @@
             </div>
         </f:block>
 
-        <f:entry title="Enable Anomaly Alert Banner (display global security alert banner on Jenkins pages when anomalies occur)">
-            <f:checkbox name="enableAnomalyBanner" checked="${descriptor.isEnableAnomalyBanner()}"/>
-        </f:entry>
+        <f:optionalBlock title="Enable Security Anomaly Detection (monitor real-time security anomalies and risks)"
+                         name="enableAnomalyDetection"
+                         checked="${descriptor.isEnableAnomalyDetection()}">
 
-        <f:optionalBlock title="Failed Login Detection (flag brute force attempts)"
-                         name="anomalyFailedLogins"
-                         checked="${descriptor.isAnomalyFailedLogins()}">
-            <f:entry title="Failed login threshold" description="Trigger alert after this many failed logins for a single account within the time window.">
-                <f:number name="anomalyFailedLoginsThreshold" value="${descriptor.getAnomalyFailedLoginsThreshold()}"/>
+            <f:entry title="Enable Anomaly Alert Banner (display global security alert banner on Jenkins pages when anomalies occur)">
+                <f:checkbox name="enableAnomalyBanner" checked="${descriptor.isEnableAnomalyBanner()}"/>
             </f:entry>
-            <f:entry title="Time window (minutes)" description="Sliding window in minutes to evaluate failed logins.">
-                <f:number name="anomalyFailedLoginsWindowMinutes" value="${descriptor.getAnomalyFailedLoginsWindowMinutes()}"/>
-            </f:entry>
-        </f:optionalBlock>
 
-        <f:optionalBlock title="Unusual IP Activity (flag logins or actions from new/unseen IP addresses)"
-                         name="anomalyUnusualIp"
-                         checked="${descriptor.isAnomalyUnusualIp()}">
-            <f:entry title="Tracking window (minutes)" description="Lookback window for user IP address history.">
-                <f:number name="anomalyUnusualIpWindowMinutes" value="${descriptor.getAnomalyUnusualIpWindowMinutes()}"/>
-            </f:entry>
-        </f:optionalBlock>
+            <f:optionalBlock title="Failed Login Detection (flag brute force attempts)"
+                             name="anomalyFailedLogins"
+                             checked="${descriptor.isAnomalyFailedLogins()}">
+                <f:entry title="Failed login threshold" description="Trigger alert after this many failed logins for a single account within the time window.">
+                    <f:number name="anomalyFailedLoginsThreshold" value="${descriptor.getAnomalyFailedLoginsThreshold()}"/>
+                </f:entry>
+                <f:entry title="Time window (minutes)" description="Sliding window in minutes to evaluate failed logins.">
+                    <f:number name="anomalyFailedLoginsWindowMinutes" value="${descriptor.getAnomalyFailedLoginsWindowMinutes()}"/>
+                </f:entry>
+            </f:optionalBlock>
 
-        <f:optionalBlock title="Multiple Logins from Different IPs (flag concurrent sessions from distinct IP addresses)"
-                         name="anomalyMultiIpLogin"
-                         checked="${descriptor.isAnomalyMultiIpLogin()}">
-            <f:entry title="Distinct IP threshold" description="Trigger alert if a user logs in from this many distinct IP addresses within the window.">
-                <f:number name="anomalyMultiIpLoginThreshold" value="${descriptor.getAnomalyMultiIpLoginThreshold()}"/>
-            </f:entry>
-            <f:entry title="Time window (minutes)" description="Sliding time window to evaluate concurrent multi-IP logins.">
-                <f:number name="anomalyMultiIpLoginWindowMinutes" value="${descriptor.getAnomalyMultiIpLoginWindowMinutes()}"/>
-            </f:entry>
-        </f:optionalBlock>
+            <f:optionalBlock title="Unusual IP Activity (flag logins or actions from new/unseen IP addresses)"
+                             name="anomalyUnusualIp"
+                             checked="${descriptor.isAnomalyUnusualIp()}">
+                <f:entry title="Tracking window (minutes)" description="Lookback window for user IP address history.">
+                    <f:number name="anomalyUnusualIpWindowMinutes" value="${descriptor.getAnomalyUnusualIpWindowMinutes()}"/>
+                </f:entry>
+            </f:optionalBlock>
 
-        <f:entry title="Suspicious Auth Patterns (flag successful login following brute-force attempts)">
-            <f:checkbox name="anomalySuspiciousAuth" checked="${descriptor.isAnomalySuspiciousAuth()}"/>
-        </f:entry>
+            <f:optionalBlock title="Multiple Logins from Different IPs (flag concurrent sessions from distinct IP addresses)"
+                             name="anomalyMultiIpLogin"
+                             checked="${descriptor.isAnomalyMultiIpLogin()}">
+                <f:entry title="Distinct IP threshold" description="Trigger alert if a user logs in from this many distinct IP addresses within the window.">
+                    <f:number name="anomalyMultiIpLoginThreshold" value="${descriptor.getAnomalyMultiIpLoginThreshold()}"/>
+                </f:entry>
+                <f:entry title="Time window (minutes)" description="Sliding time window to evaluate concurrent multi-IP logins.">
+                    <f:number name="anomalyMultiIpLoginWindowMinutes" value="${descriptor.getAnomalyMultiIpLoginWindowMinutes()}"/>
+                </f:entry>
+            </f:optionalBlock>
 
-        <f:entry title="Admin Privilege Changes (flag security matrix, authorization strategy, or admin permission changes)">
-            <f:checkbox name="anomalyAdminPrivilegeChanges" checked="${descriptor.isAnomalyAdminPrivilegeChanges()}"/>
-        </f:entry>
+            <f:entry title="Suspicious Auth Patterns (flag successful login following brute-force attempts)">
+                <f:checkbox name="anomalySuspiciousAuth" checked="${descriptor.isAnomalySuspiciousAuth()}"/>
+            </f:entry>
 
-        <f:optionalBlock title="User Account Lifecycle (flag user account creation or deletion activity)"
-                         name="anomalyUserLifecycle"
-                         checked="${descriptor.isAnomalyUserLifecycle()}">
-            <f:entry title="Event threshold" description="Trigger alert after this many user creation/deletion events within the window.">
-                <f:number name="anomalyUserLifecycleThreshold" value="${descriptor.getAnomalyUserLifecycleThreshold()}"/>
+            <f:entry title="Admin Privilege Changes (flag security matrix, authorization strategy, or admin permission changes)">
+                <f:checkbox name="anomalyAdminPrivilegeChanges" checked="${descriptor.isAnomalyAdminPrivilegeChanges()}"/>
             </f:entry>
-            <f:entry title="Time window (minutes)" description="Sliding time window for user lifecycle tracking.">
-                <f:number name="anomalyUserLifecycleWindowMinutes" value="${descriptor.getAnomalyUserLifecycleWindowMinutes()}"/>
-            </f:entry>
+
+            <f:optionalBlock title="User Account Lifecycle (flag user account creation or deletion activity)"
+                             name="anomalyUserLifecycle"
+                             checked="${descriptor.isAnomalyUserLifecycle()}">
+                <f:entry title="Event threshold" description="Trigger alert after this many user creation/deletion events within the window.">
+                    <f:number name="anomalyUserLifecycleThreshold" value="${descriptor.getAnomalyUserLifecycleThreshold()}"/>
+                </f:entry>
+                <f:entry title="Time window (minutes)" description="Sliding time window for user lifecycle tracking.">
+                    <f:number name="anomalyUserLifecycleWindowMinutes" value="${descriptor.getAnomalyUserLifecycleWindowMinutes()}"/>
+                </f:entry>
+            </f:optionalBlock>
         </f:optionalBlock>
     </f:section>
 

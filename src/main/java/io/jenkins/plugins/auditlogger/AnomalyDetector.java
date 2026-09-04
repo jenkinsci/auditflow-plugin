@@ -134,6 +134,9 @@ public class AnomalyDetector {
         }
 
         AuditLoggerConfiguration currentConfig = config != null ? config : AuditLoggerConfiguration.get();
+        if (currentConfig != null && !currentConfig.isEnableAnomalyDetection()) {
+            return;
+        }
         long eventTime = entry.getTimestamp();
 
         analyzeFailedLogins(entry, currentConfig);
