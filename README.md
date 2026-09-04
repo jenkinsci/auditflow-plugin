@@ -172,8 +172,10 @@ Issues reported will be reviewed and fixed in upcoming releases. Community contr
 | Builds | BUILD_STARTED, BUILD_COMPLETED, BUILD_DELETED |
 | Jobs | JOB_CREATED, JOB_UPDATED, JOB_DELETED, JOB_RENAMED, JOB_COPIED |
 | Credentials | CREDENTIAL_CREATED, CREDENTIAL_ACCESSED, CREDENTIAL_UPDATED, CREDENTIAL_DELETED |
-| System | USER_CONFIG_UPDATED, SECURITY_REALM_CHANGED |
-| Plugins | PLUGIN_INSTALLED, PLUGIN_UNINSTALLED |
+| System | USER_CONFIG_UPDATED, SECURITY_REALM_CHANGED, SYSTEM_RESTART |
+| Plugins | PLUGIN_INSTALLED, PLUGIN_UPDATED, PLUGIN_UNINSTALLED |
+| Nodes | NODE_CREATED, NODE_UPDATED, NODE_DELETED, NODE_OFFLINE, NODE_ONLINE |
+| CLI | CLI_EXECUTION |
 
 ### Severity & Badge Colors
 
@@ -254,7 +256,21 @@ Parameters: `user`, `action`, `startTime`, `endTime`
 ### Configuration Events
 - `CONFIG_CHANGED` - System or job configuration saved
 - `CREDENTIAL_UPDATED` - Credentials modified
-- `PLUGIN_INSTALLED` - Plugin installed or updated
+- `PLUGIN_INSTALLED` - Plugin installed
+- `PLUGIN_UPDATED` - Plugin updated
+
+### Node Events
+- `NODE_CREATED` - Agent/node created
+- `NODE_UPDATED` - Agent configuration updated
+- `NODE_DELETED` - Agent deleted
+- `NODE_OFFLINE` - Agent taken offline
+- `NODE_ONLINE` - Agent brought online
+
+### CLI Events
+- `CLI_EXECUTION` - Jenkins CLI command executed
+
+### System Events
+- `SYSTEM_RESTART` - System restart (safe or immediate) initiated
 
 ## Log Entry Format
 
@@ -302,9 +318,13 @@ src/main/java/io/jenkins/plugins/auditlogger/
 +-- AuditItemListener.java          # Job lifecycle
 +-- AuditSaveableListener.java      # Config changes
 +-- AuditSessionListener.java       # Session tracking
++-- AuditNodeListener.java          # Agent/node lifecycle tracking
++-- AuditComputerListener.java      # Node online/offline status tracking
++-- AuditCLIListener.java           # CLI command context tracking
++-- AuditRestartListener.java       # System restart tracking
 +-- AuditRequestCapture.java        # HTTP request capture
 +-- AuditAlertEngine.java           # Rule-based alerts
-+-- AnomalyDetector.java            # Anomaly detection
++-- AnomalyDetector.java            # Anomaly detector
 +-- AuditMetricsEngine.java         # Metrics collection
 +-- BatchWriteBuffer.java           # Batch writer
 +-- ComplianceReportGenerator.java  # Compliance reports
@@ -328,6 +348,21 @@ MIT License.
 - **Issues:** Report bugs and feature requests on GitHub
 
 ## Version History
+
+### 88.vb_c8b_8c60ef3f
+Introduced CLI event logging (`AuditCLIListener`) to capture and audit Jenkins CLI command executions, registering execution contexts to attribute CLI-initiated actions across domain listeners. (#40 by @harryofficial, @Aarav-Singh2007)
+
+### 87.v6848b_a_db_83db_
+Hotfix: Revamped audit configuration schema for node events and added node lifecycle event logging (`AuditNodeListener`), intelligent update filtering to suppress noise during offline status toggles, and schema updates.
+
+### 86.vce6f147b_a_f3e
+Implementation of node events logging (`AuditNodeListener`, `AuditComputerListener`) to track agent creation (`NODE_CREATED`), configuration changes (`NODE_UPDATED`), deletions (`NODE_DELETED`), and online/offline status transitions (`NODE_OFFLINE`, `NODE_ONLINE`).
+
+### 85.v150658c752a_9
+Restart logging bugfix (`AuditRestartListener`), resolving duplicate restart audit logs with a deduplication window, properly differentiating between "Safe" and "Immediate" restarts (`SYSTEM_RESTART`), and capturing pending restarts via Update Center.
+
+### 84.v6332c6078927
+Fix plugin installation and update audit logging in `AuditRequestCapture`, enhancing route classification and resolving single and bulk plugin operations to accurately record `PLUGIN_INSTALLED` vs `PLUGIN_UPDATED` events.
 
 ### 82.v33a_7d14a_b_8e0
 The complete Anomaly Detection (AD) implementation in AuditFlow will be rolled out in multiple phases. Phase 1 has been released, with additional detection capabilities planned for future releases.
