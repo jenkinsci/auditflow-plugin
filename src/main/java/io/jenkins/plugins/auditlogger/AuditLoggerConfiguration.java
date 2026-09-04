@@ -143,6 +143,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
 
     // UI
     private boolean enableRiskLevels = true;
+    private boolean enableAnomalyBanner = true;
     private boolean enableEventCategories = false;
     private boolean enableTimelineView = false;
     private boolean enableSensitiveEventsPanel = false;
@@ -280,6 +281,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         JSONObject dashboardStatsBlock = getOptionalBlock(json, "enableDashboardStats");
         setEnableDashboardStats(isOptionalBlockEnabled(json, "enableDashboardStats"));
         setEnableRiskLevels(json.optBoolean("enableRiskLevels", false));
+        setEnableAnomalyBanner(json.optBoolean("enableAnomalyBanner", false));
         if (json.has("displayTimeZoneId")) setDisplayTimeZoneId(json.optString("displayTimeZoneId", displayTimeZoneId));
         JSONObject dashboardStatsConfig = dashboardStatsBlock != null ? dashboardStatsBlock : json;
         setShowMetricTotal(dashboardStatsConfig.optBoolean("showMetricTotal", false));
@@ -500,6 +502,15 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     @DataBoundSetter
     public void setEnableRiskLevels(boolean enableRiskLevels) {
         this.enableRiskLevels = enableRiskLevels;
+    }
+
+    public boolean isEnableAnomalyBanner() {
+        return enableAnomalyBanner;
+    }
+
+    @DataBoundSetter
+    public void setEnableAnomalyBanner(boolean enableAnomalyBanner) {
+        this.enableAnomalyBanner = enableAnomalyBanner;
     }
 
 

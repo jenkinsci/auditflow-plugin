@@ -73,4 +73,29 @@ class AuditFlowPageDecoratorTest {
         assertNotNull(url, "AuditFlow URL should not be null");
         assertTrue(url.contains("manage/auditflow-logs/"), "URL should point to manage/auditflow-logs/");
     }
+
+    @Test
+    void testBannerHiddenWhenDisabledInConfiguration(JenkinsRule j) {
+        AuditLogStorage storage = AuditLogStorage.getInstance();
+        AnomalyDetector detector = storage.getAnomalyDetector();
+
+        // Inject simulated anomaly alert
+        AnomalyDetector.AnomalyAlert alert = new AnomalyDetector.AnomalyAlert(
+                AnomalyDetector.AnomalyType.BRUTE_FORCE_LOGIN,
+                "target-user",
+                "Multiple failed login attempts detected",
+                "CRITICAL"
+        );
+        detector.addAlert(alert);
+        assertTrue(decorator.isBannerVisible(), "Banner should be visible initially");
+
+        // Disable banner in configuration
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        config.setEnableAnomalyBanner(false);
+        assertFalse(decorator.isBannerVisible(), "Banner should be hidden when disabled in configuration");
+
+        // Reset configuration
+        config.setEnableAnomalyBanner(true);
+        assertTrue(decorator.isBannerVisible(), "Banner should be visible again when re-enabled");
+    }
 }

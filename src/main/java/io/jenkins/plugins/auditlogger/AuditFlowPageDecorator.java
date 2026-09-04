@@ -22,6 +22,10 @@ public class AuditFlowPageDecorator extends PageDecorator {
      */
     public boolean isBannerVisible() {
         try {
+            AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+            if (config != null && !config.isEnableAnomalyBanner()) {
+                return false;
+            }
             return getActiveAlertCount() > 0;
         } catch (Exception e) {
             return false;

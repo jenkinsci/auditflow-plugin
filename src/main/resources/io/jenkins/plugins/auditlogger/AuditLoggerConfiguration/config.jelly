@@ -46,6 +46,10 @@
             </div>
         </f:block>
 
+        <f:entry title="Enable Anomaly Alert Banner (display global security alert banner on Jenkins pages when anomalies occur)">
+            <f:checkbox name="enableAnomalyBanner" checked="${descriptor.isEnableAnomalyBanner()}"/>
+        </f:entry>
+
         <f:optionalBlock title="Failed Login Detection (flag brute force attempts)"
                          name="anomalyFailedLogins"
                          checked="${descriptor.isAnomalyFailedLogins()}">
