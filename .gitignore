@@ -25,7 +25,9 @@ regression/
 # Jenkins
 work/
 .m2/
+auditflow-logs/
 
 # Build
 *.hpi
 *.jar
+cp.txt
