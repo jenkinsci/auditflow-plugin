@@ -1,0 +1,96 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+    <j:if test="${it.bannerVisible}">
+        <style type="text/css">
+            .auditflow-anomaly-banner {
+                background: linear-gradient(135deg, rgba(220, 38, 38, 0.12) 0%, rgba(185, 28, 28, 0.22) 100%);
+                border: 1px solid rgba(239, 68, 68, 0.4);
+                border-left: 5px solid #ef4444;
+                color: var(--text-color, #1e293b);
+                padding: 10px 16px;
+                margin: 8px 16px 12px 16px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                font-family: inherit;
+                box-shadow: 0 2px 8px rgba(239, 68, 68, 0.12);
+                backdrop-filter: blur(4px);
+                z-index: 999;
+            }
+            .auditflow-anomaly-banner--critical {
+                border-left-color: #dc2626;
+                background: linear-gradient(135deg, rgba(220, 38, 38, 0.2) 0%, rgba(153, 27, 27, 0.3) 100%);
+            }
+            .auditflow-banner-left {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            .auditflow-badge {
+                background-color: #ef4444;
+                color: #ffffff;
+                font-size: 0.75rem;
+                font-weight: 700;
+                padding: 3px 9px;
+                border-radius: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                white-space: nowrap;
+            }
+            .auditflow-badge--critical {
+                background-color: #dc2626;
+                animation: auditflow-pulse 2s infinite;
+            }
+            @keyframes auditflow-pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.65; }
+                100% { opacity: 1; }
+            }
+            .auditflow-banner-text {
+                font-size: 0.9rem;
+                font-weight: 500;
+            }
+            .auditflow-banner-action-btn {
+                background: #ef4444;
+                color: #ffffff !important;
+                padding: 6px 14px;
+                border-radius: 6px;
+                text-decoration: none !important;
+                font-size: 0.85rem;
+                font-weight: 600;
+                transition: all 0.2s ease;
+                white-space: nowrap;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .auditflow-banner-action-btn:hover {
+                background: #dc2626;
+                box-shadow: 0 2px 6px rgba(220, 38, 38, 0.3);
+            }
+        </style>
+        <div class="auditflow-anomaly-banner auditflow-anomaly-banner--${it.highestSeverity.toLowerCase()}">
+            <div class="auditflow-banner-left">
+                <span class="auditflow-badge auditflow-badge--${it.highestSeverity.toLowerCase()}">
+                    &#9888; ${it.highestSeverity} SECURITY ALERT
+                </span>
+                <span class="auditflow-banner-text">
+                    <j:choose>
+                        <j:when test="${it.adminUser}">
+                            <strong>AuditFlow:</strong> ${it.activeAlertCount} active security anomaly event(s) detected on this Jenkins controller.
+                        </j:when>
+                        <j:otherwise>
+                            <strong>AuditFlow Security Warning:</strong> ${it.activeAlertCount} active security anomaly event(s) detected. Please notify your Jenkins Administrator.
+                        </j:otherwise>
+                    </j:choose>
+                </span>
+            </div>
+            <j:if test="${it.adminUser}">
+                <a href="${it.auditFlowUrl}" class="auditflow-banner-action-btn">
+                    Review &amp; Manage in AuditFlow &#8594;
+                </a>
+            </j:if>
+        </div>
+    </j:if>
+</j:jelly>

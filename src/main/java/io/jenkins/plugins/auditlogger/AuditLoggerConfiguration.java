@@ -491,6 +491,11 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         this.enableDashboardStats = enableDashboardStats;
     }
 
+    @DataBoundSetter
+    public void setEnableAnomalyDetection(boolean enableAnomalyDetection) {
+        this.enableAnomalyDetection = enableAnomalyDetection;
+    }
+
 
     @DataBoundSetter
     public void setEnableRiskLevels(boolean enableRiskLevels) {
@@ -702,7 +707,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public int getStartupGracePeriodSeconds() { return startupGracePeriodSeconds; }
 
     public boolean isEnableAdvancedIndexing() { return enableAdvancedIndexing; }
-    public boolean isEnableAnomalyDetection() { return false; }
+    public boolean isEnableAnomalyDetection() { return enableAnomalyDetection; }
     public boolean isEnableMetricsCollection() { return enableMetricsCollection; }
     public int getBatchWriteSize() { return batchWriteSize; }
     public int getBatchFlushIntervalSeconds() { return batchFlushIntervalSeconds; }

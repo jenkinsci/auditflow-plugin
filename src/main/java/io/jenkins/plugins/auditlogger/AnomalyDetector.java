@@ -363,7 +363,11 @@ public class AnomalyDetector {
         }
     }
 
-    private void addAlert(AnomalyAlert alert, AuditLoggerConfiguration config) {
+    public void addAlert(AnomalyAlert alert) {
+        addAlert(alert, AuditLoggerConfiguration.get());
+    }
+
+    public void addAlert(AnomalyAlert alert, AuditLoggerConfiguration config) {
         activeAlerts.add(alert);
         trimAlerts();
 
