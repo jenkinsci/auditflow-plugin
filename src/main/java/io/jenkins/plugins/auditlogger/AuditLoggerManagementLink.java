@@ -482,11 +482,12 @@ public class AuditLoggerManagementLink extends ManagementLink {
                                          String searchText,
                                          String searchColumn,
                                          ZoneId displayZone) {
-        if (searchText == null || searchText.isEmpty()) {
+        if (searchText == null || searchText.trim().isEmpty()) {
             return true;
         }
 
-        String needle = searchText.toLowerCase(Locale.ENGLISH);
+        String needle = searchText.trim().toLowerCase(Locale.ENGLISH);
+        String needleNorm = needle.replace('_', ' ');
         if ("all".equals(searchColumn)) {
             String haystack = String.join(" ",
                     nvl(entry.getUsername()),
@@ -498,7 +499,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
                     nvl(entry.getTriggerType()),
                     entry.getReadableTimestamp(displayZone))
                     .toLowerCase(Locale.ENGLISH);
-            return haystack.contains(needle);
+            return haystack.contains(needle) || haystack.replace('_', ' ').contains(needleNorm);
         }
 
         String value;
@@ -524,7 +525,9 @@ public class AuditLoggerManagementLink extends ManagementLink {
             default:
                 value = "";
         }
-        return value != null && value.toLowerCase(Locale.ENGLISH).contains(needle);
+        if (value == null) return false;
+        String valLower = value.toLowerCase(Locale.ENGLISH);
+        return valLower.contains(needle) || valLower.replace('_', ' ').contains(needleNorm);
     }
 
     private static Comparator<AuditLogEntry> buildComparator(String sortField) {
