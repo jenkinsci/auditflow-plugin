@@ -27,9 +27,12 @@
                 <h1>${it.pageHeading}</h1>
 
                 <div class="onboarding-banner" id="onboardingBanner">
-                    <h2>✨ What's New in AuditFlow</h2>
+                    <h2>✨ What’s New in AuditFlow</h2>
                     <p>
-                        <strong>Phase 2 Security Anomaly Detection &amp; Risk Insights:</strong> Real-time automated risk tracking for brute-force logins, unusual IP access, multi-IP concurrent logins, suspicious auth patterns, administrative privilege changes, and user account lifecycle events. Easily toggle and configure anomaly rules in System Settings, and view live metrics in your AuditFlow dashboard!
+                        <strong>Phase 2 — Security Anomaly Detection &amp; Risk Insights:</strong> Detect suspicious authentication, IP, login, privilege, and account activity in real time. Configure anomaly rules in System Settings and monitor risk insights from your AuditFlow Dashboard.
+                    </p>
+                    <p class="onboarding-banner__note" style="margin-top: 6px; font-size: 0.88rem; opacity: 0.9;">
+                        <em>Note: Anomaly detection settings have been updated. Please review System Settings to verify that your preferred detection rules are enabled or disabled as intended.</em>
                     </p>
                     <button type="button" class="jenkins-button onboarding-banner__dismiss" id="dismissOnboardingButton">Got it</button>
                 </div>
