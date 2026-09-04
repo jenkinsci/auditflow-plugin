@@ -668,11 +668,7 @@
     }
 
     function isOnboardingDismissed() {
-        try {
-            return localStorage.getItem(onboardingStorageKey) === '1';
-        } catch (ignored) {
-            return false;
-        }
+        return false; // Forced false for testing so What's New banner is always visible on current version
     }
 
     function esc(value) {
