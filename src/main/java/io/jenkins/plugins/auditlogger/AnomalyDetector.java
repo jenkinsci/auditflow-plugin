@@ -123,9 +123,25 @@ public class AnomalyDetector {
 
     private final CopyOnWriteArrayList<AnomalyAlert> activeAlerts = new CopyOnWriteArrayList<>();
     private final AtomicLong lastCleanup = new AtomicLong(0L);
+    private volatile AuditLoggerConfiguration lastConfig;
+
+    private AuditLoggerConfiguration resolveConfig(AuditLoggerConfiguration explicitConfig) {
+        if (explicitConfig != null) {
+            this.lastConfig = explicitConfig;
+            return explicitConfig;
+        }
+        if (lastConfig != null) {
+            return lastConfig;
+        }
+        try {
+            return AuditLoggerConfiguration.get();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
 
     public void analyze(AuditLogEntry entry) {
-        analyze(entry, AuditLoggerConfiguration.get());
+        analyze(entry, null);
     }
 
     public void analyze(AuditLogEntry entry, AuditLoggerConfiguration config) {
@@ -133,8 +149,8 @@ public class AnomalyDetector {
             return;
         }
 
-        AuditLoggerConfiguration currentConfig = config != null ? config : AuditLoggerConfiguration.get();
-        if (currentConfig != null && !currentConfig.isEnableAnomalyDetection()) {
+        AuditLoggerConfiguration currentConfig = resolveConfig(config);
+        if (currentConfig != null && (!currentConfig.isEnableAnomalyDetection() || !currentConfig.isAnyAnomalyRuleEnabled())) {
             return;
         }
         long eventTime = entry.getTimestamp();
@@ -154,8 +170,7 @@ public class AnomalyDetector {
             return;
         }
 
-        boolean detectionEnabled = config != null && config.isAnomalyFailedLogins();
-        if (!detectionEnabled) {
+        if (config != null && !isRuleEnabled(AnomalyType.BRUTE_FORCE_LOGIN, config)) {
             return;
         }
 
@@ -198,7 +213,7 @@ public class AnomalyDetector {
     }
 
     private void analyzeUnusualIp(AuditLogEntry entry, AuditLoggerConfiguration config) {
-        if (config == null || !config.isAnomalyUnusualIp()) {
+        if (config != null && !isRuleEnabled(AnomalyType.UNUSUAL_IP, config)) {
             return;
         }
 
@@ -229,7 +244,7 @@ public class AnomalyDetector {
     }
 
     private void analyzeMultiIpLogin(AuditLogEntry entry, AuditLoggerConfiguration config) {
-        if (config == null || !config.isAnomalyMultiIpLogin()) {
+        if (config != null && !isRuleEnabled(AnomalyType.MULTI_IP_LOGIN, config)) {
             return;
         }
 
@@ -244,8 +259,8 @@ public class AnomalyDetector {
             return;
         }
 
-        int threshold = Math.max(2, config.getAnomalyMultiIpLoginThreshold());
-        int windowMinutes = Math.max(1, config.getAnomalyMultiIpLoginWindowMinutes());
+        int threshold = Math.max(2, config != null ? config.getAnomalyMultiIpLoginThreshold() : 2);
+        int windowMinutes = Math.max(1, config != null ? config.getAnomalyMultiIpLoginWindowMinutes() : 15);
         long eventTime = entry.getTimestamp();
         long cutoff = eventTime - windowMinutes * 60_000L;
 
@@ -278,7 +293,7 @@ public class AnomalyDetector {
     }
 
     private void analyzeSuspiciousAuthPattern(AuditLogEntry entry, AuditLoggerConfiguration config) {
-        if (config == null || !config.isAnomalySuspiciousAuth()) {
+        if (config != null && !isRuleEnabled(AnomalyType.SUSPICIOUS_AUTH_PATTERN, config)) {
             return;
         }
 
@@ -313,7 +328,7 @@ public class AnomalyDetector {
     }
 
     private void analyzeAdminPrivilegeChange(AuditLogEntry entry, AuditLoggerConfiguration config) {
-        if (config == null || !config.isAnomalyAdminPrivilegeChanges()) {
+        if (config != null && !isRuleEnabled(AnomalyType.ADMIN_PRIVILEGE_CHANGE, config)) {
             return;
         }
 
@@ -332,15 +347,15 @@ public class AnomalyDetector {
     }
 
     private void analyzeUserLifecycle(AuditLogEntry entry, AuditLoggerConfiguration config) {
-        if (config == null || !config.isAnomalyUserLifecycle()) {
+        if (config != null && !isRuleEnabled(AnomalyType.USER_LIFECYCLE_ANOMALY, config)) {
             return;
         }
 
         String action = entry.getAction() != null ? entry.getAction().toUpperCase() : "";
         if (action.contains("USER_CREATED") || action.contains("USER_DELETED")) {
             String user = entry.getUsername() != null ? entry.getUsername() : "UNKNOWN";
-            int threshold = Math.max(1, config.getAnomalyUserLifecycleThreshold());
-            int windowMinutes = Math.max(1, config.getAnomalyUserLifecycleWindowMinutes());
+            int threshold = Math.max(1, config != null ? config.getAnomalyUserLifecycleThreshold() : 1);
+            int windowMinutes = Math.max(1, config != null ? config.getAnomalyUserLifecycleWindowMinutes() : 15);
             long eventTime = entry.getTimestamp();
             long cutoff = eventTime - windowMinutes * 60_000L;
 
@@ -367,18 +382,22 @@ public class AnomalyDetector {
     }
 
     public void addAlert(AnomalyAlert alert) {
-        addAlert(alert, AuditLoggerConfiguration.get());
+        addAlert(alert, null);
     }
 
     public void addAlert(AnomalyAlert alert, AuditLoggerConfiguration config) {
+        if (alert == null) {
+            return;
+        }
         activeAlerts.add(alert);
         trimAlerts();
 
-        if (config != null && config.isEnableEmailAlerts()) {
-            sendEmailNotification(alert, config.getAlertEmailAddresses());
+        AuditLoggerConfiguration currentConfig = resolveConfig(config);
+        if (currentConfig != null && currentConfig.isEnableEmailAlerts()) {
+            sendEmailNotification(alert, currentConfig.getAlertEmailAddresses());
         }
-        if (config != null && config.isEnableWebhookAlerts()) {
-            sendWebhookNotification(alert, config.getWebhookUrl());
+        if (currentConfig != null && currentConfig.isEnableWebhookAlerts()) {
+            sendWebhookNotification(alert, currentConfig.getWebhookUrl());
         }
     }
 
@@ -396,7 +415,16 @@ public class AnomalyDetector {
     }
 
     public List<AnomalyAlert> getAlerts(int limit) {
+        return getAlerts(limit, null);
+    }
+
+    public List<AnomalyAlert> getAlerts(int limit, AuditLoggerConfiguration config) {
         if (limit <= 0 || activeAlerts.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        AuditLoggerConfiguration currentConfig = resolveConfig(config);
+        if (currentConfig != null && (!currentConfig.isEnableAnomalyDetection() || !currentConfig.isAnyAnomalyRuleEnabled())) {
             return Collections.emptyList();
         }
 
@@ -404,12 +432,46 @@ public class AnomalyDetector {
         List<AnomalyAlert> recentOpenAlerts = new ArrayList<>(Math.min(size, limit));
         for (int i = size - 1; i >= 0 && recentOpenAlerts.size() < limit; i--) {
             AnomalyAlert alert = activeAlerts.get(i);
-            if (!alert.isDismissed()) {
+            if (!alert.isDismissed() && isRuleEnabled(alert.type, currentConfig)) {
                 recentOpenAlerts.add(alert);
             }
         }
         Collections.reverse(recentOpenAlerts);
         return recentOpenAlerts;
+    }
+
+    public boolean isRuleEnabled(AnomalyType type, AuditLoggerConfiguration config) {
+        if (config == null) {
+            return true;
+        }
+        if (!config.isEnableAnomalyDetection()) {
+            return false;
+        }
+        if (type == null) {
+            return false;
+        }
+        switch (type) {
+            case BRUTE_FORCE_LOGIN:
+                return config.isAnomalyFailedLogins();
+            case UNUSUAL_IP:
+                return config.isAnomalyUnusualIp();
+            case MULTI_IP_LOGIN:
+                return config.isAnomalyMultiIpLogin();
+            case SUSPICIOUS_AUTH_PATTERN:
+                return config.isAnomalySuspiciousAuth();
+            case ADMIN_PRIVILEGE_CHANGE:
+                return config.isAnomalyAdminPrivilegeChanges();
+            case USER_LIFECYCLE_ANOMALY:
+                return config.isAnomalyUserLifecycle();
+            case MASS_CHANGES:
+                return config.isAnomalyGlobalConfigChanges() || config.isAnomalyJobConfigChanges();
+            case AFTER_HOURS_ADMIN:
+                return config.isAnomalyOffHoursAdmin();
+            case CREDENTIAL_EXPOSURE:
+                return config.isAnomalyCredentialChanges();
+            default:
+                return true;
+        }
     }
 
     private boolean hasActiveOpenAlert(String user, AnomalyType type) {
@@ -446,6 +508,19 @@ public class AnomalyDetector {
             }
         }
         return count;
+    }
+
+    public void dismissAlertsForDisabledRules(AuditLoggerConfiguration config) {
+        if (config == null || !config.isEnableAnomalyDetection() || !config.isAnyAnomalyRuleEnabled()) {
+            activeAlerts.clear();
+            return;
+        }
+        for (AnomalyAlert alert : activeAlerts) {
+            if (!isRuleEnabled(alert.type, config)) {
+                alert.dismiss();
+            }
+        }
+        activeAlerts.removeIf(AnomalyAlert::isDismissed);
     }
 
     public void cleanupOldAlerts() {

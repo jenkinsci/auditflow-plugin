@@ -50,7 +50,7 @@
                          name="enableAnomalyDetection"
                          checked="${descriptor.isEnableAnomalyDetection()}">
 
-            <f:entry title="Enable Anomaly Alert Banner (display global security alert banner on Jenkins pages when anomalies occur)">
+            <f:entry title="Global Anomaly Alert Banner (display a persistent alert banner across Jenkins when active anomalies are detected)">
                 <f:checkbox name="enableAnomalyBanner" checked="${descriptor.isEnableAnomalyBanner()}"/>
             </f:entry>
 
@@ -102,6 +102,29 @@
                     <f:number name="anomalyUserLifecycleWindowMinutes" value="${descriptor.getAnomalyUserLifecycleWindowMinutes()}"/>
                 </f:entry>
             </f:optionalBlock>
+
+            <f:block>
+                <h4>Anomaly Alert Notifications</h4>
+                <div class="jenkins-section__description">
+                    Configure notification destinations for audit and alert delivery.
+                </div>
+            </f:block>
+            <f:optionalBlock title="Email notifications (send anomaly alerts through Jenkins mail settings)"
+                             name="enableEmailAlerts"
+                             checked="${descriptor.isEnableEmailAlerts()}">
+                <f:entry title="Alert email addresses"
+                         description="Comma-separated recipients for anomaly emails, for example: secops@example.com, admins@example.com">
+                    <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
+                </f:entry>
+            </f:optionalBlock>
+            <f:optionalBlock title="Webhook notifications (send anomaly alerts to a webhook endpoint using JSON payload)"
+                             name="enableWebhookAlerts"
+                             checked="${descriptor.isEnableWebhookAlerts()}">
+                <f:entry title="Webhook URL"
+                         description="Enter a valid HTTP webhook endpoint such as Slack, Microsoft Teams, or another supported service. AuditFlow sends a JSON payload whenever an alert is created. Example: https://hooks.slack.com/services/T000/B000/XXXX">
+                    <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
+                </f:entry>
+            </f:optionalBlock>
         </f:optionalBlock>
     </f:section>
 
@@ -149,28 +172,6 @@
                 <script type="application/json" id="auditflowTimezoneOptions">${descriptor.availableDisplayTimeZonesJson}</script>
             </div>
         </f:entry>
-        <f:block>
-            <h4>Notifications</h4>
-            <div class="jenkins-section__description">
-                Configure notification destinations for audit and alert delivery.
-            </div>
-        </f:block>
-        <f:optionalBlock title="Email notifications (send anomaly alerts through Jenkins mail settings)"
-                         name="enableEmailAlerts"
-                         checked="${descriptor.isEnableEmailAlerts()}">
-            <f:entry title="Alert email addresses"
-                     description="Comma-separated recipients for anomaly emails, for example: secops@example.com, admins@example.com">
-                <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
-            </f:entry>
-        </f:optionalBlock>
-        <f:optionalBlock title="Webhook notifications (send anomaly alerts to a webhook endpoint using JSON payload)"
-                         name="enableWebhookAlerts"
-                         checked="${descriptor.isEnableWebhookAlerts()}">
-            <f:entry title="Webhook URL"
-                     description="Enter a valid HTTP webhook endpoint such as Slack, Microsoft Teams, or another supported service. AuditFlow sends a JSON payload whenever an alert is created. Example: https://hooks.slack.com/services/T000/B000/XXXX">
-                <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
-            </f:entry>
-        </f:optionalBlock>
         <f:block>
             <h4>Export and Integrations</h4>
             <div class="jenkins-section__description">

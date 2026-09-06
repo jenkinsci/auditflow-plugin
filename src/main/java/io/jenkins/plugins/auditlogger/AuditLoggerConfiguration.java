@@ -143,7 +143,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
 
     // UI
     private boolean enableRiskLevels = true;
-    private boolean enableAnomalyBanner = true;
+    private Boolean enableAnomalyBanner = true;
     private boolean enableEventCategories = false;
     private boolean enableTimelineView = false;
     private boolean enableSensitiveEventsPanel = false;
@@ -175,8 +175,9 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         if (enablePluginEvents == null) enablePluginEvents = true;
         if (enableSystemConfigEvents == null) enableSystemConfigEvents = true;
         if (enableNodeEvents == null) enableNodeEvents = true;
-        if (anomalyFailedLogins == null) anomalyFailedLogins = true;
+        if (anomalyFailedLogins == null) anomalyFailedLogins = false;
         if (enableAnomalyDetection == null) enableAnomalyDetection = true;
+        if (enableAnomalyBanner == null) enableAnomalyBanner = true;
         if (enableLogRotation == null) enableLogRotation = true;
         if (maskTokens == null) maskTokens = true;
         if (maskEmailAddresses == null) maskEmailAddresses = false;
@@ -213,6 +214,14 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
             applyJsonConfiguration(json);
             StartupPhaseManager.setGracePeriodSeconds(startupGracePeriodSeconds);
             bulkChange.commit();
+
+            try {
+                AuditLogStorage storage = AuditLogStorage.getInstance();
+                if (storage != null && storage.getAnomalyDetector() != null) {
+                    storage.getAnomalyDetector().dismissAlertsForDisabledRules(this);
+                }
+            } catch (Exception ignored) {}
+
             return true;
         } catch (IOException e) {
             LOGGER.warning("Failed to save AuditFlow configuration: " + e.getMessage());
@@ -314,14 +323,21 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         setMaskEmailAddresses(json.optBoolean("maskEmailAddresses", false));
         setMaskCreditCards(json.optBoolean("maskCreditCards", false));
 
-        // ── Notification toggles (same fix: no json.has() for checkboxes) ──
-        JSONObject emailAlertsBlock = getOptionalBlock(json, "enableEmailAlerts");
-        setEnableEmailAlerts(isOptionalBlockEnabled(json, "enableEmailAlerts"));
-        JSONObject emailAlertsConfig = emailAlertsBlock != null ? emailAlertsBlock : json;
+        // ── Notification toggles (support both inside anomalyConfig and root json) ──
+        JSONObject emailAlertsBlock = getOptionalBlock(anomalyConfig, "enableEmailAlerts");
+        if (emailAlertsBlock == null) {
+            emailAlertsBlock = getOptionalBlock(json, "enableEmailAlerts");
+        }
+        setEnableEmailAlerts(isOptionalBlockEnabled(anomalyConfig, "enableEmailAlerts") || isOptionalBlockEnabled(json, "enableEmailAlerts"));
+        JSONObject emailAlertsConfig = emailAlertsBlock != null ? emailAlertsBlock : (anomalyConfig.has("alertEmailAddresses") ? anomalyConfig : json);
         if (emailAlertsConfig.has("alertEmailAddresses")) setAlertEmailAddresses(emailAlertsConfig.optString("alertEmailAddresses", alertEmailAddresses));
-        JSONObject webhookAlertsBlock = getOptionalBlock(json, "enableWebhookAlerts");
-        setEnableWebhookAlerts(isOptionalBlockEnabled(json, "enableWebhookAlerts"));
-        JSONObject webhookAlertsConfig = webhookAlertsBlock != null ? webhookAlertsBlock : json;
+
+        JSONObject webhookAlertsBlock = getOptionalBlock(anomalyConfig, "enableWebhookAlerts");
+        if (webhookAlertsBlock == null) {
+            webhookAlertsBlock = getOptionalBlock(json, "enableWebhookAlerts");
+        }
+        setEnableWebhookAlerts(isOptionalBlockEnabled(anomalyConfig, "enableWebhookAlerts") || isOptionalBlockEnabled(json, "enableWebhookAlerts"));
+        JSONObject webhookAlertsConfig = webhookAlertsBlock != null ? webhookAlertsBlock : (anomalyConfig.has("webhookUrl") ? anomalyConfig : json);
         if (webhookAlertsConfig.has("webhookUrl")) setWebhookUrl(webhookAlertsConfig.optString("webhookUrl", webhookUrl));
     }
 
@@ -492,6 +508,41 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         this.anomalyUserLifecycleWindowMinutes = clamp(anomalyUserLifecycleWindowMinutes, 1, 1440);
     }
 
+    @DataBoundSetter
+    public void setAnomalyGlobalConfigChanges(boolean anomalyGlobalConfigChanges) {
+        this.anomalyGlobalConfigChanges = anomalyGlobalConfigChanges;
+    }
+
+    @DataBoundSetter
+    public void setAnomalyJobConfigChanges(boolean anomalyJobConfigChanges) {
+        this.anomalyJobConfigChanges = anomalyJobConfigChanges;
+    }
+
+    @DataBoundSetter
+    public void setAnomalyOffHoursAdmin(boolean anomalyOffHoursAdmin) {
+        this.anomalyOffHoursAdmin = anomalyOffHoursAdmin;
+    }
+
+    @DataBoundSetter
+    public void setAnomalyCredentialChanges(boolean anomalyCredentialChanges) {
+        this.anomalyCredentialChanges = anomalyCredentialChanges;
+    }
+
+    @DataBoundSetter
+    public void setAnomalySecurityConfigChanges(boolean anomalySecurityConfigChanges) {
+        this.anomalySecurityConfigChanges = anomalySecurityConfigChanges;
+    }
+
+    @DataBoundSetter
+    public void setAnomalyPluginChanges(boolean anomalyPluginChanges) {
+        this.anomalyPluginChanges = anomalyPluginChanges;
+    }
+
+    @DataBoundSetter
+    public void setAnomalyBuildFailures(boolean anomalyBuildFailures) {
+        this.anomalyBuildFailures = anomalyBuildFailures;
+    }
+
 
     @DataBoundSetter
     public void setEnableDashboardStats(boolean enableDashboardStats) {
@@ -510,7 +561,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     }
 
     public boolean isEnableAnomalyBanner() {
-        return enableAnomalyBanner;
+        return enableAnomalyBanner == null || enableAnomalyBanner;
     }
 
     @DataBoundSetter
@@ -724,6 +775,25 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
 
     public boolean isEnableAdvancedIndexing() { return enableAdvancedIndexing; }
     public boolean isEnableAnomalyDetection() { return enableAnomalyDetection == null || enableAnomalyDetection; }
+
+    public boolean isAnyAnomalyRuleEnabled() {
+        if (!isEnableAnomalyDetection()) {
+            return false;
+        }
+        return (anomalyFailedLogins != null && anomalyFailedLogins)
+                || anomalyUnusualIp
+                || anomalyMultiIpLogin
+                || anomalySuspiciousAuth
+                || anomalyAdminPrivilegeChanges
+                || anomalyUserLifecycle
+                || anomalyGlobalConfigChanges
+                || anomalyJobConfigChanges
+                || anomalyOffHoursAdmin
+                || anomalyCredentialChanges
+                || anomalySecurityConfigChanges
+                || anomalyPluginChanges
+                || anomalyBuildFailures;
+    }
     public boolean isEnableMetricsCollection() { return enableMetricsCollection; }
     public int getBatchWriteSize() { return batchWriteSize; }
     public int getBatchFlushIntervalSeconds() { return batchFlushIntervalSeconds; }

@@ -47,6 +47,8 @@ class AuditFlowPageDecoratorTest {
     void testBannerVisibleWhenAnomaliesExist(JenkinsRule j) {
         AuditLogStorage storage = AuditLogStorage.getInstance();
         AnomalyDetector detector = storage.getAnomalyDetector();
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        config.setAnomalyFailedLogins(true);
 
         // Inject simulated anomaly alert
         AnomalyDetector.AnomalyAlert alert = new AnomalyDetector.AnomalyAlert(
@@ -55,16 +57,18 @@ class AuditFlowPageDecoratorTest {
                 "Multiple failed login attempts detected",
                 "CRITICAL"
         );
-        detector.addAlert(alert);
+        detector.addAlert(alert, config);
 
         assertTrue(decorator.isBannerVisible(), "Banner should be visible when active anomaly exists");
         assertTrue(decorator.getActiveAlertCount() > 0, "Active alert count should be > 0");
         assertEquals("CRITICAL", decorator.getHighestSeverity(), "Highest severity should match CRITICAL");
+        assertEquals("Brute Force Login", decorator.getActiveAlertTypesSummary(), "Alert types summary should match");
 
         // Verify dismissal hides the banner
         detector.dismissAllAlerts();
         assertFalse(decorator.isBannerVisible(), "Banner should hide after all alerts are dismissed");
         assertEquals(0, decorator.getActiveAlertCount(), "Active alert count should return 0 after dismissal");
+        assertEquals("", decorator.getActiveAlertTypesSummary(), "Alert types summary should be empty after dismissal");
     }
 
     @Test
@@ -78,6 +82,8 @@ class AuditFlowPageDecoratorTest {
     void testBannerHiddenWhenDisabledInConfiguration(JenkinsRule j) {
         AuditLogStorage storage = AuditLogStorage.getInstance();
         AnomalyDetector detector = storage.getAnomalyDetector();
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        config.setAnomalyFailedLogins(true);
 
         // Inject simulated anomaly alert
         AnomalyDetector.AnomalyAlert alert = new AnomalyDetector.AnomalyAlert(
@@ -86,17 +92,16 @@ class AuditFlowPageDecoratorTest {
                 "Multiple failed login attempts detected",
                 "CRITICAL"
         );
-        detector.addAlert(alert);
+        detector.addAlert(alert, config);
         assertTrue(decorator.isBannerVisible(), "Banner should be visible initially");
 
-        // Disable banner in configuration
-        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
-        config.setEnableAnomalyBanner(false);
-        assertFalse(decorator.isBannerVisible(), "Banner should be hidden when disabled in configuration");
+        // Disable specific anomaly rule
+        config.setAnomalyFailedLogins(false);
+        assertFalse(decorator.isBannerVisible(), "Banner should be hidden when anomaly rule is disabled");
 
         // Reset configuration
-        config.setEnableAnomalyBanner(true);
-        assertTrue(decorator.isBannerVisible(), "Banner should be visible again when re-enabled");
+        config.setAnomalyFailedLogins(true);
+        assertTrue(decorator.isBannerVisible(), "Banner should be visible again when rule is re-enabled");
 
         // Test master anomaly detection toggle
         config.setEnableAnomalyDetection(false);
