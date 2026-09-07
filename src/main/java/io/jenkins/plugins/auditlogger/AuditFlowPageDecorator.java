@@ -51,9 +51,7 @@ public class AuditFlowPageDecorator extends PageDecorator {
      */
     public int getActiveAlertCount() {
         try {
-            AuditLogStorage storage = AuditLogStorage.getInstance();
-            if (storage == null) return 0;
-            AnomalyDetector detector = storage.getAnomalyDetector();
+            AnomalyDetector detector = AuditLogStorage.getInstance().getAnomalyDetector();
             if (detector == null) return 0;
             AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
             if (config == null || !config.isEnableAnomalyDetection() || !config.isEnableAnomalyBanner() || !config.isAnyAnomalyRuleEnabled()) {
@@ -71,9 +69,7 @@ public class AuditFlowPageDecorator extends PageDecorator {
      */
     public String getActiveAlertTypesSummary() {
         try {
-            AuditLogStorage storage = AuditLogStorage.getInstance();
-            if (storage == null) return "";
-            AnomalyDetector detector = storage.getAnomalyDetector();
+            AnomalyDetector detector = AuditLogStorage.getInstance().getAnomalyDetector();
             if (detector == null) return "";
             AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
             if (config == null || !config.isEnableAnomalyDetection() || !config.isEnableAnomalyBanner() || !config.isAnyAnomalyRuleEnabled()) {
@@ -128,9 +124,7 @@ public class AuditFlowPageDecorator extends PageDecorator {
      */
     public String getHighestSeverity() {
         try {
-            AuditLogStorage storage = AuditLogStorage.getInstance();
-            if (storage == null) return "HIGH";
-            AnomalyDetector detector = storage.getAnomalyDetector();
+            AnomalyDetector detector = AuditLogStorage.getInstance().getAnomalyDetector();
             if (detector == null) return "HIGH";
             AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
             if (config == null || !config.isEnableAnomalyDetection() || !config.isEnableAnomalyBanner() || !config.isAnyAnomalyRuleEnabled()) {
