@@ -474,4 +474,83 @@ class AnomalyDetectorTest {
     void testDismissAlertReturnsFalseForUnknownId(JenkinsRule j) {
         assertEquals(false, detector.dismissAlert("nonexistent-id"), "Dismiss should return false for unknown alert id");
     }
+
+    @Test
+    void testDismissAllAlerts(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+
+        long now = System.currentTimeMillis();
+        detector.analyze(new AuditLogEntry("user1", "FAILED_LOGIN", "jenkins", "", now), config);
+        detector.analyze(new AuditLogEntry("user1", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+        detector.analyze(new AuditLogEntry("user2", "FAILED_LOGIN", "jenkins", "", now + 2000), config);
+        detector.analyze(new AuditLogEntry("user2", "FAILED_LOGIN", "jenkins", "", now + 3000), config);
+
+        List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(10);
+        assertEquals(2, alerts.size(), "Should have 2 open alerts before dismissAll");
+
+        int dismissed = detector.dismissAllAlerts();
+        assertEquals(2, dismissed, "Should dismiss both alerts");
+        assertEquals(0, detector.getAlerts(10).size(), "All alerts should be dismissed");
+    }
+
+    @Test
+    void testNoAnomaliesReturnedWhenAllRulesDisabled(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setEnableAnomalyDetection(true);
+        // disable all rules
+        config.setAnomalyFailedLogins(false);
+        config.setAnomalyUnusualIp(false);
+        config.setAnomalyMultiIpLogin(false);
+        config.setAnomalySuspiciousAuth(false);
+        config.setAnomalyAdminPrivilegeChanges(false);
+        config.setAnomalyUserLifecycle(false);
+        config.setAnomalyGlobalConfigChanges(false);
+        config.setAnomalyJobConfigChanges(false);
+        config.setAnomalyOffHoursAdmin(false);
+        config.setAnomalyCredentialChanges(false);
+        config.setAnomalySecurityConfigChanges(false);
+        config.setAnomalyPluginChanges(false);
+        config.setAnomalyBuildFailures(false);
+
+        assertEquals(false, config.isAnyAnomalyRuleEnabled(), "Should report no anomaly rule enabled");
+
+        detector.addAlert(new AnomalyDetector.AnomalyAlert(
+                AnomalyDetector.AnomalyType.BRUTE_FORCE_LOGIN, "testuser", "details", "CRITICAL"));
+
+        assertEquals(0, detector.getAlerts(10, config).size(), "Alerts list should be empty when no rules enabled");
+
+        AuditFlowPageDecorator decorator = new AuditFlowPageDecorator();
+        // Even if active alerts exist in memory, isBannerVisible must return false
+        assertEquals(false, decorator.isBannerVisible(), "Banner must not be visible when no rules enabled");
+    }
+
+    @Test
+    void testDismissAlertsForDisabledRulesPrunesStaleAlerts(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setEnableAnomalyDetection(true);
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyUnusualIp(false);
+
+        detector.addAlert(new AnomalyDetector.AnomalyAlert(
+                AnomalyDetector.AnomalyType.BRUTE_FORCE_LOGIN, "user1", "failed login", "CRITICAL"));
+        detector.addAlert(new AnomalyDetector.AnomalyAlert(
+                AnomalyDetector.AnomalyType.UNUSUAL_IP, "user2", "unusual ip", "MEDIUM"));
+
+        // Before pruning: BRUTE_FORCE_LOGIN is enabled, UNUSUAL_IP is disabled
+        List<AnomalyDetector.AnomalyAlert> alertsBefore = detector.getAlerts(10, config);
+        assertEquals(1, alertsBefore.size());
+        assertEquals(AnomalyDetector.AnomalyType.BRUTE_FORCE_LOGIN, alertsBefore.get(0).type);
+
+        // Prune alerts for disabled rules
+        detector.dismissAlertsForDisabledRules(config);
+
+        // Now disable all rules
+        config.setAnomalyFailedLogins(false);
+        detector.dismissAlertsForDisabledRules(config);
+
+        assertEquals(0, detector.getAlerts(10, config).size(), "All alerts should be pruned when all rules disabled");
+    }
 }

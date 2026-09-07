@@ -100,7 +100,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
             response.put("logs", toDisplayEntries(page.entries, displayZone));
             response.put("summary", buildSummary(filteredEntries, displayZone));
             response.put("insights", buildInsights(filteredEntries, config, displayZone));
-            response.put("anomalies", mapAnomalyAlerts(AuditLogStorage.getInstance().getAnomalyDetector().getAlerts(10)));
+            response.put("anomalies", mapAnomalyAlerts(AuditLogStorage.getInstance().getAnomalyDetector().getAlerts(10, config)));
             response.put("anomalyConfig", buildAnomalyConfig(config));
             response.put("displayTimeZone", displayZone.getId());
             response.put("displayToday", LocalDate.now(displayZone).toString());
@@ -240,11 +240,13 @@ public class AuditLoggerManagementLink extends ManagementLink {
     }
 
     public boolean getAnomalyDetectionEnabled() {
-        return false;
+        AuditLoggerConfiguration c = AuditLoggerConfiguration.get();
+        return c != null && c.isEnableAnomalyDetection() && c.isAnyAnomalyRuleEnabled();
     }
 
     public boolean getAnomalyRowEnabled() {
-        return false;
+        AuditLoggerConfiguration c = AuditLoggerConfiguration.get();
+        return c != null && c.isEnableAnomalyDetection() && c.isAnyAnomalyRuleEnabled();
     }
 
     public String getAnomalyConfigJson() {
@@ -254,6 +256,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
     private static Map<String, Object> buildAnomalyConfig(AuditLoggerConfiguration config) {
         Map<String, Object> anomalyConfig = new LinkedHashMap<>();
         if (config == null) {
+            anomalyConfig.put("enableAnomalyDetection", false);
             anomalyConfig.put("failedLoginsThreshold", 5);
             anomalyConfig.put("credentialChangesThreshold", 3);
             anomalyConfig.put("pluginChangesThreshold", 3);
@@ -264,7 +267,20 @@ public class AuditLoggerManagementLink extends ManagementLink {
             return anomalyConfig;
         }
 
+        anomalyConfig.put("enableAnomalyDetection", config.isEnableAnomalyDetection());
+        anomalyConfig.put("anomalyFailedLogins", config.isAnomalyFailedLogins());
         anomalyConfig.put("failedLoginsThreshold", config.getAnomalyFailedLoginsThreshold());
+        anomalyConfig.put("anomalyFailedLoginsWindowMinutes", config.getAnomalyFailedLoginsWindowMinutes());
+        anomalyConfig.put("anomalyUnusualIp", config.isAnomalyUnusualIp());
+        anomalyConfig.put("anomalyUnusualIpWindowMinutes", config.getAnomalyUnusualIpWindowMinutes());
+        anomalyConfig.put("anomalyMultiIpLogin", config.isAnomalyMultiIpLogin());
+        anomalyConfig.put("anomalyMultiIpLoginThreshold", config.getAnomalyMultiIpLoginThreshold());
+        anomalyConfig.put("anomalyMultiIpLoginWindowMinutes", config.getAnomalyMultiIpLoginWindowMinutes());
+        anomalyConfig.put("anomalySuspiciousAuth", config.isAnomalySuspiciousAuth());
+        anomalyConfig.put("anomalyAdminPrivilegeChanges", config.isAnomalyAdminPrivilegeChanges());
+        anomalyConfig.put("anomalyUserLifecycle", config.isAnomalyUserLifecycle());
+        anomalyConfig.put("anomalyUserLifecycleThreshold", config.getAnomalyUserLifecycleThreshold());
+        anomalyConfig.put("anomalyUserLifecycleWindowMinutes", config.getAnomalyUserLifecycleWindowMinutes());
         anomalyConfig.put("credentialChangesThreshold", config.getAnomalyCredentialChangesThreshold());
         anomalyConfig.put("pluginChangesThreshold", config.getAnomalyPluginChangesThreshold());
         anomalyConfig.put("globalConfigChangesThreshold", config.getAnomalyGlobalConfigChangesThreshold());
@@ -482,11 +498,12 @@ public class AuditLoggerManagementLink extends ManagementLink {
                                          String searchText,
                                          String searchColumn,
                                          ZoneId displayZone) {
-        if (searchText == null || searchText.isEmpty()) {
+        if (searchText == null || searchText.trim().isEmpty()) {
             return true;
         }
 
-        String needle = searchText.toLowerCase(Locale.ENGLISH);
+        String needle = searchText.trim().toLowerCase(Locale.ENGLISH);
+        String needleNorm = needle.replace('_', ' ');
         if ("all".equals(searchColumn)) {
             String haystack = String.join(" ",
                     nvl(entry.getUsername()),
@@ -498,7 +515,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
                     nvl(entry.getTriggerType()),
                     entry.getReadableTimestamp(displayZone))
                     .toLowerCase(Locale.ENGLISH);
-            return haystack.contains(needle);
+            return haystack.contains(needle) || haystack.replace('_', ' ').contains(needleNorm);
         }
 
         String value;
@@ -524,7 +541,9 @@ public class AuditLoggerManagementLink extends ManagementLink {
             default:
                 value = "";
         }
-        return value != null && value.toLowerCase(Locale.ENGLISH).contains(needle);
+        if (value == null) return false;
+        String valLower = value.toLowerCase(Locale.ENGLISH);
+        return valLower.contains(needle) || valLower.replace('_', ' ').contains(needleNorm);
     }
 
     private static Comparator<AuditLogEntry> buildComparator(String sortField) {
@@ -955,7 +974,8 @@ public class AuditLoggerManagementLink extends ManagementLink {
 
         try {
             AnomalyDetector detector = AuditLogStorage.getInstance().getAnomalyDetector();
-            List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(50);
+            AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+            List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(50, config);
 
             var gson = new com.google.gson.GsonBuilder().create();
             var response = new LinkedHashMap<String, Object>();
@@ -978,7 +998,13 @@ public class AuditLoggerManagementLink extends ManagementLink {
         String alertId = req.getParameter("alertId");
         boolean success = false;
         if (alertId != null && !alertId.trim().isEmpty()) {
-            success = AuditLogStorage.getInstance().getAnomalyDetector().dismissAlert(alertId.trim());
+            String trimmedId = alertId.trim();
+            if ("ALL".equalsIgnoreCase(trimmedId) || "*".equals(trimmedId)) {
+                AuditLogStorage.getInstance().getAnomalyDetector().dismissAllAlerts();
+                success = true;
+            } else {
+                success = AuditLogStorage.getInstance().getAnomalyDetector().dismissAlert(trimmedId);
+            }
         }
 
         res.setContentType("application/json; charset=UTF-8");

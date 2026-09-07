@@ -1,0 +1,51 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+    <j:if test="${it.bannerVisible}">
+        <div id="auditflow-anomaly-banner" class="auditflow-anomaly-banner auditflow-anomaly-banner--${it.highestSeverity.toLowerCase()}">
+            <div class="auditflow-banner-left">
+                <span class="auditflow-badge auditflow-badge--${it.highestSeverity.toLowerCase()}">
+                    &#9888; ${it.highestSeverity} SECURITY ALERT
+                </span>
+                <span class="auditflow-banner-text">
+                    <j:choose>
+                        <j:when test="${it.adminUser}">
+                            <strong>AuditFlow:</strong> ${it.activeAlertCount} active security anomaly event(s)<j:if test="${!empty(it.activeAlertTypesSummary)}">&#160;(${it.activeAlertTypesSummary})</j:if> detected on this Jenkins controller.
+                        </j:when>
+                        <j:otherwise>
+                            <strong>AuditFlow Security Warning:</strong> ${it.activeAlertCount} active security anomaly event(s)<j:if test="${!empty(it.activeAlertTypesSummary)}">&#160;(${it.activeAlertTypesSummary})</j:if> detected. Please notify your Jenkins Administrator.
+                        </j:otherwise>
+                    </j:choose>
+                </span>
+            </div>
+            <j:if test="${it.adminUser}">
+                <a href="${it.auditFlowUrl}" class="auditflow-banner-action-btn">
+                    Review &amp; Manage in AuditFlow &#8594;
+                </a>
+            </j:if>
+        </div>
+        <script type="text/javascript">
+        (function() {
+            function attachAuditFlowBanner() {
+                var banner = document.getElementById('auditflow-anomaly-banner');
+                if (!banner) return;
+                var pageHeader = document.getElementById('page-header') || document.querySelector('.jenkins-header') || document.querySelector('header');
+                if (pageHeader) {
+                    pageHeader.parentNode.insertBefore(banner, pageHeader.nextSibling);
+                    return;
+                }
+                var pageBody = document.getElementById('page-body') || document.getElementById('main-panel');
+                if (pageBody) {
+                    pageBody.parentNode.insertBefore(banner, pageBody);
+                    return;
+                }
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', attachAuditFlowBanner);
+            } else {
+                attachAuditFlowBanner();
+            }
+        })();
+        </script>
+    </j:if>
+</j:jelly>
+

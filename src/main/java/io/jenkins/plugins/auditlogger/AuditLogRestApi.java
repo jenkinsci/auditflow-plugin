@@ -93,7 +93,8 @@ public class AuditLogRestApi implements RootAction {
 
             // hey, grabbing our new anomalies from the detector!
             AnomalyDetector detector = AuditLogStorage.getInstance().getAnomalyDetector();
-            List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(10);
+            AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+            List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(10, config);
             JSONArray anomalyArray = new JSONArray();
             for (AnomalyDetector.AnomalyAlert alert : alerts) {
                 JSONObject json = new JSONObject();

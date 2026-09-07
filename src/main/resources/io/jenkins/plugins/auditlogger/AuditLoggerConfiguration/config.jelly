@@ -39,6 +39,95 @@
         </f:entry>
     </f:section>
 
+    <f:section title="Security Anomaly Detection">
+        <f:block>
+            <div class="jenkins-section__description">
+                Real-time security anomaly and risk detection rules (Phase 2 expanded).
+            </div>
+        </f:block>
+
+        <f:optionalBlock title="Enable Security Anomaly Detection (monitor real-time security anomalies and risks)"
+                         name="enableAnomalyDetection"
+                         checked="${descriptor.isEnableAnomalyDetection()}">
+
+            <f:entry title="Global Anomaly Alert Banner (display a persistent alert banner across Jenkins when active anomalies are detected)">
+                <f:checkbox name="enableAnomalyBanner" checked="${descriptor.isEnableAnomalyBanner()}"/>
+            </f:entry>
+
+            <f:optionalBlock title="Failed Login Detection (flag brute force attempts)"
+                             name="anomalyFailedLogins"
+                             checked="${descriptor.isAnomalyFailedLogins()}">
+                <f:entry title="Failed login threshold" description="Trigger alert after this many failed logins for a single account within the time window.">
+                    <f:number name="anomalyFailedLoginsThreshold" value="${descriptor.getAnomalyFailedLoginsThreshold()}"/>
+                </f:entry>
+                <f:entry title="Time window (minutes)" description="Sliding window in minutes to evaluate failed logins.">
+                    <f:number name="anomalyFailedLoginsWindowMinutes" value="${descriptor.getAnomalyFailedLoginsWindowMinutes()}"/>
+                </f:entry>
+            </f:optionalBlock>
+
+            <f:optionalBlock title="Unusual IP Activity (flag logins or actions from new/unseen IP addresses)"
+                             name="anomalyUnusualIp"
+                             checked="${descriptor.isAnomalyUnusualIp()}">
+                <f:entry title="Tracking window (minutes)" description="Lookback window for user IP address history.">
+                    <f:number name="anomalyUnusualIpWindowMinutes" value="${descriptor.getAnomalyUnusualIpWindowMinutes()}"/>
+                </f:entry>
+            </f:optionalBlock>
+
+            <f:optionalBlock title="Multiple Logins from Different IPs (flag concurrent sessions from distinct IP addresses)"
+                             name="anomalyMultiIpLogin"
+                             checked="${descriptor.isAnomalyMultiIpLogin()}">
+                <f:entry title="Distinct IP threshold" description="Trigger alert if a user logs in from this many distinct IP addresses within the window.">
+                    <f:number name="anomalyMultiIpLoginThreshold" value="${descriptor.getAnomalyMultiIpLoginThreshold()}"/>
+                </f:entry>
+                <f:entry title="Time window (minutes)" description="Sliding time window to evaluate concurrent multi-IP logins.">
+                    <f:number name="anomalyMultiIpLoginWindowMinutes" value="${descriptor.getAnomalyMultiIpLoginWindowMinutes()}"/>
+                </f:entry>
+            </f:optionalBlock>
+
+            <f:entry title="Suspicious Auth Patterns (flag successful login following brute-force attempts)">
+                <f:checkbox name="anomalySuspiciousAuth" checked="${descriptor.isAnomalySuspiciousAuth()}"/>
+            </f:entry>
+
+            <f:entry title="Admin Privilege Changes (flag security matrix, authorization strategy, or admin permission changes)">
+                <f:checkbox name="anomalyAdminPrivilegeChanges" checked="${descriptor.isAnomalyAdminPrivilegeChanges()}"/>
+            </f:entry>
+
+            <f:optionalBlock title="User Account Lifecycle (flag user account creation or deletion activity)"
+                             name="anomalyUserLifecycle"
+                             checked="${descriptor.isAnomalyUserLifecycle()}">
+                <f:entry title="Event threshold" description="Trigger alert after this many user creation/deletion events within the window.">
+                    <f:number name="anomalyUserLifecycleThreshold" value="${descriptor.getAnomalyUserLifecycleThreshold()}"/>
+                </f:entry>
+                <f:entry title="Time window (minutes)" description="Sliding time window for user lifecycle tracking.">
+                    <f:number name="anomalyUserLifecycleWindowMinutes" value="${descriptor.getAnomalyUserLifecycleWindowMinutes()}"/>
+                </f:entry>
+            </f:optionalBlock>
+
+            <f:block>
+                <h4>Anomaly Alert Notifications</h4>
+                <div class="jenkins-section__description">
+                    Configure notification destinations for audit and alert delivery.
+                </div>
+            </f:block>
+            <f:optionalBlock title="Email notifications (send anomaly alerts through Jenkins mail settings)"
+                             name="enableEmailAlerts"
+                             checked="${descriptor.isEnableEmailAlerts()}">
+                <f:entry title="Alert email addresses"
+                         description="Comma-separated recipients for anomaly emails, for example: secops@example.com, admins@example.com">
+                    <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
+                </f:entry>
+            </f:optionalBlock>
+            <f:optionalBlock title="Webhook notifications (send anomaly alerts to a webhook endpoint using JSON payload)"
+                             name="enableWebhookAlerts"
+                             checked="${descriptor.isEnableWebhookAlerts()}">
+                <f:entry title="Webhook URL"
+                         description="Enter a valid HTTP webhook endpoint such as Slack, Microsoft Teams, or another supported service. AuditFlow sends a JSON payload whenever an alert is created. Example: https://hooks.slack.com/services/T000/B000/XXXX">
+                    <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
+                </f:entry>
+            </f:optionalBlock>
+        </f:optionalBlock>
+    </f:section>
+
     <f:section title="Operational Monitoring &amp; Export">
         <f:block>
             <div class="jenkins-section__description">
@@ -83,28 +172,6 @@
                 <script type="application/json" id="auditflowTimezoneOptions">${descriptor.availableDisplayTimeZonesJson}</script>
             </div>
         </f:entry>
-        <f:block>
-            <h4>Notifications</h4>
-            <div class="jenkins-section__description">
-                Configure notification destinations for audit and alert delivery.
-            </div>
-        </f:block>
-        <f:optionalBlock title="Email notifications (send anomaly alerts through Jenkins mail settings)"
-                         name="enableEmailAlerts"
-                         checked="${descriptor.isEnableEmailAlerts()}">
-            <f:entry title="Alert email addresses"
-                     description="Comma-separated recipients for anomaly emails, for example: secops@example.com, admins@example.com">
-                <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
-            </f:entry>
-        </f:optionalBlock>
-        <f:optionalBlock title="Webhook notifications (send anomaly alerts to a webhook endpoint using JSON payload)"
-                         name="enableWebhookAlerts"
-                         checked="${descriptor.isEnableWebhookAlerts()}">
-            <f:entry title="Webhook URL"
-                     description="Enter a valid HTTP webhook endpoint such as Slack, Microsoft Teams, or another supported service. AuditFlow sends a JSON payload whenever an alert is created. Example: https://hooks.slack.com/services/T000/B000/XXXX">
-                <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
-            </f:entry>
-        </f:optionalBlock>
         <f:block>
             <h4>Export and Integrations</h4>
             <div class="jenkins-section__description">

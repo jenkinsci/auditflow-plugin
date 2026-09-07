@@ -26,10 +26,13 @@
                                 </template>
                 <h1>${it.pageHeading}</h1>
 
-                <div class="onboarding-banner" id="onboardingBanner">
-                    <h2>✨ What's New in AuditFlow</h2>
+                <div class="onboarding-banner jenkins-hidden" id="onboardingBanner">
+                    <h2>✨ What’s New in AuditFlow</h2>
                     <p>
-                        <strong>Enhanced Agent Auditing &amp; Unified Badging:</strong> Track node creations, configuration diffs, deletions, offline reasons, and launch failures. Enjoy a cleaner audit experience with our unified 5-tier severity color system (Red, Dark Orange, Amber, Green, Blue) across your entire log trail!
+                        <strong>Phase 2 — Security Anomaly Detection &amp; Risk Insights:</strong> Detect suspicious authentication, IP, login, privilege, and account activity in real time. Configure anomaly rules in System Settings and monitor risk insights from your AuditFlow Dashboard.
+                    </p>
+                    <p class="onboarding-banner__note" style="margin-top: 6px; font-size: 0.88rem; opacity: 0.9;">
+                        <em>Note: Anomaly detection settings have been updated. Please review System Settings to verify that your preferred detection rules are enabled or disabled as intended.</em>
                     </p>
                     <button type="button" class="jenkins-button onboarding-banner__dismiss" id="dismissOnboardingButton">Got it</button>
                 </div>
@@ -80,11 +83,17 @@
                     </j:if>
                 </div>
 
-                <j:set var="anomalyRowOn" value="${it.anomalyRowEnabled}"/>
-                <div class="${anomalyRowOn ? 'anomaly-box' : 'anomaly-box jenkins-hidden'}" id="anomalyBox">
-                    <div class="anomaly-label">Anomaly Detection</div>
+                <div class="anomaly-box jenkins-hidden" id="anomalyBox">
+                    <div class="anomaly-header">
+                        <div class="anomaly-header__left">
+                            <span class="anomaly-label">Anomaly Detection</span>
+                            <span class="anomaly-instruction" id="anomalyInstruction">(Click to view relevant logs)</span>
+                        </div>
+                        <div class="anomaly-header__right">
+                            <button type="button" class="jenkins-button btn-dismiss jenkins-hidden" id="btnDismiss" title="Dismiss all active anomalies">Dismiss All</button>
+                        </div>
+                    </div>
                     <div class="anomaly-status" id="anomalyStatus">No anomaly detected</div>
-                    <button type="button" class="jenkins-button btn-dismiss" id="btnDismiss">Dismiss</button>
                 </div>
 
                 <j:set var="riskEnabled" value="${it.riskLevelsEnabled}"/>
@@ -290,6 +299,11 @@
                 <div class="table-meta">
                     <div class="table-meta__summary">
                         <span class="result-count" id="resultCount"></span>
+                        <div class="anomaly-filter-indicator jenkins-hidden" id="anomalyFilterIndicator">
+                            <span class="anomaly-filter-indicator__badge">Filtered by Anomaly:</span>
+                            <span class="anomaly-filter-indicator__text" id="anomalyFilterText"></span>
+                            <button type="button" class="anomaly-filter-indicator__clear" id="btnClearAnomalyFilter" title="Clear anomaly filter" aria-label="Clear anomaly filter">✕</button>
+                        </div>
                     </div>
                     <div class="table-meta__controls">
                         <span class="table-meta__label">Rows</span>

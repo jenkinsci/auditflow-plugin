@@ -17,9 +17,12 @@
     var defaultDateTo = '';
     var onboardingStorageKey = 'auditflow-onboarded';
     var anomalyDismissedKey = 'auditflow-anomaly-dismissed-id';
+    var anomalyDismissedIdsKey = 'auditflow-anomaly-dismissed-ids';
     var anomalyDismissedTimestampKey = 'auditflow-anomaly-dismissed-until';
     var anomalyDismissed = false;
-    var latestAnomaly = null;
+    var activeAnomalies = [];
+    var lastServerAnomalies = [];
+    var activeFilteredAnomalyAlertId = null;
 
     function setHidden(element, hidden) {
         if (element) {
@@ -32,40 +35,63 @@
         return isFinite(timestamp) && timestamp > 0 ? timestamp : 0;
     }
 
-    function getLatestAnomaly(anomalies) {
-        var latest = null;
-        var latestTimestamp = 0;
-        if (!anomalies || anomalies.length === 0) {
-            return null;
+    function getDismissedAlertIds() {
+        try {
+            var raw = sessionStorage.getItem(anomalyDismissedIdsKey);
+            if (raw) {
+                return JSON.parse(raw) || {};
+            }
+        } catch (e) {}
+        var single = sessionStorage.getItem(anomalyDismissedKey);
+        var res = {};
+        if (single) {
+            res[single] = true;
         }
+        return res;
+    }
 
-        for (var i = 0; i < anomalies.length; i++) {
-            var candidate = anomalies[i];
-            var candidateTimestamp = parseAnomalyTimestamp(candidate && candidate.timestamp);
-            if (!latest || candidateTimestamp >= latestTimestamp) {
-                latest = candidate;
-                latestTimestamp = candidateTimestamp;
+    function saveDismissedAlertIds(ids) {
+        if (!ids || ids.length === 0) return;
+        var map = getDismissedAlertIds();
+        for (var i = 0; i < ids.length; i++) {
+            if (ids[i]) {
+                map[ids[i]] = true;
             }
         }
-        return latest;
+        try {
+            sessionStorage.setItem(anomalyDismissedIdsKey, JSON.stringify(map));
+            sessionStorage.setItem(anomalyDismissedKey, ids[ids.length - 1]);
+        } catch (e) {}
+    }
+
+    function getUndismissedAnomalies(anomalies) {
+        if (!anomalies || anomalies.length === 0) {
+            return [];
+        }
+        var dismissedMap = getDismissedAlertIds();
+
+        var result = [];
+        for (var i = 0; i < anomalies.length; i++) {
+            var candidate = anomalies[i];
+            if (!candidate) continue;
+            var alertId = candidate.alertId || ('auditflow-' + (candidate.type || '') + '-' + (candidate.user || '') + '-' + (candidate.timestamp || ''));
+            if (dismissedMap[alertId]) {
+                continue;
+            }
+            result.push(candidate);
+        }
+        return result;
+    }
+
+    function getLatestAnomaly(anomalies) {
+        var un = getUndismissedAnomalies(anomalies);
+        return un.length > 0 ? un[0] : null;
     }
 
     function refreshAnomalyDismissState(anomalies) {
-        latestAnomaly = getLatestAnomaly(anomalies);
-        if (!latestAnomaly) {
-            anomalyDismissed = false;
-            return;
-        }
-
-        var dismissedId = sessionStorage.getItem(anomalyDismissedKey);
-        if (dismissedId && latestAnomaly.alertId && dismissedId === latestAnomaly.alertId) {
-            anomalyDismissed = true;
-            return;
-        }
-
-        var dismissedUntil = parseAnomalyTimestamp(sessionStorage.getItem(anomalyDismissedTimestampKey));
-        anomalyDismissed = dismissedUntil > 0
-            && parseAnomalyTimestamp(latestAnomaly.timestamp) <= dismissedUntil;
+        activeAnomalies = getUndismissedAnomalies(anomalies);
+        latestAnomaly = activeAnomalies.length > 0 ? activeAnomalies[0] : null;
+        anomalyDismissed = (activeAnomalies.length === 0);
     }
 
     function formatAnomalyStatus(alert) {
@@ -404,86 +430,308 @@
         }
     }
 
-    // displays our real backend anomalies
+    function extractEntityFromDetails(details) {
+        if (!details || typeof details !== 'string') return '';
+        var m = details.match(/(?:provisioned|deleted|target|account|user|credential):\s*([^\s,]+)/i);
+        if (m && m[1]) return m[1].replace(/["']/g, '').trim();
+        var mQuote = details.match(/["']([^"']+)["']/);
+        if (mQuote && mQuote[1]) return mQuote[1].trim();
+        return '';
+    }
+
+    function filterByAnomaly(alert, element) {
+        if (!alert) return;
+
+        var alertId = alert.alertId || ('auditflow-' + (alert.type || '') + '-' + (alert.user || '') + '-' + (alert.timestamp || ''));
+        activeFilteredAnomalyAlertId = alertId;
+
+        // Highlight selected anomaly in the UI
+        var allItems = document.querySelectorAll('.anomaly-combined-item, .anomaly-single-item');
+        Array.prototype.forEach.call(allItems, function(el) {
+            el.classList.remove('anomaly-item--active');
+        });
+        if (element) {
+            element.classList.add('anomaly-item--active');
+        }
+
+        var searchInput = document.getElementById('searchText');
+        var columnSelect = document.getElementById('searchColumn');
+        var actionSelect = document.getElementById('filterAction');
+
+        // Reset default filters first
+        if (searchInput) searchInput.value = '';
+        if (columnSelect) columnSelect.value = 'all';
+        if (actionSelect) actionSelect.value = '';
+
+        var type = alert.type || '';
+        var hasRealUser = alert.user && alert.user !== 'UNKNOWN' && alert.user !== 'SYSTEM';
+        var extractedTarget = extractEntityFromDetails(alert.details);
+
+        // Smart filtering: Prioritize specific actor/target to avoid broad historical matches
+        if (hasRealUser) {
+            if (searchInput) searchInput.value = alert.user;
+            if (columnSelect) columnSelect.value = 'user';
+
+            if (type === 'BRUTE_FORCE_LOGIN') {
+                if (actionSelect) actionSelect.value = 'FAILED_LOGIN';
+            } else if (type === 'CREDENTIAL_EXPOSURE') {
+                if (actionSelect) actionSelect.value = 'CREDENTIAL_ACCESSED';
+            }
+        } else if (extractedTarget) {
+            if (searchInput) searchInput.value = extractedTarget;
+            if (columnSelect) columnSelect.value = 'all';
+
+            if (type === 'BRUTE_FORCE_LOGIN') {
+                if (actionSelect) actionSelect.value = 'FAILED_LOGIN';
+            } else if (type === 'CREDENTIAL_EXPOSURE') {
+                if (actionSelect) actionSelect.value = 'CREDENTIAL_ACCESSED';
+            }
+        } else {
+            // Fallback when neither actor nor target could be extracted
+            if (type === 'BRUTE_FORCE_LOGIN') {
+                if (actionSelect) actionSelect.value = 'FAILED_LOGIN';
+            } else if (type === 'ADMIN_PRIVILEGE_CHANGE') {
+                if (searchInput) searchInput.value = 'SECURITY';
+                if (columnSelect) columnSelect.value = 'action';
+            } else if (type === 'USER_LIFECYCLE_ANOMALY') {
+                if (searchInput) searchInput.value = 'USER';
+                if (columnSelect) columnSelect.value = 'action';
+            } else if (type === 'CREDENTIAL_EXPOSURE') {
+                if (actionSelect) actionSelect.value = 'CREDENTIAL_ACCESSED';
+            } else if (alert.details) {
+                var keyword = alert.details.split(':')[0] || alert.details;
+                if (searchInput) searchInput.value = keyword.trim();
+                if (columnSelect) columnSelect.value = 'all';
+            }
+        }
+
+        // Show active anomaly filter indicator pill
+        var indicator = document.getElementById('anomalyFilterIndicator');
+        var indicatorText = document.getElementById('anomalyFilterText');
+        if (indicator && indicatorText) {
+            var label = (alert.type || 'ANOMALY').replace(/_/g, ' ');
+            if (hasRealUser) {
+                label += ' (' + alert.user + ')';
+            } else if (extractedTarget) {
+                label += ' (' + extractedTarget + ')';
+            }
+            indicatorText.textContent = label;
+            indicator.classList.remove('jenkins-hidden');
+        }
+
+        // Load logs with applied filters
+        loadLogs(true);
+
+        // Smooth scroll to logs table
+        var targetCard = document.getElementById('logsTable') || document.querySelector('.table-meta');
+        if (targetCard) {
+            targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    function clearAnomalyFilter() {
+        activeFilteredAnomalyAlertId = null;
+        var allItems = document.querySelectorAll('.anomaly-combined-item, .anomaly-single-item');
+        Array.prototype.forEach.call(allItems, function(el) {
+            el.classList.remove('anomaly-item--active');
+        });
+
+        var indicator = document.getElementById('anomalyFilterIndicator');
+        if (indicator) {
+            indicator.classList.add('jenkins-hidden');
+        }
+
+        var searchInput = document.getElementById('searchText');
+        var columnSelect = document.getElementById('searchColumn');
+        var actionSelect = document.getElementById('filterAction');
+        if (searchInput) searchInput.value = '';
+        if (columnSelect) columnSelect.value = 'all';
+        if (actionSelect) actionSelect.value = '';
+
+        loadLogs(true);
+    }
+
+    function bindAnomalyItemClickListeners() {
+        var status = document.getElementById('anomalyStatus');
+        if (!status) return;
+
+        var items = status.querySelectorAll('.anomaly-combined-item, .anomaly-single-item');
+        Array.prototype.forEach.call(items, function(item) {
+            var idx = parseInt(item.getAttribute('data-alert-index'), 10);
+            if (isNaN(idx) || !activeAnomalies[idx]) return;
+
+            var alert = activeAnomalies[idx];
+
+            item.addEventListener('click', function(e) {
+                if (e.target && (e.target.classList.contains('anomaly-item__dismiss') || e.target.closest('.anomaly-item__dismiss'))) {
+                    return;
+                }
+                e.preventDefault();
+                filterByAnomaly(alert, item);
+            });
+
+            item.addEventListener('keydown', function(e) {
+                if (e.target && (e.target.classList.contains('anomaly-item__dismiss') || e.target.closest('.anomaly-item__dismiss'))) {
+                    return;
+                }
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    filterByAnomaly(alert, item);
+                }
+            });
+        });
+
+        // Bind individual anomaly dismiss buttons (✕)
+        var dismissButtons = status.querySelectorAll('.anomaly-item__dismiss');
+        Array.prototype.forEach.call(dismissButtons, function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                var alertId = btn.getAttribute('data-alert-id');
+                dismissSingleAnomaly(alertId);
+            });
+            btn.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    var alertId = btn.getAttribute('data-alert-id');
+                    dismissSingleAnomaly(alertId);
+                }
+            });
+        });
+    }
+
+    // displays our real backend anomalies - combines all undismissed ones
     function renderServerAnomalies(anomalies) {
         var box = document.getElementById('anomalyBox');
         var status = document.getElementById('anomalyStatus');
+        var dismissBtn = document.getElementById('btnDismiss');
+        var instruction = document.getElementById('anomalyInstruction');
         if (!box || !status) return;
 
-        var latest = getLatestAnomaly(anomalies);
+        if (anomalies && Array.isArray(anomalies)) {
+            lastServerAnomalies = anomalies;
+        }
+        activeAnomalies = getUndismissedAnomalies(lastServerAnomalies);
 
-        if (latest && !anomalyDismissed) {
+        if (activeAnomalies.length > 0) {
             box.classList.remove('jenkins-hidden');
             box.classList.add('anomaly-alert');
             box.classList.remove('anomaly-dismissed');
-            status.textContent = formatAnomalyStatus(latest);
-        } else if (latest && anomalyDismissed) {
-            // Anomalies exist but user dismissed them
+
+            if (instruction) {
+                instruction.textContent = activeAnomalies.length > 1
+                    ? '(Click any anomaly to view relevant logs)'
+                    : '(Click to view relevant logs)';
+            }
+
+            if (dismissBtn) {
+                if (activeAnomalies.length > 1) {
+                    dismissBtn.classList.remove('jenkins-hidden');
+                    dismissBtn.textContent = 'Dismiss All';
+                    dismissBtn.setAttribute('title', 'Dismiss all ' + activeAnomalies.length + ' active anomalies');
+                } else {
+                    dismissBtn.classList.add('jenkins-hidden');
+                }
+            }
+
+            if (activeAnomalies.length === 1) {
+                var singleAlert = activeAnomalies[0];
+                var singleSev = singleAlert.severity || 'HIGH';
+                var singleSevClass = severityBadgeClass(singleSev, '');
+                var singleAlertId = singleAlert.alertId || ('auditflow-' + (singleAlert.type || '') + '-' + (singleAlert.user || '') + '-' + (singleAlert.timestamp || ''));
+                var isActive = (activeFilteredAnomalyAlertId === singleAlertId);
+
+                var html = '<div class="anomaly-single-item' + (isActive ? ' anomaly-item--active' : '') + '" role="button" tabindex="0" data-alert-index="0" data-alert-id="' + escAttr(singleAlertId) + '" title="Click to view relevant logs for ' + escAttr(singleAlert.user || 'this anomaly') + '">'
+                    + '<span class="badge ' + singleSevClass + '">' + esc(singleSev) + '</span> '
+                    + '<span class="anomaly-combined-text">' + esc(formatAnomalyStatus(singleAlert)) + '</span>'
+                    + '<button type="button" class="anomaly-item__dismiss" data-alert-id="' + escAttr(singleAlertId) + '" title="Dismiss this alert" aria-label="Dismiss this alert">✕</button>'
+                    + '</div>';
+                status.innerHTML = html;
+            } else {
+                var html = '<ul class="anomaly-combined-list">';
+                for (var i = 0; i < activeAnomalies.length; i++) {
+                    var alert = activeAnomalies[i];
+                    var sev = alert.severity || 'HIGH';
+                    var sevClass = severityBadgeClass(sev, '');
+                    var alertId = alert.alertId || ('auditflow-' + (alert.type || '') + '-' + (alert.user || '') + '-' + (alert.timestamp || ''));
+                    var isActive = (activeFilteredAnomalyAlertId === alertId);
+
+                    html += '<li class="anomaly-combined-item' + (isActive ? ' anomaly-item--active' : '') + '" role="button" tabindex="0" data-alert-index="' + i + '" data-alert-id="' + escAttr(alertId) + '" title="Click to view relevant logs for ' + escAttr(alert.user || 'this anomaly') + '">'
+                        + '<span class="badge ' + sevClass + '">' + esc(sev) + '</span> '
+                        + '<span class="anomaly-combined-text">' + esc(formatAnomalyStatus(alert)) + '</span>'
+                        + '<button type="button" class="anomaly-item__dismiss" data-alert-id="' + escAttr(alertId) + '" title="Dismiss this alert" aria-label="Dismiss this alert">✕</button>'
+                        + '</li>';
+                }
+                html += '</ul>';
+                status.innerHTML = html;
+            }
+            bindAnomalyItemClickListeners();
+        } else if (activeAnomalies.length === 0 && anomalyDismissed) {
             box.classList.add('jenkins-hidden');
             box.classList.remove('anomaly-alert');
             box.classList.add('anomaly-dismissed');
             status.textContent = 'No anomaly detected';
+            if (dismissBtn) {
+                dismissBtn.classList.add('jenkins-hidden');
+            }
         } else {
-            // No anomalies at all
             box.classList.add('jenkins-hidden');
             box.classList.remove('anomaly-alert');
             box.classList.remove('anomaly-dismissed');
             status.textContent = 'No anomaly detected';
-        }
-    }
-
-    function parsePatterns(str) {
-        if (!str) {
-            return [];
-        }
-        return str.split(/[\n,]+/).map(function(segment) {
-            return segment.trim();
-        }).filter(function(segment) {
-            return segment.length > 0;
-        });
-    }
-
-    function matchesAnyPattern(name, patterns) {
-        for (var i = 0; i < patterns.length; i++) {
-            if (globMatch(name, patterns[i])) {
-                return true;
+            if (dismissBtn) {
+                dismissBtn.classList.add('jenkins-hidden');
             }
         }
-        return false;
     }
 
-    function globMatch(str, pattern) {
-        var escaped = '';
-        for (var index = 0; index < pattern.length; index++) {
-            var ch = pattern.charAt(index);
-            if (ch === '*') {
-                escaped += '.*';
-            } else if (ch === '?') {
-                escaped += '.';
-            } else if ('.+^(){}|[]\\'.indexOf(ch) >= 0) {
-                escaped += '\\' + ch;
-            } else {
-                escaped += ch;
-            }
+    function dismissSingleAnomaly(alertId) {
+        if (!alertId) return;
+
+        saveDismissedAlertIds([alertId]);
+
+        // Tell server to dismiss specific alert
+        fetch('dismissAlert?alertId=' + encodeURIComponent(alertId)).catch(function() {});
+
+        // If this alert was actively filtered, clear the filter
+        if (activeFilteredAnomalyAlertId === alertId) {
+            clearAnomalyFilter();
         }
-        try {
-            return new RegExp('^' + escaped + '$', 'i').test(str);
-        } catch (ignored) {
-            return false;
-        }
+
+        // Re-render server anomalies with remaining active alerts
+        renderServerAnomalies(lastServerAnomalies);
     }
 
     function dismissAnomaly() {
         anomalyDismissed = true;
-        if (latestAnomaly && latestAnomaly.alertId) {
-            sessionStorage.setItem(anomalyDismissedKey, latestAnomaly.alertId);
-            fetch('dismissAlert?alertId=' + encodeURIComponent(latestAnomaly.alertId))
-                .catch(function() {
-                    // Best-effort dismissal; UI state is preserved locally.
-                });
+        activeFilteredAnomalyAlertId = null;
+        var indicator = document.getElementById('anomalyFilterIndicator');
+        if (indicator) {
+            indicator.classList.add('jenkins-hidden');
         }
+
+        var idsToDismiss = [];
+        if (activeAnomalies && activeAnomalies.length > 0) {
+            for (var i = 0; i < activeAnomalies.length; i++) {
+                var a = activeAnomalies[i];
+                var id = a.alertId || ('auditflow-' + (a.type || '') + '-' + (a.user || '') + '-' + (a.timestamp || ''));
+                if (id) {
+                    idsToDismiss.push(id);
+                }
+            }
+        }
+
+        saveDismissedAlertIds(idsToDismiss);
+
+        // Tell server to dismiss all
+        fetch('dismissAlert?alertId=ALL').catch(function() {});
+
+        activeAnomalies = [];
+
         var box = document.getElementById('anomalyBox');
         var status = document.getElementById('anomalyStatus');
+        var dismissBtn = document.getElementById('btnDismiss');
         if (box) {
             box.classList.add('jenkins-hidden');
             box.classList.remove('anomaly-alert');
@@ -491,6 +739,9 @@
         }
         if (status) {
             status.textContent = 'No anomaly detected';
+        }
+        if (dismissBtn) {
+            dismissBtn.classList.add('jenkins-hidden');
         }
     }
 
@@ -521,6 +772,16 @@
     }
 
     function clearAll() {
+        var indicator = document.getElementById('anomalyFilterIndicator');
+        if (indicator) {
+            indicator.classList.add('jenkins-hidden');
+        }
+        var allItems = document.querySelectorAll('.anomaly-combined-item, .anomaly-single-item');
+        Array.prototype.forEach.call(allItems, function(el) {
+            el.classList.remove('anomaly-item--active');
+        });
+        activeFilteredAnomalyAlertId = null;
+
         applyConfiguredDefaults();
         loadLogs(false);
     }
@@ -752,6 +1013,11 @@
             clearAllButton.addEventListener('click', clearAll);
         }
 
+        var btnClearAnomalyFilter = document.getElementById('btnClearAnomalyFilter');
+        if (btnClearAnomalyFilter) {
+            btnClearAnomalyFilter.addEventListener('click', clearAnomalyFilter);
+        }
+
         var refreshLogsButton = document.getElementById('refreshLogsButton');
         if (refreshLogsButton) {
             refreshLogsButton.addEventListener('click', function() {
@@ -839,8 +1105,8 @@
         loadUiDefaults();
         applyConfiguredDefaults();
         bindUiHandlers();
-        if (isOnboardingDismissed()) {
-            setHidden(document.getElementById('onboardingBanner'), true);
+        if (!isOnboardingDismissed()) {
+            setHidden(document.getElementById('onboardingBanner'), false);
         }
         loadLogs(false);
     });

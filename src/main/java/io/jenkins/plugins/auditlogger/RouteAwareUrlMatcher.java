@@ -336,6 +336,26 @@ public class RouteAwareUrlMatcher {
     }
 
     /**
+     * Extracts username from user routes:
+     * /user/alice/doDelete -> alice
+     * /user/bob/configure -> bob
+     */
+    public static String extractUserName(String uri) {
+        if (uri == null) return null;
+        String normalized = normalizeUri(uri);
+        String[] segments = normalized.split("/");
+        for (int i = 0; i < segments.length - 1; i++) {
+            if ("user".equals(segments[i]) && i + 1 < segments.length) {
+                String name = segments[i + 1];
+                if (!name.isEmpty() && isLikelyJobName(name)) {
+                    return name;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * Checks if a URI path segment is a known Jenkins job/item name vs. a route keyword.
      * This helps prevent false positives where a job happens to be named "script" or "restart".
      */

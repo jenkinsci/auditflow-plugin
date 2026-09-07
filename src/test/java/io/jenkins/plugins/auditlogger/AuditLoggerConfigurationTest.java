@@ -192,14 +192,18 @@ class AuditLoggerConfigurationTest {
         assertTrue(html.contains("https://hooks.slack.com/services/T000/B000/XXXX"));
         assertTrue(html.contains("/auditflow/api"));
 
+        int eventLoggingIndex = html.indexOf("Event Logging Controls");
+        int anomalyIndex = html.indexOf("Security Anomaly Detection");
+        int notificationsIndex = html.indexOf("Anomaly Alert Notifications");
         int operationalIndex = html.indexOf("Operational Monitoring &amp; Export");
         int timeZoneIndex = html.indexOf("Display Time Zone");
-        int notificationsIndex = html.indexOf("Notifications");
         int exportIndex = html.indexOf("Export and Integrations");
 
-        assertTrue(operationalIndex < timeZoneIndex);
-        assertTrue(timeZoneIndex < notificationsIndex);
-        assertTrue(notificationsIndex < exportIndex);
+        assertTrue(eventLoggingIndex < anomalyIndex, "Event Logging before Anomaly Detection");
+        assertTrue(anomalyIndex < notificationsIndex, "Anomaly Detection contains Notifications");
+        assertTrue(notificationsIndex < operationalIndex, "Notifications before Operational Monitoring");
+        assertTrue(operationalIndex < timeZoneIndex, "Operational Monitoring before Display Time Zone");
+        assertTrue(timeZoneIndex < exportIndex, "Display Time Zone before Export and Integrations");
     }
 
     private static JSONObject findOption(JSONArray options, String id) {
