@@ -1,9 +1,20 @@
 package io.jenkins.plugins.auditlogger;
 
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import com.sun.net.httpserver.HttpServer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -280,13 +291,43 @@ class AnomalyDetectorTest {
     @Test
     void testRealSendWebhookMethodIsCovered(JenkinsRule j) throws Exception {
         // Call the real sendWebhook directly with a URL that will fail connection
-        // but the code path (lines 291-310) will still be executed.
         // The async nature means it won't throw — the exceptionally handler will catch it.
         AnomalyDetector realDetector = new AnomalyDetector();
         // Use a non-routable address so it fails fast but still exercises the code
         realDetector.sendWebhook("http://192.0.2.1:1/test", "{\"test\":true}");
-        
         assertTrue(true, "sendWebhook should not throw (async)");
+
+        // Test 200 OK and 400 Bad Request branches using local HttpServer
+        CountDownLatch latch200 = new CountDownLatch(1);
+        CountDownLatch latch400 = new CountDownLatch(1);
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/webhook-200", exchange -> {
+            byte[] resp = "ok".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, resp.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(resp);
+            }
+            latch200.countDown();
+        });
+        server.createContext("/webhook-400", exchange -> {
+            byte[] resp = "no_text".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(400, resp.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(resp);
+            }
+            latch400.countDown();
+        });
+        server.start();
+        int port = server.getAddress().getPort();
+        try {
+            realDetector.sendWebhook("http://127.0.0.1:" + port + "/webhook-200", "{\"text\":\"alert\"}");
+            assertTrue(latch200.await(5, TimeUnit.SECONDS), "200 endpoint should be hit");
+
+            realDetector.sendWebhook("http://127.0.0.1:" + port + "/webhook-400", "{\"type\":\"test\"}");
+            assertTrue(latch400.await(5, TimeUnit.SECONDS), "400 endpoint should be hit");
+        } finally {
+            server.stop(0);
+        }
     }
 
     // ── Enhanced email and webhook format tests ──────────────────────
@@ -357,6 +398,9 @@ class AnomalyDetectorTest {
         assertEquals(1, sentWebhooks.size(), "Webhook should be sent");
         String json = sentWebhooks.get(0)[1];
         
+        assertTrue(json.contains("\"text\":\""), "Webhook should contain text property for Slack/Teams compatibility");
+        assertTrue(json.contains("[AuditFlow Alert]"), "Webhook text should contain alert prefix");
+        assertTrue(json.contains("Suspicious Login Attempts (Brute Force)"), "Webhook text should contain readable type");
         assertTrue(json.contains("\"type\":\"BRUTE_FORCE_LOGIN\""), "Webhook should contain type");
         assertTrue(json.contains("\"severity\":\"CRITICAL\""), "Webhook should contain severity");
         assertTrue(json.contains("\"user\":\"webhookuser\""), "Webhook should contain user");
@@ -367,6 +411,55 @@ class AnomalyDetectorTest {
         assertTrue(json.contains("\"source\":\"Jenkins Audit Logger\""), 
                 "Webhook should contain source");
         assertTrue(json.contains("\"version\":\"1.0\""), "Webhook should contain version");
+    }
+
+    @Test
+    void testBuildWebhookPayloadSlackAndTeamsCompatibility(JenkinsRule j) {
+        AnomalyDetector.AnomalyAlert alert = new AnomalyDetector.AnomalyAlert(
+                AnomalyDetector.AnomalyType.BRUTE_FORCE_LOGIN,
+                "admin",
+                "Multiple failed logins (5 attempts)",
+                "CRITICAL"
+        );
+        String jenkinsUrl = "https://ci.example.com/";
+        String isoTimestamp = "2026-10-14T17:00:00.000Z";
+
+        AnomalyDetector defaultDetector = new AnomalyDetector();
+        String json = defaultDetector.buildWebhookPayload(alert, jenkinsUrl, isoTimestamp);
+
+        // Verify JSON envelope
+        assertTrue(json.startsWith("{") && json.endsWith("}"), "Payload must be valid JSON object");
+
+        // Verify text field for Slack / Teams
+        assertTrue(json.contains("\"text\":\"[AuditFlow Alert] CRITICAL: Suspicious Login Attempts (Brute Force) - User: 'admin' | Multiple failed logins (5 attempts) (Jenkins: https://ci.example.com/)\""),
+                "Text field should be formatted properly for Slack/Teams");
+
+        // Verify existing payload fields are intact
+        assertTrue(json.contains("\"type\":\"BRUTE_FORCE_LOGIN\""));
+        assertTrue(json.contains("\"severity\":\"CRITICAL\""));
+        assertTrue(json.contains("\"user\":\"admin\""));
+        assertTrue(json.contains("\"details\":\"Multiple failed logins (5 attempts)\""));
+        assertTrue(json.contains("\"timestamp\":\"2026-10-14T17:00:00.000Z\""));
+        assertTrue(json.contains("\"timestampMs\":" + alert.timestamp));
+        assertTrue(json.contains("\"jenkinsUrl\":\"https://ci.example.com/\""));
+        assertTrue(json.contains("\"alertId\":\"" + alert.alertId + "\""));
+        assertTrue(json.contains("\"source\":\"Jenkins Audit Logger\""));
+        assertTrue(json.contains("\"version\":\"1.0\""));
+    }
+
+    @Test
+    void testBuildWebhookPayloadWithEmptyDetailsAndNullJenkinsUrl() {
+        AnomalyDetector.AnomalyAlert alert = new AnomalyDetector.AnomalyAlert(
+                AnomalyDetector.AnomalyType.UNUSUAL_IP,
+                "alice",
+                "",
+                "HIGH"
+        );
+        AnomalyDetector defaultDetector = new AnomalyDetector();
+        String json = defaultDetector.buildWebhookPayload(alert, null, "2026-10-14T17:00:00.000Z");
+
+        assertTrue(json.contains("\"text\":\"[AuditFlow Alert] HIGH: Unusual IP Address Activity - User: 'alice'\""),
+                "Text field should omit empty details and null jenkinsUrl cleanly");
     }
 
     @Test
@@ -494,6 +587,57 @@ class AnomalyDetectorTest {
         int dismissed = detector.dismissAllAlerts();
         assertEquals(2, dismissed, "Should dismiss both alerts");
         assertEquals(0, detector.getAlerts(10).size(), "All alerts should be dismissed");
+    }
+
+    @Test
+    void testDismissAndGetAlert(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+
+        long now = System.currentTimeMillis();
+        detector.analyze(new AuditLogEntry("testuser", "FAILED_LOGIN", "jenkins", "", now), config);
+        detector.analyze(new AuditLogEntry("testuser", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+
+        List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(10);
+        assertEquals(1, alerts.size());
+
+        String alertId = alerts.get(0).alertId;
+        AnomalyDetector.AnomalyAlert dismissed = detector.dismissAndGetAlert(alertId);
+        assertNotNull(dismissed, "dismissAndGetAlert should return dismissed alert");
+        assertEquals(alertId, dismissed.alertId);
+        assertEquals("testuser", dismissed.user);
+        assertTrue(dismissed.isDismissed());
+
+        // Subsequent call returns null
+        assertNull(detector.dismissAndGetAlert(alertId), "Second dismissAndGetAlert should return null");
+        assertNull(detector.dismissAndGetAlert("nonexistent"), "dismissAndGetAlert with unknown id should return null");
+    }
+
+    @Test
+    void testDismissAllAndGetAlerts(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+
+        long now = System.currentTimeMillis();
+        detector.analyze(new AuditLogEntry("user1", "FAILED_LOGIN", "jenkins", "", now), config);
+        detector.analyze(new AuditLogEntry("user1", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+        detector.analyze(new AuditLogEntry("user2", "FAILED_LOGIN", "jenkins", "", now + 2000), config);
+        detector.analyze(new AuditLogEntry("user2", "FAILED_LOGIN", "jenkins", "", now + 3000), config);
+
+        List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(10);
+        assertEquals(2, alerts.size());
+
+        List<AnomalyDetector.AnomalyAlert> dismissed = detector.dismissAllAndGetAlerts();
+        assertEquals(2, dismissed.size());
+        assertEquals(0, detector.getAlerts(10).size());
+
+        // Calling again returns empty list
+        List<AnomalyDetector.AnomalyAlert> dismissedSecond = detector.dismissAllAndGetAlerts();
+        assertTrue(dismissedSecond.isEmpty());
     }
 
     @Test

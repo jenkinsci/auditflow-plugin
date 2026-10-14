@@ -692,7 +692,11 @@
         saveDismissedAlertIds([alertId]);
 
         // Tell server to dismiss specific alert
-        fetch('dismissAlert?alertId=' + encodeURIComponent(alertId)).catch(function() {});
+        fetch('dismissAlert?alertId=' + encodeURIComponent(alertId))
+            .then(function() {
+                loadLogs(false);
+            })
+            .catch(function() {});
 
         // If this alert was actively filtered, clear the filter
         if (activeFilteredAnomalyAlertId === alertId) {
@@ -725,7 +729,11 @@
         saveDismissedAlertIds(idsToDismiss);
 
         // Tell server to dismiss all
-        fetch('dismissAlert?alertId=ALL').catch(function() {});
+        fetch('dismissAlert?alertId=ALL')
+            .then(function() {
+                loadLogs(false);
+            })
+            .catch(function() {});
 
         activeAnomalies = [];
 

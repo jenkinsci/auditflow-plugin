@@ -483,6 +483,23 @@ public class AnomalyDetector {
         return false;
     }
 
+    public AnomalyAlert dismissAndGetAlert(String alertId) {
+        if (alertId == null || alertId.trim().isEmpty()) {
+            return null;
+        }
+
+        for (AnomalyAlert alert : activeAlerts) {
+            if (alert.alertId.equals(alertId)) {
+                if (!alert.isDismissed()) {
+                    alert.dismiss();
+                    return alert;
+                }
+                return null;
+            }
+        }
+        return null;
+    }
+
     public boolean dismissAlert(String alertId) {
         if (alertId == null || alertId.trim().isEmpty()) {
             return false;
@@ -499,15 +516,19 @@ public class AnomalyDetector {
         return false;
     }
 
-    public int dismissAllAlerts() {
-        int count = 0;
+    public List<AnomalyAlert> dismissAllAndGetAlerts() {
+        List<AnomalyAlert> dismissed = new ArrayList<>();
         for (AnomalyAlert alert : activeAlerts) {
             if (!alert.isDismissed()) {
                 alert.dismiss();
-                count++;
+                dismissed.add(alert);
             }
         }
-        return count;
+        return dismissed;
+    }
+
+    public int dismissAllAlerts() {
+        return dismissAllAndGetAlerts().size();
     }
 
     public void dismissAlertsForDisabledRules(AuditLoggerConfiguration config) {
@@ -716,7 +737,6 @@ public class AnomalyDetector {
             }
 
             sendWebhook(webhookUrl.trim(), json);
-            LOGGER.info("Successfully sent anomaly webhook alert to " + webhookUrl);
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Failed to send anomaly webhook alert", e);
         }
@@ -735,8 +755,13 @@ public class AnomalyDetector {
                 .build();
         client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenAccept(resp -> {
-                    if (resp.statusCode() >= 400) {
-                        LOGGER.warning("Webhook returned HTTP " + resp.statusCode() + " for " + url);
+                    if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
+                        LOGGER.info("Successfully sent anomaly webhook alert to " + url);
+                    } else {
+                        String bodySnippet = resp.body() != null && !resp.body().trim().isEmpty()
+                                ? " - Response: " + resp.body().trim()
+                                : "";
+                        LOGGER.warning("Webhook returned HTTP " + resp.statusCode() + " for " + url + bodySnippet);
                     }
                 })
                 .exceptionally(ex -> {
@@ -778,21 +803,40 @@ public class AnomalyDetector {
     }
     
     /**
-     * Builds a comprehensive webhook JSON payload.
+     * Builds a comprehensive webhook JSON payload with Slack and Microsoft Teams compatibility.
      * @param alert the anomaly alert
      * @param jenkinsUrl the Jenkins instance URL
      * @param isoTimestamp the ISO 8601 formatted timestamp
      * @return JSON payload string
      */
-    private String buildWebhookPayload(AnomalyAlert alert, String jenkinsUrl, String isoTimestamp) {
+    String buildWebhookPayload(AnomalyAlert alert, String jenkinsUrl, String isoTimestamp) {
         // Build JSON with proper escaping
         StringBuilder json = new StringBuilder();
         json.append("{");
-        json.append("\"type\":\"").append(escapeJson(alert.type.name())).append("\",");
+
+        // Top-level text field for Slack, Microsoft Teams, and chat webhooks compatibility
+        StringBuilder textBuilder = new StringBuilder();
+        textBuilder.append("[AuditFlow Alert] ");
+        if (alert.severity != null && !alert.severity.trim().isEmpty()) {
+            textBuilder.append(alert.severity).append(": ");
+        }
+        textBuilder.append(getReadableAnomalyType(alert.type));
+        if (alert.user != null && !alert.user.trim().isEmpty()) {
+            textBuilder.append(" - User: '").append(alert.user).append("'");
+        }
+        if (alert.details != null && !alert.details.trim().isEmpty()) {
+            textBuilder.append(" | ").append(alert.details);
+        }
+        if (jenkinsUrl != null && !jenkinsUrl.trim().isEmpty()) {
+            textBuilder.append(" (Jenkins: ").append(jenkinsUrl).append(")");
+        }
+        json.append("\"text\":\"").append(escapeJson(textBuilder.toString())).append("\",");
+
+        json.append("\"type\":\"").append(escapeJson(alert.type != null ? alert.type.name() : "")).append("\",");
         json.append("\"severity\":\"").append(escapeJson(alert.severity)).append("\",");
         json.append("\"user\":\"").append(escapeJson(alert.user)).append("\",");
         json.append("\"details\":\"").append(escapeJson(alert.details)).append("\",");
-        json.append("\"timestamp\":\"").append(isoTimestamp).append("\",");
+        json.append("\"timestamp\":\"").append(isoTimestamp != null ? isoTimestamp : "").append("\",");
         json.append("\"timestampMs\":").append(alert.timestamp).append(",");
         json.append("\"jenkinsUrl\":\"").append(escapeJson(jenkinsUrl)).append("\",");
         json.append("\"alertId\":\"").append(escapeJson(alert.alertId)).append("\",");
