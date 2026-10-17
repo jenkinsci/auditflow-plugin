@@ -853,7 +853,7 @@ public class AnomalyDetector {
         json.append("\"fallback\":\"").append(escapeJson(textBuilder.toString())).append("\",");
         json.append("\"title\":\"").append(escapeJson(getSeverityEmoji(alert.severity) + " [AuditFlow Alert] "
                 + (alert.severity != null && !alert.severity.isEmpty() ? alert.severity + ": " : "")
-                + getReadableAnomalyType(alert.type))).append("\",");
+                + (alert.type != null ? getReadableAnomalyType(alert.type) : "Anomaly Alert"))).append("\",");
         if (!auditflowUrl.isEmpty()) {
             json.append("\"title_link\":\"").append(escapeJson(auditflowUrl)).append("\",");
         }
@@ -903,6 +903,9 @@ public class AnomalyDetector {
      * @return readable description
      */
     private String getReadableAnomalyType(AnomalyType type) {
+        if (type == null) {
+            return "Anomaly Alert";
+        }
         switch (type) {
             case BRUTE_FORCE_LOGIN:
                 return "Suspicious Login Attempts (Brute Force)";
