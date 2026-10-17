@@ -831,7 +831,6 @@ public class AnomalyDetector {
         if (jenkinsUrl != null && !jenkinsUrl.trim().isEmpty()) {
             textBuilder.append(" (Jenkins: ").append(jenkinsUrl).append(")");
         }
-        json.append("\"text\":\"").append(escapeJson(textBuilder.toString())).append("\",");
 
         json.append("\"type\":\"").append(escapeJson(alert.type != null ? alert.type.name() : "")).append("\",");
         json.append("\"severity\":\"").append(escapeJson(alert.severity)).append("\",");

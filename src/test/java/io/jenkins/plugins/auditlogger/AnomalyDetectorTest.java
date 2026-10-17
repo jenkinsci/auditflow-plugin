@@ -398,9 +398,9 @@ class AnomalyDetectorTest {
         assertEquals(1, sentWebhooks.size(), "Webhook should be sent");
         String json = sentWebhooks.get(0)[1];
         
-        assertTrue(json.contains("\"text\":\""), "Webhook should contain text property for Slack/Teams compatibility");
-        assertTrue(json.contains("[AuditFlow Alert]"), "Webhook text should contain alert prefix");
-        assertTrue(json.contains("Suspicious Login Attempts (Brute Force)"), "Webhook text should contain readable type");
+        assertTrue(json.contains("\"fallback\":\""), "Webhook should contain fallback property for Slack/Teams compatibility");
+        assertTrue(json.contains("[AuditFlow Alert]"), "Webhook fallback should contain alert prefix");
+        assertTrue(json.contains("Suspicious Login Attempts (Brute Force)"), "Webhook fallback should contain readable type");
         assertTrue(json.contains("\"type\":\"BRUTE_FORCE_LOGIN\""), "Webhook should contain type");
         assertTrue(json.contains("\"severity\":\"CRITICAL\""), "Webhook should contain severity");
         assertTrue(json.contains("\"user\":\"webhookuser\""), "Webhook should contain user");
@@ -430,9 +430,9 @@ class AnomalyDetectorTest {
         // Verify JSON envelope
         assertTrue(json.startsWith("{") && json.endsWith("}"), "Payload must be valid JSON object");
 
-        // Verify text field for Slack / Teams
-        assertTrue(json.contains("\"text\":\"[AuditFlow Alert] CRITICAL: Suspicious Login Attempts (Brute Force) - User: 'admin' | Multiple failed logins (5 attempts) (Jenkins: https://ci.example.com/)\""),
-                "Text field should be formatted properly for Slack/Teams");
+        // Verify fallback field for Slack / notifications
+        assertTrue(json.contains("\"fallback\":\"[AuditFlow Alert] CRITICAL: Suspicious Login Attempts (Brute Force) - User: 'admin' | Multiple failed logins (5 attempts) (Jenkins: https://ci.example.com/)\""),
+                "Fallback field should be formatted properly for notifications");
 
         // Verify existing payload fields are intact
         assertTrue(json.contains("\"type\":\"BRUTE_FORCE_LOGIN\""));
@@ -461,8 +461,8 @@ class AnomalyDetectorTest {
         AnomalyDetector defaultDetector = new AnomalyDetector();
         String json = defaultDetector.buildWebhookPayload(alert, null, "2026-10-14T17:00:00.000Z");
 
-        assertTrue(json.contains("\"text\":\"[AuditFlow Alert] HIGH: Unusual IP Address Activity - User: 'alice'\""),
-                "Text field should omit empty details and null jenkinsUrl cleanly");
+        assertTrue(json.contains("\"fallback\":\"[AuditFlow Alert] HIGH: Unusual IP Address Activity - User: 'alice'\""),
+                "Fallback field should omit empty details and null jenkinsUrl cleanly");
     }
 
     @Test
