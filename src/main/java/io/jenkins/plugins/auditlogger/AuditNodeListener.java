@@ -45,6 +45,16 @@ public class AuditNodeListener extends NodeListener {
     }
 
     private static boolean isStatusToggleRequest() {
+        try {
+            hudson.cli.CLICommand currentCmd = hudson.cli.CLICommand.getCurrent();
+            if (currentCmd != null) {
+                String cmdName = currentCmd.getName();
+                if ("offline-node".equals(cmdName) || "online-node".equals(cmdName)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+
         for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
             String method = element.getMethodName();
             if ("setTemporarilyOffline".equals(method)

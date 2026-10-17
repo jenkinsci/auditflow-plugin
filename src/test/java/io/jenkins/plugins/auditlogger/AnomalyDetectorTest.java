@@ -445,6 +445,9 @@ class AnomalyDetectorTest {
         assertTrue(json.contains("\"alertId\":\"" + alert.alertId + "\""));
         assertTrue(json.contains("\"source\":\"Jenkins Audit Logger\""));
         assertTrue(json.contains("\"version\":\"1.0\""));
+        assertTrue(json.contains("\"attachments\":["));
+        assertTrue(json.contains("\"color\":\"#E01E5A\""));
+        assertTrue(json.contains("\"title_link\":\"https://ci.example.com/manage/auditflow-logs/\""));
     }
 
     @Test

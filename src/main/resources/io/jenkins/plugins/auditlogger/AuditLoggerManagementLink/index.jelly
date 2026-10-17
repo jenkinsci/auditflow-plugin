@@ -219,6 +219,7 @@
                                     <select id="filterAction" class="jenkins-select__input">
                                         <option value="">All Actions</option>
                                         <optgroup label="Authentication">
+                                            <option value="AUTH">All Authentication</option>
                                             <option value="LOGIN">Login</option>
                                             <option value="SSO_LOGIN">SSO Login</option>
                                             <option value="LOGOUT">Logout</option>

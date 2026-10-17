@@ -443,6 +443,12 @@
         if (!alert) return;
 
         var alertId = alert.alertId || ('auditflow-' + (alert.type || '') + '-' + (alert.user || '') + '-' + (alert.timestamp || ''));
+
+        // Toggle off if clicking the already active anomaly filter
+        if (activeFilteredAnomalyAlertId === alertId) {
+            clearAnomalyFilter();
+            return;
+        }
         activeFilteredAnomalyAlertId = alertId;
 
         // Highlight selected anomaly in the UI
@@ -467,15 +473,23 @@
         var hasRealUser = alert.user && alert.user !== 'UNKNOWN' && alert.user !== 'SYSTEM';
         var extractedTarget = extractEntityFromDetails(alert.details);
 
-        // Smart filtering: Prioritize specific actor/target to avoid broad historical matches
+        // Smart filtering: Prioritize specific actor/target and corresponding anomaly action
         if (hasRealUser) {
             if (searchInput) searchInput.value = alert.user;
             if (columnSelect) columnSelect.value = 'user';
 
             if (type === 'BRUTE_FORCE_LOGIN') {
                 if (actionSelect) actionSelect.value = 'FAILED_LOGIN';
+            } else if (type === 'MULTI_IP_LOGIN' || type === 'UNUSUAL_IP') {
+                if (actionSelect) actionSelect.value = 'LOGIN';
+            } else if (type === 'SUSPICIOUS_AUTH_PATTERN') {
+                if (actionSelect) actionSelect.value = 'AUTH';
             } else if (type === 'CREDENTIAL_EXPOSURE') {
                 if (actionSelect) actionSelect.value = 'CREDENTIAL_ACCESSED';
+            } else if (type === 'ADMIN_PRIVILEGE_CHANGE') {
+                if (actionSelect) actionSelect.value = 'SECURITY_CONFIG_UPDATED';
+            } else if (type === 'USER_LIFECYCLE_ANOMALY') {
+                if (actionSelect) actionSelect.value = 'USER_CONFIG_UPDATED';
             }
         } else if (extractedTarget) {
             if (searchInput) searchInput.value = extractedTarget;
@@ -483,16 +497,25 @@
 
             if (type === 'BRUTE_FORCE_LOGIN') {
                 if (actionSelect) actionSelect.value = 'FAILED_LOGIN';
+            } else if (type === 'MULTI_IP_LOGIN' || type === 'UNUSUAL_IP') {
+                if (actionSelect) actionSelect.value = 'LOGIN';
+            } else if (type === 'SUSPICIOUS_AUTH_PATTERN') {
+                if (actionSelect) actionSelect.value = 'AUTH';
             } else if (type === 'CREDENTIAL_EXPOSURE') {
                 if (actionSelect) actionSelect.value = 'CREDENTIAL_ACCESSED';
+            } else if (type === 'ADMIN_PRIVILEGE_CHANGE') {
+                if (actionSelect) actionSelect.value = 'SECURITY_CONFIG_UPDATED';
             }
         } else {
             // Fallback when neither actor nor target could be extracted
             if (type === 'BRUTE_FORCE_LOGIN') {
                 if (actionSelect) actionSelect.value = 'FAILED_LOGIN';
+            } else if (type === 'MULTI_IP_LOGIN' || type === 'UNUSUAL_IP') {
+                if (actionSelect) actionSelect.value = 'LOGIN';
+            } else if (type === 'SUSPICIOUS_AUTH_PATTERN') {
+                if (actionSelect) actionSelect.value = 'AUTH';
             } else if (type === 'ADMIN_PRIVILEGE_CHANGE') {
-                if (searchInput) searchInput.value = 'SECURITY';
-                if (columnSelect) columnSelect.value = 'action';
+                if (actionSelect) actionSelect.value = 'SECURITY_CONFIG_UPDATED';
             } else if (type === 'USER_LIFECYCLE_ANOMALY') {
                 if (searchInput) searchInput.value = 'USER';
                 if (columnSelect) columnSelect.value = 'action';
@@ -522,10 +545,10 @@
         // Load logs with applied filters
         loadLogs(true);
 
-        // Smooth scroll to logs table
-        var targetCard = document.getElementById('logsTable') || document.querySelector('.table-meta');
-        if (targetCard) {
-            targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Smooth scroll to toolbar so user sees the active filters and logs table
+        var toolbarCard = document.querySelector('.toolbar') || document.getElementById('logsTable');
+        if (toolbarCard) {
+            toolbarCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }
 
@@ -1060,6 +1083,11 @@
         var filterAction = document.getElementById('filterAction');
         if (filterAction) {
             filterAction.addEventListener('change', applySearch);
+        }
+
+        var searchColumn = document.getElementById('searchColumn');
+        if (searchColumn) {
+            searchColumn.addEventListener('change', applySearch);
         }
 
         var pageSizeSelect = document.getElementById('pageSize');

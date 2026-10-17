@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -841,9 +842,59 @@ public class AnomalyDetector {
         json.append("\"jenkinsUrl\":\"").append(escapeJson(jenkinsUrl)).append("\",");
         json.append("\"alertId\":\"").append(escapeJson(alert.alertId)).append("\",");
         json.append("\"source\":\"Jenkins Audit Logger\",");
-        json.append("\"version\":\"1.0\"");
+        json.append("\"version\":\"1.0\",");
+
+        // Rich Slack & Chat Webhook attachment for beautiful formatting and color sidebar
+        String auditflowUrl = jenkinsUrl != null && !jenkinsUrl.trim().isEmpty()
+                ? (jenkinsUrl.endsWith("/") ? jenkinsUrl + "manage/auditflow-logs/" : jenkinsUrl + "/manage/auditflow-logs/")
+                : "";
+        json.append("\"attachments\":[{");
+        json.append("\"color\":\"").append(getSeverityColor(alert.severity)).append("\",");
+        json.append("\"fallback\":\"").append(escapeJson(textBuilder.toString())).append("\",");
+        json.append("\"title\":\"").append(escapeJson(getSeverityEmoji(alert.severity) + " [AuditFlow Alert] "
+                + (alert.severity != null && !alert.severity.isEmpty() ? alert.severity + ": " : "")
+                + getReadableAnomalyType(alert.type))).append("\",");
+        if (!auditflowUrl.isEmpty()) {
+            json.append("\"title_link\":\"").append(escapeJson(auditflowUrl)).append("\",");
+        }
+        json.append("\"fields\":[");
+        json.append("{\"title\":\"Severity\",\"value\":\"").append(escapeJson(alert.severity != null ? alert.severity : "INFO")).append("\",\"short\":true},");
+        json.append("{\"title\":\"User\",\"value\":\"").append(escapeJson(alert.user != null ? alert.user : "SYSTEM")).append("\",\"short\":true},");
+        json.append("{\"title\":\"Anomaly Type\",\"value\":\"").append(escapeJson(alert.type != null ? alert.type.name() : "")).append("\",\"short\":true},");
+        json.append("{\"title\":\"Timestamp\",\"value\":\"").append(escapeJson(isoTimestamp != null ? isoTimestamp : "")).append("\",\"short\":true},");
+        json.append("{\"title\":\"Details\",\"value\":\"").append(escapeJson(formatDetailsForSlack(alert.details))).append("\",\"short\":false}");
+        json.append("],");
+        json.append("\"footer\":\"Jenkins AuditFlow\",");
+        json.append("\"ts\":").append(alert.timestamp / 1000L);
+        json.append("}]");
         json.append("}");
         return json.toString();
+    }
+
+    private String getSeverityColor(String severity) {
+        if (severity == null) return "#1D9BD1";
+        switch (severity.toUpperCase(Locale.ENGLISH)) {
+            case "CRITICAL": return "#E01E5A";
+            case "HIGH": return "#ECB22E";
+            case "MEDIUM": return "#2EB886";
+            default: return "#1D9BD1";
+        }
+    }
+
+    private String getSeverityEmoji(String severity) {
+        if (severity == null) return "ℹ️";
+        switch (severity.toUpperCase(Locale.ENGLISH)) {
+            case "CRITICAL": return "🚨";
+            case "HIGH": return "⚠️";
+            case "MEDIUM": return "⚡";
+            default: return "ℹ️";
+        }
+    }
+
+    private String formatDetailsForSlack(String details) {
+        if (details == null) return "";
+        // Wrap IPv4 addresses in backticks so Slack won't auto-link them as telephone numbers
+        return details.replaceAll("\\b(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\b", "`$1`");
     }
     
     /**

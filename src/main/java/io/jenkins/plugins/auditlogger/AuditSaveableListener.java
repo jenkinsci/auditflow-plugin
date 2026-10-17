@@ -96,6 +96,11 @@ public class AuditSaveableListener extends SaveableListener {
     @Override
     public void onChange(Saveable o, XmlFile file) {
         try {
+            Jenkins j = Jenkins.getInstanceOrNull();
+            if (j == null || j.getInitLevel().compareTo(hudson.init.InitMilestone.EXTENSIONS_AUGMENTED) <= 0) {
+                return;
+            }
+
             AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
             if (config == null) return;
 
