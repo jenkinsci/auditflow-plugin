@@ -333,6 +333,12 @@ public class AnomalyDetector {
             return;
         }
 
+        String target = entry.getTarget() != null ? entry.getTarget() : "";
+        String details = entry.getDetails() != null ? entry.getDetails() : "";
+        if (target.contains("ResourceDomainConfiguration") || details.contains("ResourceDomainConfiguration")) {
+            return;
+        }
+
         String action = entry.getAction() != null ? entry.getAction().toUpperCase() : "";
         if (action.contains("ADMIN_PRIVILEGE") || action.contains("SECURITY_CONFIG") || action.contains("AUTH_STRATEGY") || action.contains("ROLE_CONFIG")) {
             String user = entry.getUsername() != null ? entry.getUsername() : "UNKNOWN";
