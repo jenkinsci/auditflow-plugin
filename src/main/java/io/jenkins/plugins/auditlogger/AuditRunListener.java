@@ -212,6 +212,13 @@ public class AuditRunListener extends RunListener<Run<?, ?>> {
                 }
                 AuditLogStorage.getInstance().addEntry(abortEntry);
             } else {
+                // Keep the BUILD_COMPLETED action for non-terminal warning and success
+                // outcomes, while giving the dashboard the correct status colour.
+                if ("SUCCESS".equals(result)) {
+                    entry.setSeverity("LOW");
+                } else if ("UNSTABLE".equals(result)) {
+                    entry.setSeverity("MEDIUM");
+                }
                 AuditLogStorage.getInstance().addEntry(entry);
             }
         } catch (Exception e) {

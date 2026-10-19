@@ -1,12 +1,17 @@
 package io.jenkins.plugins.auditlogger;
 
+import hudson.Launcher;
+import hudson.model.AbstractBuild;
+import hudson.model.BuildListener;
 import hudson.model.FreeStyleBuild;
 import hudson.model.FreeStyleProject;
+import hudson.model.Result;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jvnet.hudson.test.JenkinsRule;
+import org.jvnet.hudson.test.TestBuilder;
 import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -58,8 +63,11 @@ public class AuditRunListenerTest {
         boolean hasBuildStarted = logs.stream().anyMatch(e -> e.getAction().contains("BUILD_STARTED") && e.getTarget().contains("build-audit-job"));
         assertTrue(hasBuildStarted, "BUILD_STARTED should be recorded");
 
-        boolean hasBuildCompleted = logs.stream().anyMatch(e -> e.getAction().contains("BUILD_COMPLETED") && e.getTarget().contains("build-audit-job"));
-        assertTrue(hasBuildCompleted, "BUILD_COMPLETED should be recorded");
+        AuditLogEntry completedEntry = logs.stream()
+                .filter(e -> "BUILD_COMPLETED".equals(e.getAction()) && e.getTarget().contains("build-audit-job"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("BUILD_COMPLETED should be recorded"));
+        assertEquals("LOW", completedEntry.getSeverity(), "Successful completed builds should be green");
 
         HttpServletRequest req = (HttpServletRequest) Proxy.newProxyInstance(
                 HttpServletRequest.class.getClassLoader(),
@@ -83,6 +91,29 @@ public class AuditRunListenerTest {
             assertTrue(hasBuildDeleted, "BUILD_DELETED should be recorded");
         } finally {
             RequestHolder.clear();
+        }
+    }
+
+    @Test
+    void testUnstableCompletedBuildUsesWarningSeverity(JenkinsRule j) throws Exception {
+        FreeStyleProject project = j.createFreeStyleProject("unstable-build-audit-job");
+        project.getBuildersList().add(new UnstableBuilder());
+        j.buildAndAssertStatus(Result.UNSTABLE, project);
+
+        AuditLogEntry completedEntry = AuditLogStorage.getInstance().getAllEntries().stream()
+                .filter(e -> "BUILD_COMPLETED".equals(e.getAction())
+                        && e.getTarget().contains("unstable-build-audit-job")
+                        && e.getDetails().contains("UNSTABLE"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Unstable BUILD_COMPLETED should be recorded"));
+        assertEquals("MEDIUM", completedEntry.getSeverity(), "Unstable completed builds should be yellow");
+    }
+
+    private static final class UnstableBuilder extends TestBuilder {
+        @Override
+        public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) {
+            build.setResult(Result.UNSTABLE);
+            return true;
         }
     }
 }
