@@ -349,6 +349,7 @@ MIT License.
 
 ## Version History
 
+
 ### 88.vb_c8b_8c60ef3f
 Introduced CLI event logging (`AuditCLIListener`) to capture and audit Jenkins CLI command executions, registering execution contexts to attribute CLI-initiated actions across domain listeners. (#40 by @harryofficial, @Aarav-Singh2007)
 
