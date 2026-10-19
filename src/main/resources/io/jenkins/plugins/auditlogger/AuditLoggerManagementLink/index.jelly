@@ -29,10 +29,7 @@
                 <div class="onboarding-banner jenkins-hidden" id="onboardingBanner">
                     <h2>✨ What’s New in AuditFlow</h2>
                     <p>
-                        <strong>Phase 2 — Security Anomaly Detection &amp; Risk Insights:</strong> Detect suspicious authentication, IP, login, privilege, and account activity in real time. Configure anomaly rules in System Settings and monitor risk insights from your AuditFlow Dashboard.
-                    </p>
-                    <p class="onboarding-banner__note" style="margin-top: 6px; font-size: 0.88rem; opacity: 0.9;">
-                        <em>Note: Anomaly detection settings have been updated. Please review System Settings to verify that your preferred detection rules are enabled or disabled as intended.</em>
+                        Slack webhook notifications have been fixed. Build status colors are now clearer: successful completed builds appear green, while unstable builds appear yellow.
                     </p>
                     <button type="button" class="jenkins-button onboarding-banner__dismiss" id="dismissOnboardingButton">Got it</button>
                 </div>
@@ -219,6 +216,7 @@
                                     <select id="filterAction" class="jenkins-select__input">
                                         <option value="">All Actions</option>
                                         <optgroup label="Authentication">
+                                            <option value="AUTH">All Authentication</option>
                                             <option value="LOGIN">Login</option>
                                             <option value="SSO_LOGIN">SSO Login</option>
                                             <option value="LOGOUT">Logout</option>

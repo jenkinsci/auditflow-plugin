@@ -204,7 +204,15 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     }
 
     public static AuditLoggerConfiguration get() {
-        return GlobalConfiguration.all().get(AuditLoggerConfiguration.class);
+        jenkins.model.Jenkins j = jenkins.model.Jenkins.getInstanceOrNull();
+        if (j == null) {
+            return null;
+        }
+        try {
+            return hudson.ExtensionList.lookupSingleton(AuditLoggerConfiguration.class);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     @Override

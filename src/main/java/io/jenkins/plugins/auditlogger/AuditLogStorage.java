@@ -703,15 +703,26 @@ public class AuditLogStorage {
         return endTime == null || entry.getTimestamp() <= endTime;
     }
 
-    private boolean matchesActionFilter(String entryAction, String requestedAction) {
+    static boolean matchesActionFilter(String entryAction, String requestedAction) {
         if (entryAction == null || requestedAction == null) {
             return false;
         }
         if (entryAction.equalsIgnoreCase(requestedAction)) {
             return true;
         }
-        return "SCRIPT_CONSOLE_ACCESS".equalsIgnoreCase(requestedAction)
-                && "SCRIPT_CONSOLE_ACCESSED".equalsIgnoreCase(entryAction);
+        String cleanEntry = entryAction.startsWith("[CLI] ") ? entryAction.substring(6).trim() : entryAction;
+        String cleanReq = requestedAction.startsWith("[CLI] ") ? requestedAction.substring(6).trim() : requestedAction;
+        if (cleanEntry.equalsIgnoreCase(cleanReq)) {
+            return true;
+        }
+        if (cleanEntry.replace(' ', '_').equalsIgnoreCase(cleanReq.replace(' ', '_'))) {
+            return true;
+        }
+        if ("AUTH".equalsIgnoreCase(cleanReq)) {
+            return cleanEntry.contains("LOGIN") || cleanEntry.contains("AUTH");
+        }
+        return "SCRIPT_CONSOLE_ACCESS".equalsIgnoreCase(cleanReq)
+                && "SCRIPT_CONSOLE_ACCESSED".equalsIgnoreCase(cleanEntry);
     }
 
     private int getBatchSize() {

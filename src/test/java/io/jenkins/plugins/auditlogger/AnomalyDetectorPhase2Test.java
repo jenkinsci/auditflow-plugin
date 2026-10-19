@@ -106,6 +106,22 @@ class AnomalyDetectorPhase2Test {
     }
 
     @Test
+    void testResourceDomainConfigDoesNotTriggerAdminPrivilegeChangeAlert(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyAdminPrivilegeChanges(true);
+
+        AuditLogEntry entry = new AuditLogEntry(
+                "regression_test",
+                "SECURITY_CONFIG_UPDATED",
+                "ResourceDomainConfiguration",
+                "Global system configuration updated: ResourceDomainConfiguration by regression_test");
+        detector.analyze(entry, config);
+
+        List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(10);
+        assertTrue(alerts.isEmpty(), "ResourceDomainConfiguration must never trigger ADMIN_PRIVILEGE_CHANGE alert");
+    }
+
+    @Test
     void testUserLifecycleAnomalyDetection(JenkinsRule j) {
         AuditLoggerConfiguration config = new AuditLoggerConfiguration();
         config.setAnomalyUserLifecycle(true);

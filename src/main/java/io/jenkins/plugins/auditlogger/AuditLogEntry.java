@@ -153,7 +153,7 @@ public class AuditLogEntry implements Serializable {
 
         // 3. MEDIUM: Configuration updates and status warnings
         if (u.contains("UPDATED") || u.contains("CONFIG") || u.contains("RENAMED")
-                || u.contains("PLUGIN") || "BUILD_UNSTABLE".equals(u)) {
+                || u.contains("PLUGIN") || u.contains("DISMISS") || "BUILD_UNSTABLE".equals(u)) {
             return "MEDIUM";
         }
 

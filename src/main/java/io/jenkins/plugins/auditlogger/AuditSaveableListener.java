@@ -96,6 +96,11 @@ public class AuditSaveableListener extends SaveableListener {
     @Override
     public void onChange(Saveable o, XmlFile file) {
         try {
+            Jenkins j = Jenkins.getInstanceOrNull();
+            if (j == null || j.getInitLevel().compareTo(hudson.init.InitMilestone.EXTENSIONS_AUGMENTED) <= 0) {
+                return;
+            }
+
             AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
             if (config == null) return;
 
@@ -136,17 +141,17 @@ public class AuditSaveableListener extends SaveableListener {
                 return;
             }
 
+            String requestUri = currentRequestUri();
+            if (shouldSuppressRequestScopedSystemConfigSave(isSystem, requestUri)) {
+                LOGGER.log(Level.FINE, "Suppressing request-scoped system config save for: {0} during {1}",
+                        new Object[]{o.getClass().getSimpleName(), requestUri});
+                return;
+            }
+
             String action;
             String target;
 
-            boolean isSecurityConfig = isSystem && (
-                o.getClass().getName().toLowerCase().contains("security") ||
-                o.getClass().getName().toLowerCase().contains("authorization") ||
-                o.getClass().getName().toLowerCase().contains("realm") ||
-                o.getClass().getName().toLowerCase().contains("permission") ||
-                o.getClass().getName().toLowerCase().contains("matrix") ||
-                o.getClass().getName().toLowerCase().contains("role")
-            );
+            boolean isSecurityConfig = isSystem && isSecurityConfiguration(o);
 
             if (isJob) {
                 action = "JOB_CONFIG_UPDATED";
@@ -251,8 +256,59 @@ public class AuditSaveableListener extends SaveableListener {
     }
 
     static boolean shouldSuppressRequestScopedSystemConfigSave(boolean isSystem, String requestUri) {
-        if (!isSystem || requestUri == null) return false;
-        return requestUri.endsWith("/configure") || requestUri.contains("/configure");
+        if (!isSystem || requestUri == null || requestUri.isEmpty()) return false;
+        return RouteAwareUrlMatcher.isConfigurationChange(requestUri)
+                || requestUri.endsWith("/configure")
+                || requestUri.contains("/configure")
+                || requestUri.endsWith("/configSubmit")
+                || requestUri.contains("/configSubmit");
+    }
+
+    static boolean isSecurityConfiguration(Saveable o) {
+        if (o == null) return false;
+        String className = o.getClass().getName();
+        String simpleName = o.getClass().getSimpleName();
+
+        // Explicitly exclude non-security system configurations that happen to live in security packages
+        // (e.g. ResourceDomainConfiguration configures the alternate Resource Root URL for static asset isolation)
+        if ("ResourceDomainConfiguration".equals(simpleName)
+                || className.endsWith("ResourceDomainConfiguration")
+                || className.contains("ResourceDomain")) {
+            return false;
+        }
+
+        String lowerClass = className.toLowerCase(java.util.Locale.ENGLISH);
+        String lowerSimple = simpleName.toLowerCase(java.util.Locale.ENGLISH);
+
+        return lowerClass.contains("authorization")
+                || lowerClass.contains("realm")
+                || lowerClass.contains("permission")
+                || lowerClass.contains("matrix")
+                || lowerClass.contains("role")
+                || lowerSimple.contains("security")
+                || lowerClass.contains("securityrealm")
+                || lowerClass.contains("securityconfiguration")
+                || lowerClass.contains("globalsecurityconfiguration");
+    }
+
+    private static String currentRequestUri() {
+        try {
+            HttpServletRequest request = RequestHolder.get();
+            if (request != null && request.getRequestURI() != null) {
+                return request.getRequestURI();
+            }
+        } catch (Exception ignored) {
+        }
+
+        try {
+            org.kohsuke.stapler.StaplerRequest2 request = Stapler.getCurrentRequest2();
+            if (request != null && request.getRequestURI() != null) {
+                return request.getRequestURI();
+            }
+        } catch (Exception ignored) {
+        }
+
+        return "";
     }
 
     private static boolean isUserThemePreferenceSave(Saveable o) {

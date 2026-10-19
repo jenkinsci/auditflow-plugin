@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -332,6 +333,12 @@ public class AnomalyDetector {
             return;
         }
 
+        String target = entry.getTarget() != null ? entry.getTarget() : "";
+        String details = entry.getDetails() != null ? entry.getDetails() : "";
+        if (target.contains("ResourceDomainConfiguration") || details.contains("ResourceDomainConfiguration")) {
+            return;
+        }
+
         String action = entry.getAction() != null ? entry.getAction().toUpperCase() : "";
         if (action.contains("ADMIN_PRIVILEGE") || action.contains("SECURITY_CONFIG") || action.contains("AUTH_STRATEGY") || action.contains("ROLE_CONFIG")) {
             String user = entry.getUsername() != null ? entry.getUsername() : "UNKNOWN";
@@ -483,6 +490,23 @@ public class AnomalyDetector {
         return false;
     }
 
+    public AnomalyAlert dismissAndGetAlert(String alertId) {
+        if (alertId == null || alertId.trim().isEmpty()) {
+            return null;
+        }
+
+        for (AnomalyAlert alert : activeAlerts) {
+            if (alert.alertId.equals(alertId)) {
+                if (!alert.isDismissed()) {
+                    alert.dismiss();
+                    return alert;
+                }
+                return null;
+            }
+        }
+        return null;
+    }
+
     public boolean dismissAlert(String alertId) {
         if (alertId == null || alertId.trim().isEmpty()) {
             return false;
@@ -499,15 +523,19 @@ public class AnomalyDetector {
         return false;
     }
 
-    public int dismissAllAlerts() {
-        int count = 0;
+    public List<AnomalyAlert> dismissAllAndGetAlerts() {
+        List<AnomalyAlert> dismissed = new ArrayList<>();
         for (AnomalyAlert alert : activeAlerts) {
             if (!alert.isDismissed()) {
                 alert.dismiss();
-                count++;
+                dismissed.add(alert);
             }
         }
-        return count;
+        return dismissed;
+    }
+
+    public int dismissAllAlerts() {
+        return dismissAllAndGetAlerts().size();
     }
 
     public void dismissAlertsForDisabledRules(AuditLoggerConfiguration config) {
@@ -716,7 +744,6 @@ public class AnomalyDetector {
             }
 
             sendWebhook(webhookUrl.trim(), json);
-            LOGGER.info("Successfully sent anomaly webhook alert to " + webhookUrl);
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Failed to send anomaly webhook alert", e);
         }
@@ -735,8 +762,13 @@ public class AnomalyDetector {
                 .build();
         client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenAccept(resp -> {
-                    if (resp.statusCode() >= 400) {
-                        LOGGER.warning("Webhook returned HTTP " + resp.statusCode() + " for " + url);
+                    if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
+                        LOGGER.info("Successfully sent anomaly webhook alert to " + url);
+                    } else {
+                        String bodySnippet = resp.body() != null && !resp.body().trim().isEmpty()
+                                ? " - Response: " + resp.body().trim()
+                                : "";
+                        LOGGER.warning("Webhook returned HTTP " + resp.statusCode() + " for " + url + bodySnippet);
                     }
                 })
                 .exceptionally(ex -> {
@@ -778,28 +810,96 @@ public class AnomalyDetector {
     }
     
     /**
-     * Builds a comprehensive webhook JSON payload.
+     * Builds a comprehensive webhook JSON payload with Slack and Microsoft Teams compatibility.
      * @param alert the anomaly alert
      * @param jenkinsUrl the Jenkins instance URL
      * @param isoTimestamp the ISO 8601 formatted timestamp
      * @return JSON payload string
      */
-    private String buildWebhookPayload(AnomalyAlert alert, String jenkinsUrl, String isoTimestamp) {
+    String buildWebhookPayload(AnomalyAlert alert, String jenkinsUrl, String isoTimestamp) {
         // Build JSON with proper escaping
         StringBuilder json = new StringBuilder();
         json.append("{");
-        json.append("\"type\":\"").append(escapeJson(alert.type.name())).append("\",");
+
+        // Top-level text field for Slack, Microsoft Teams, and chat webhooks compatibility
+        StringBuilder textBuilder = new StringBuilder();
+        textBuilder.append("[AuditFlow Alert] ");
+        if (alert.severity != null && !alert.severity.trim().isEmpty()) {
+            textBuilder.append(alert.severity).append(": ");
+        }
+        textBuilder.append(getReadableAnomalyType(alert.type));
+        if (alert.user != null && !alert.user.trim().isEmpty()) {
+            textBuilder.append(" - User: '").append(alert.user).append("'");
+        }
+        if (alert.details != null && !alert.details.trim().isEmpty()) {
+            textBuilder.append(" | ").append(alert.details);
+        }
+        if (jenkinsUrl != null && !jenkinsUrl.trim().isEmpty()) {
+            textBuilder.append(" (Jenkins: ").append(jenkinsUrl).append(")");
+        }
+
+        json.append("\"type\":\"").append(escapeJson(alert.type != null ? alert.type.name() : "")).append("\",");
         json.append("\"severity\":\"").append(escapeJson(alert.severity)).append("\",");
         json.append("\"user\":\"").append(escapeJson(alert.user)).append("\",");
         json.append("\"details\":\"").append(escapeJson(alert.details)).append("\",");
-        json.append("\"timestamp\":\"").append(isoTimestamp).append("\",");
+        json.append("\"timestamp\":\"").append(isoTimestamp != null ? isoTimestamp : "").append("\",");
         json.append("\"timestampMs\":").append(alert.timestamp).append(",");
         json.append("\"jenkinsUrl\":\"").append(escapeJson(jenkinsUrl)).append("\",");
         json.append("\"alertId\":\"").append(escapeJson(alert.alertId)).append("\",");
         json.append("\"source\":\"Jenkins Audit Logger\",");
-        json.append("\"version\":\"1.0\"");
+        json.append("\"version\":\"1.0\",");
+
+        // Rich Slack & Chat Webhook attachment for beautiful formatting and color sidebar
+        String auditflowUrl = jenkinsUrl != null && !jenkinsUrl.trim().isEmpty()
+                ? (jenkinsUrl.endsWith("/") ? jenkinsUrl + "manage/auditflow-logs/" : jenkinsUrl + "/manage/auditflow-logs/")
+                : "";
+        json.append("\"attachments\":[{");
+        json.append("\"color\":\"").append(getSeverityColor(alert.severity)).append("\",");
+        json.append("\"fallback\":\"").append(escapeJson(textBuilder.toString())).append("\",");
+        json.append("\"title\":\"").append(escapeJson(getSeverityEmoji(alert.severity) + " [AuditFlow Alert] "
+                + (alert.severity != null && !alert.severity.isEmpty() ? alert.severity + ": " : "")
+                + (alert.type != null ? getReadableAnomalyType(alert.type) : "Anomaly Alert"))).append("\",");
+        if (!auditflowUrl.isEmpty()) {
+            json.append("\"title_link\":\"").append(escapeJson(auditflowUrl)).append("\",");
+        }
+        json.append("\"fields\":[");
+        json.append("{\"title\":\"Severity\",\"value\":\"").append(escapeJson(alert.severity != null ? alert.severity : "INFO")).append("\",\"short\":true},");
+        json.append("{\"title\":\"User\",\"value\":\"").append(escapeJson(alert.user != null ? alert.user : "SYSTEM")).append("\",\"short\":true},");
+        json.append("{\"title\":\"Anomaly Type\",\"value\":\"").append(escapeJson(alert.type != null ? alert.type.name() : "")).append("\",\"short\":true},");
+        json.append("{\"title\":\"Timestamp\",\"value\":\"").append(escapeJson(isoTimestamp != null ? isoTimestamp : "")).append("\",\"short\":true},");
+        json.append("{\"title\":\"Details\",\"value\":\"").append(escapeJson(formatDetailsForSlack(alert.details))).append("\",\"short\":false}");
+        json.append("],");
+        json.append("\"footer\":\"Jenkins AuditFlow\",");
+        json.append("\"ts\":").append(alert.timestamp / 1000L);
+        json.append("}]");
         json.append("}");
         return json.toString();
+    }
+
+    private String getSeverityColor(String severity) {
+        if (severity == null) return "#1D9BD1";
+        switch (severity.toUpperCase(Locale.ENGLISH)) {
+            case "CRITICAL": return "#E01E5A";
+            case "HIGH": return "#ECB22E";
+            case "MEDIUM": return "#2EB886";
+            default: return "#1D9BD1";
+        }
+    }
+
+    private String getSeverityEmoji(String severity) {
+        if (severity == null) return "ℹ️";
+        switch (severity.toUpperCase(Locale.ENGLISH)) {
+            case "CRITICAL": return "🚨";
+            case "HIGH": return "⚠️";
+            case "MEDIUM": return "⚡";
+            default: return "ℹ️";
+        }
+    }
+
+    private String formatDetailsForSlack(String details) {
+        if (details == null) return "";
+        // Wrap IPv4 addresses in backticks so Slack won't auto-link them as telephone numbers
+        return details.replaceAll("\\b(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\b", "`$1`");
     }
     
     /**
@@ -808,6 +908,9 @@ public class AnomalyDetector {
      * @return readable description
      */
     private String getReadableAnomalyType(AnomalyType type) {
+        if (type == null) {
+            return "Anomaly Alert";
+        }
         switch (type) {
             case BRUTE_FORCE_LOGIN:
                 return "Suspicious Login Attempts (Brute Force)";

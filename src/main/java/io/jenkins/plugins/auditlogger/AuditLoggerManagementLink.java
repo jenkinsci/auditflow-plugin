@@ -997,13 +997,61 @@ public class AuditLoggerManagementLink extends ManagementLink {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         String alertId = req.getParameter("alertId");
         boolean success = false;
+        int dismissedCount = 0;
+        String currentUser = resolveCurrentUser(req);
+
         if (alertId != null && !alertId.trim().isEmpty()) {
             String trimmedId = alertId.trim();
             if ("ALL".equalsIgnoreCase(trimmedId) || "*".equals(trimmedId)) {
-                AuditLogStorage.getInstance().getAnomalyDetector().dismissAllAlerts();
+                List<AnomalyDetector.AnomalyAlert> dismissedAlerts =
+                        AuditLogStorage.getInstance().getAnomalyDetector().dismissAllAndGetAlerts();
+                dismissedCount = dismissedAlerts.size();
                 success = true;
+
+                StringBuilder details = new StringBuilder();
+                if (dismissedAlerts.isEmpty()) {
+                    details.append("Dismissed all active anomaly alerts (0 active alerts were present).");
+                } else {
+                    details.append("Dismissed all active anomaly alerts (count: ").append(dismissedCount).append("). Dismissed alerts: ");
+                    for (int i = 0; i < dismissedAlerts.size(); i++) {
+                        AnomalyDetector.AnomalyAlert a = dismissedAlerts.get(i);
+                        if (i > 0) {
+                            details.append("; ");
+                        }
+                        details.append("[").append(i + 1).append("] ID: ").append(a.alertId)
+                                .append(" | Type: ").append(a.type != null ? a.type.name() : "UNKNOWN")
+                                .append(" | Subject: ").append(a.user != null ? a.user : "UNKNOWN")
+                                .append(" | Severity: ").append(a.severity != null ? a.severity : "UNKNOWN")
+                                .append(" | Message: ").append(a.details != null ? a.details : "");
+                    }
+                }
+
+                String target = "All Alerts (" + dismissedCount + " item" + (dismissedCount == 1 ? "" : "s") + ")";
+                AuditLogEntry entry = new AuditLogEntry(currentUser, "ALERT_DISMISSED", target, details.toString());
+                entry.setSeverity("MEDIUM");
+                AuditLogStorage.getInstance().addEntry(entry);
             } else {
-                success = AuditLogStorage.getInstance().getAnomalyDetector().dismissAlert(trimmedId);
+                AnomalyDetector.AnomalyAlert dismissedAlert =
+                        AuditLogStorage.getInstance().getAnomalyDetector().dismissAndGetAlert(trimmedId);
+                if (dismissedAlert != null) {
+                    success = true;
+                    dismissedCount = 1;
+                    String alertType = dismissedAlert.type != null ? dismissedAlert.type.name() : "UNKNOWN";
+                    String subjectUser = dismissedAlert.user != null ? dismissedAlert.user : "UNKNOWN";
+                    String target = alertType + " (" + subjectUser + ")";
+                    String details = "Dismissed anomaly alert. Alert ID: " + dismissedAlert.alertId
+                            + " | Type: " + alertType
+                            + " | Subject: " + subjectUser
+                            + " | Severity: " + (dismissedAlert.severity != null ? dismissedAlert.severity : "UNKNOWN")
+                            + " | Message: " + (dismissedAlert.details != null ? dismissedAlert.details : "");
+
+                    AuditLogEntry entry = new AuditLogEntry(currentUser, "ALERT_DISMISSED", target, details);
+                    entry.setSeverity("MEDIUM");
+                    AuditLogStorage.getInstance().addEntry(entry);
+                } else {
+                    // Check if alert was already dismissed or didn't exist
+                    success = AuditLogStorage.getInstance().getAnomalyDetector().dismissAlert(trimmedId);
+                }
             }
         }
 
@@ -1011,6 +1059,51 @@ public class AuditLoggerManagementLink extends ManagementLink {
         var gson = new com.google.gson.GsonBuilder().create();
         var response = new LinkedHashMap<String, Object>();
         response.put("success", success);
+        response.put("dismissedCount", dismissedCount);
         res.getWriter().write(gson.toJson(response));
+    }
+
+    private static String resolveCurrentUser(StaplerRequest2 req) {
+        try {
+            User current = User.current();
+            if (current != null && isRealUser(current.getId())) {
+                return current.getId();
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            org.springframework.security.core.Authentication auth = Jenkins.getAuthentication2();
+            if (auth != null && isRealUser(auth.getName())) {
+                return auth.getName();
+            }
+        } catch (Exception ignored) {}
+
+        if (req != null) {
+            try {
+                String remoteUser = req.getRemoteUser();
+                if (isRealUser(remoteUser)) {
+                    return remoteUser;
+                }
+                java.security.Principal principal = req.getUserPrincipal();
+                if (principal != null && isRealUser(principal.getName())) {
+                    return principal.getName();
+                }
+            } catch (Exception ignored) {}
+        }
+
+        try {
+            org.springframework.security.core.Authentication auth =
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && isRealUser(auth.getName())) {
+                return auth.getName();
+            }
+        } catch (Exception ignored) {}
+
+        return "SYSTEM";
+    }
+
+    private static boolean isRealUser(String user) {
+        return user != null && !user.trim().isEmpty() && !"SYSTEM".equalsIgnoreCase(user)
+                && !"anonymous".equalsIgnoreCase(user) && !"anonymousUser".equalsIgnoreCase(user);
     }
 }

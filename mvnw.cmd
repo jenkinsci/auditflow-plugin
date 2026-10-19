@@ -59,8 +59,9 @@ goto error
 @REM Setup the command line
 
 set MAVEN_PROJECTBASEDIR=%~dp0
-set WRAPPER_JAR="%MAVEN_PROJECTBASEDIR%\.mvn\wrapper\maven-wrapper.jar"
-set WRAPPER_PROPERTIES="%MAVEN_PROJECTBASEDIR%\.mvn\wrapper\maven-wrapper.properties"
+if "%MAVEN_PROJECTBASEDIR:~-1%"=="\" set MAVEN_PROJECTBASEDIR=%MAVEN_PROJECTBASEDIR:~0,-1%
+set WRAPPER_JAR=%MAVEN_PROJECTBASEDIR%\.mvn\wrapper\maven-wrapper.jar
+set WRAPPER_PROPERTIES=%MAVEN_PROJECTBASEDIR%\.mvn\wrapper\maven-wrapper.properties
 
 @REM Extension to allow automatically downloading the maven-wrapper.jar from Maven-Repo
 @REM This allows using the maven wrapper in projects that prohibit adding binary files to source tree

@@ -15,8 +15,10 @@ import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.Collections;
 import java.util.List;
 
@@ -202,6 +204,49 @@ class AuditSaveableListenerTest {
                 .toList();
 
         assertTrue(entries.isEmpty(), "Global system config events should be suppressed when feature toggle is false");
+    }
+
+    @Test
+    void testResourceDomainConfigAuditedAsGlobalConfigNotSecurityConfig(JenkinsRule j) {
+        RequestHolder.setAuthenticatedUser("admin");
+        AuditLoggerConfiguration.get().setEnableSystemConfigEvents(true);
+
+        jenkins.security.ResourceDomainConfiguration resDomainConfig = jenkins.security.ResourceDomainConfiguration.get();
+        listener.onChange(resDomainConfig, null);
+
+        List<AuditLogEntry> secEntries = AuditLogStorage.getInstance().getAllEntries().stream()
+                .filter(e -> "SECURITY_CONFIG_UPDATED".equals(e.getAction()))
+                .toList();
+        assertTrue(secEntries.isEmpty(), "ResourceDomainConfiguration must not be logged as SECURITY_CONFIG_UPDATED");
+
+        List<AuditLogEntry> globalEntries = AuditLogStorage.getInstance().getAllEntries().stream()
+                .filter(e -> "GLOBAL_CONFIG_UPDATED".equals(e.getAction()) && "ResourceDomainConfiguration".equals(e.getTarget()))
+                .toList();
+        assertEquals(1, globalEntries.size(), "ResourceDomainConfiguration should be logged as GLOBAL_CONFIG_UPDATED");
+        assertEquals("MEDIUM", globalEntries.get(0).getSeverity());
+    }
+
+    @Test
+    void testSystemConfigSuppressedDuringConfigureRequest(JenkinsRule j) {
+        RequestHolder.setAuthenticatedUser("admin");
+        AuditLoggerConfiguration.get().setEnableSystemConfigEvents(true);
+
+        HttpServletRequest req = (HttpServletRequest) Proxy.newProxyInstance(
+                HttpServletRequest.class.getClassLoader(),
+                new Class<?>[]{HttpServletRequest.class},
+                (proxy, method, args) -> {
+                    if ("getRequestURI".equals(method.getName())) return "/manage/configure";
+                    if ("getRemoteUser".equals(method.getName())) return "admin";
+                    return null;
+                });
+        RequestHolder.set(req);
+
+        int initialCount = AuditLogStorage.getInstance().getAllEntries().size();
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        listener.onChange(config, null);
+
+        assertEquals(initialCount, AuditLogStorage.getInstance().getAllEntries().size(),
+                "System configuration saves must be suppressed during /manage/configure request");
     }
 
     @Test

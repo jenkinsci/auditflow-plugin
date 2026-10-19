@@ -61,17 +61,20 @@ public class AuditLogIndex {
     }
 
     public List<AuditLogEntry> queryByTime(long startMs, long endMs) {
-        String startKey = getHourKey(startMs);
-        String endKey = getHourKey(endMs);
+        long startHour = startMs / 3_600_000;
+        long endHour = endMs / 3_600_000;
         List<AuditLogEntry> results = new ArrayList<>();
         for (Map.Entry<String, List<AuditLogEntry>> e : timeIndex.entrySet()) {
-            if (e.getKey().compareTo(startKey) >= 0 && e.getKey().compareTo(endKey) <= 0) {
-                for (AuditLogEntry entry : e.getValue()) {
-                    if (entry.getTimestamp() >= startMs && entry.getTimestamp() <= endMs) {
-                        results.add(entry);
+            try {
+                long hour = Long.parseLong(e.getKey());
+                if (hour >= startHour && hour <= endHour) {
+                    for (AuditLogEntry entry : e.getValue()) {
+                        if (entry.getTimestamp() >= startMs && entry.getTimestamp() <= endMs) {
+                            results.add(entry);
+                        }
                     }
                 }
-            }
+            } catch (NumberFormatException ignored) {}
         }
         return results;
     }
@@ -88,11 +91,36 @@ public class AuditLogIndex {
 
         return results.stream()
                 .filter(e -> username == null || username.isEmpty() || e.getUsername().equalsIgnoreCase(username))
-                .filter(e -> action == null || action.isEmpty() || e.getAction().equalsIgnoreCase(action))
+                .filter(e -> action == null || action.isEmpty() || matchesAction(e.getAction(), action))
                 .filter(e -> severity == null || severity.isEmpty() || severity.equals(e.getSeverity()))
                 .filter(e -> startTime == null || e.getTimestamp() >= startTime)
                 .filter(e -> endTime == null || e.getTimestamp() <= endTime)
                 .collect(Collectors.toList());
+    }
+
+    static boolean matchesAction(String entryAction, String requestedAction) {
+        if (requestedAction == null || requestedAction.isEmpty()) {
+            return true;
+        }
+        if (entryAction == null) {
+            return false;
+        }
+        if (entryAction.equalsIgnoreCase(requestedAction)) {
+            return true;
+        }
+        String cleanEntry = entryAction.startsWith("[CLI] ") ? entryAction.substring(6).trim() : entryAction;
+        String cleanReq = requestedAction.startsWith("[CLI] ") ? requestedAction.substring(6).trim() : requestedAction;
+        if (cleanEntry.equalsIgnoreCase(cleanReq)) {
+            return true;
+        }
+        if (cleanEntry.replace(' ', '_').equalsIgnoreCase(cleanReq.replace(' ', '_'))) {
+            return true;
+        }
+        if ("AUTH".equalsIgnoreCase(cleanReq)) {
+            return cleanEntry.contains("LOGIN") || cleanEntry.contains("AUTH");
+        }
+        return "SCRIPT_CONSOLE_ACCESS".equalsIgnoreCase(cleanReq)
+                && "SCRIPT_CONSOLE_ACCESSED".equalsIgnoreCase(cleanEntry);
     }
 
     public void clear() {
