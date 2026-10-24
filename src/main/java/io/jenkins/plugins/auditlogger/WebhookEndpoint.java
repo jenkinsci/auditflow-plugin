@@ -267,19 +267,34 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
             return items;
         }
 
-        public FormValidation doCheckName(@QueryParameter String value) {
-            if (value == null || value.trim().isEmpty()) {
+        public FormValidation doCheckName(
+                @QueryParameter("value") String value,
+                @QueryParameter("name") String name) {
+            String target = (value != null && !value.trim().isEmpty()) ? value : name;
+            if (target == null || target.trim().isEmpty()) {
                 return FormValidation.error("Endpoint name cannot be empty.");
             }
             return FormValidation.ok();
         }
 
-        public FormValidation doCheckWebhookUrl(@QueryParameter String value) {
-            if (value == null || value.trim().isEmpty()) {
+        public FormValidation doCheckWebhookUrl(
+                @QueryParameter("value") String value,
+                @QueryParameter("webhookUrl") String webhookUrl) {
+            String raw = (value != null && !value.trim().isEmpty()) ? value : webhookUrl;
+            if (raw == null || raw.trim().isEmpty()) {
                 return FormValidation.error("Webhook URL cannot be empty.");
             }
-            String trimmed = value.trim();
-            if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+            String plain = raw.trim();
+            if (plain.startsWith("{") && plain.endsWith("}")) {
+                try {
+                    plain = Secret.fromString(plain).getPlainText().trim();
+                } catch (Exception ignored) {
+                }
+            }
+            if (plain.isEmpty()) {
+                return FormValidation.error("Webhook URL cannot be empty.");
+            }
+            if (!plain.startsWith("http://") && !plain.startsWith("https://")) {
                 return FormValidation.error("Webhook URL must start with http:// or https://");
             }
             return FormValidation.ok();

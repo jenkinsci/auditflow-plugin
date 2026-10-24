@@ -1,13 +1,13 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
     <f:entry title="Endpoint Name" field="name" description="A friendly name for this destination (e.g. 'SecOps Slack', 'DevOps Alert Channel', 'Teams On-Call').">
-        <f:textbox />
+        <f:textbox oninput="this.dispatchEvent(new Event('change'))" />
     </f:entry>
     <f:entry title="Channel / Target Note" field="channel" description="Optional target channel note or identifier (e.g. '#secops-critical', '#devops-audit').">
         <f:textbox />
     </f:entry>
     <f:entry title="Webhook URL" field="webhookUrl" description="The Incoming Webhook URL (e.g. Slack incoming webhook, Microsoft Teams Workflows endpoint).">
-        <f:password />
+        <f:password field="webhookUrl" oninput="this.dispatchEvent(new Event('change'))" />
     </f:entry>
     <f:entry title="Enabled" field="enabled" description="Uncheck to temporarily disable alerts to this endpoint without deleting the configuration.">
         <f:checkbox default="true" />

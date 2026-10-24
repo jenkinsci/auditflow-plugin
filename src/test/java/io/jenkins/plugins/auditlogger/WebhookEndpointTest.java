@@ -107,13 +107,22 @@ class WebhookEndpointTest {
     void testDescriptorFormValidationAndOptions(JenkinsRule j) {
         WebhookEndpoint.DescriptorImpl desc = new WebhookEndpoint.DescriptorImpl();
 
-        assertEquals(FormValidation.Kind.ERROR, desc.doCheckName("").kind);
-        assertEquals(FormValidation.Kind.OK, desc.doCheckName("Valid Name").kind);
+        assertEquals(FormValidation.Kind.ERROR, desc.doCheckName("", null).kind);
+        assertEquals(FormValidation.Kind.ERROR, desc.doCheckName(null, "").kind);
+        assertEquals(FormValidation.Kind.OK, desc.doCheckName("Valid Name", null).kind);
+        assertEquals(FormValidation.Kind.OK, desc.doCheckName(null, "Valid Name").kind);
 
-        assertEquals(FormValidation.Kind.ERROR, desc.doCheckWebhookUrl("").kind);
-        assertEquals(FormValidation.Kind.ERROR, desc.doCheckWebhookUrl("ftp://invalid.com").kind);
-        assertEquals(FormValidation.Kind.OK, desc.doCheckWebhookUrl("https://hooks.slack.com/123").kind);
-        assertEquals(FormValidation.Kind.OK, desc.doCheckWebhookUrl("http://localhost:8080/hook").kind);
+        assertEquals(FormValidation.Kind.ERROR, desc.doCheckWebhookUrl("", null).kind);
+        assertEquals(FormValidation.Kind.ERROR, desc.doCheckWebhookUrl(null, "").kind);
+        assertEquals(FormValidation.Kind.ERROR, desc.doCheckWebhookUrl("ftp://invalid.com", null).kind);
+        assertEquals(FormValidation.Kind.ERROR, desc.doCheckWebhookUrl(null, "ftp://invalid.com").kind);
+        assertEquals(FormValidation.Kind.OK, desc.doCheckWebhookUrl("https://hooks.slack.com/123", null).kind);
+        assertEquals(FormValidation.Kind.OK, desc.doCheckWebhookUrl(null, "https://hooks.slack.com/123").kind);
+        assertEquals(FormValidation.Kind.OK, desc.doCheckWebhookUrl("http://localhost:8080/hook", null).kind);
+
+        hudson.util.Secret secret = hudson.util.Secret.fromString("https://hooks.slack.com/secret");
+        assertEquals(FormValidation.Kind.OK, desc.doCheckWebhookUrl(secret.getEncryptedValue(), null).kind);
+        assertEquals(FormValidation.Kind.OK, desc.doCheckWebhookUrl(null, secret.getEncryptedValue()).kind);
 
         ListBoxModel scopes = desc.doFillScopeItems();
         assertNotNull(scopes);
@@ -136,5 +145,30 @@ class WebhookEndpointTest {
         assertEquals(ep1, ep2);
         assertEquals(ep1.hashCode(), ep2.hashCode());
         assertNotEquals(ep1, ep3);
+    }
+
+    @Test
+    void testCheckWebhookUrlViaWebClient(JenkinsRule j) throws Exception {
+        JenkinsRule.WebClient wc = j.createWebClient();
+
+        // 1. Valid with parameter 'value'
+        java.net.URL urlValue = new java.net.URL(j.getURL(), "descriptorByName/io.jenkins.plugins.auditlogger.WebhookEndpoint/checkWebhookUrl?value=" + java.net.URLEncoder.encode("https://hooks.slack.com/123", java.nio.charset.StandardCharsets.UTF_8));
+        org.htmlunit.WebResponse resp1 = wc.getPage(new org.htmlunit.WebRequest(urlValue, org.htmlunit.HttpMethod.GET)).getWebResponse();
+        assertEquals("<div/>", resp1.getContentAsString().trim());
+
+        // 2. Valid with parameter 'webhookUrl'
+        java.net.URL urlWebhookUrl = new java.net.URL(j.getURL(), "descriptorByName/io.jenkins.plugins.auditlogger.WebhookEndpoint/checkWebhookUrl?webhookUrl=" + java.net.URLEncoder.encode("https://hooks.slack.com/123", java.nio.charset.StandardCharsets.UTF_8));
+        org.htmlunit.WebResponse resp2 = wc.getPage(new org.htmlunit.WebRequest(urlWebhookUrl, org.htmlunit.HttpMethod.GET)).getWebResponse();
+        assertEquals("<div/>", resp2.getContentAsString().trim());
+
+        // 3. Invalid format with parameter 'webhookUrl'
+        java.net.URL urlInvalid = new java.net.URL(j.getURL(), "descriptorByName/io.jenkins.plugins.auditlogger.WebhookEndpoint/checkWebhookUrl?webhookUrl=invalid");
+        org.htmlunit.WebResponse resp3 = wc.getPage(new org.htmlunit.WebRequest(urlInvalid, org.htmlunit.HttpMethod.GET)).getWebResponse();
+        assertTrue(resp3.getContentAsString().contains("Webhook URL must start with http:// or https://"));
+
+        // 4. Empty with parameter 'webhookUrl'
+        java.net.URL urlEmpty = new java.net.URL(j.getURL(), "descriptorByName/io.jenkins.plugins.auditlogger.WebhookEndpoint/checkWebhookUrl?webhookUrl=");
+        org.htmlunit.WebResponse resp4 = wc.getPage(new org.htmlunit.WebRequest(urlEmpty, org.htmlunit.HttpMethod.GET)).getWebResponse();
+        assertTrue(resp4.getContentAsString().contains("Webhook URL cannot be empty."));
     }
 }
