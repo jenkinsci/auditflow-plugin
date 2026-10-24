@@ -39,6 +39,7 @@ public class AuditLoggerPlugin extends Plugin {
         AuditRestartListener.logPendingRestartOnPluginStop();
         LOGGER.info("Jenkins Audit Logger Plugin stopping — flushing writes...");
         AuditLogStorage.getInstance().shutdown();
+        WebhookDispatcher.getInstance().shutdown();
         LOGGER.info("Jenkins Audit Logger Plugin stopped");
     }
 

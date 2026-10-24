@@ -174,6 +174,15 @@ public class AuditLogStorage {
             LOGGER.log(Level.FINE, "Anomaly detection failed for entry", e);
         }
 
+        // Direct webhook notification for high-priority / critical audit events (Issue #44)
+        try {
+            if (config != null && config.isEnableWebhookAlerts()) {
+                WebhookDispatcher.getInstance().dispatchAuditLog(entry, config);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Direct audit log webhook dispatch failed for entry", e);
+        }
+
         // Queue for async disk write (lock-free)
         writeQueue.offer(entry);
         int queueLen = writeQueueSize.incrementAndGet();

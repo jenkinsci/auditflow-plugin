@@ -206,6 +206,108 @@ class AuditLoggerConfigurationTest {
         assertTrue(timeZoneIndex < exportIndex, "Display Time Zone before Export and Integrations");
     }
 
+    @Test
+    void multiWebhookConfigurationJsonBinding(JenkinsRule j) throws Exception {
+        AuditLoggerConfiguration configuration = new AuditLoggerConfiguration();
+        JSONObject json = new JSONObject();
+        JSONObject webhookAlerts = new JSONObject();
+        webhookAlerts.put("webhookUrl", "https://default.example.com/webhook");
+
+        JSONObject multiWebhook = new JSONObject();
+        net.sf.json.JSONArray endpoints = new net.sf.json.JSONArray();
+
+        JSONObject ep1 = new JSONObject();
+        ep1.put("name", "SecOps Slack");
+        ep1.put("channel", "#secops-urgent");
+        ep1.put("webhookUrl", "https://hooks.slack.com/services/T00/B00/SEC");
+        ep1.put("enabled", true);
+        ep1.put("scope", "CRITICAL_LOGS_ONLY");
+        ep1.put("minSeverity", "CRITICAL");
+        ep1.put("actionFilter", "SCRIPT_CONSOLE_ACCESS");
+        endpoints.add(ep1);
+
+        JSONObject ep2 = new JSONObject();
+        ep2.put("name", "DevOps Alerts");
+        ep2.put("channel", "#devops");
+        ep2.put("webhookUrl", "https://hooks.slack.com/services/T00/B00/DEV");
+        ep2.put("enabled", true);
+        ep2.put("scope", "ALL_ALERTS");
+        ep2.put("minSeverity", "HIGH");
+        endpoints.add(ep2);
+
+        multiWebhook.put("webhookEndpoints", endpoints);
+        webhookAlerts.put("enableMultiWebhook", multiWebhook);
+        json.put("enableWebhookAlerts", webhookAlerts);
+
+        configuration.configure((org.kohsuke.stapler.StaplerRequest2) null, json);
+
+        assertTrue(configuration.isEnableWebhookAlerts());
+        assertEquals("https://default.example.com/webhook", configuration.getWebhookUrl());
+        assertTrue(configuration.isEnableMultiWebhook());
+        assertEquals(2, configuration.getWebhookEndpoints().size());
+
+        WebhookEndpoint endpoint1 = configuration.getWebhookEndpoints().get(0);
+        assertEquals("SecOps Slack", endpoint1.getName());
+        assertEquals("#secops-urgent", endpoint1.getChannel());
+        assertEquals("CRITICAL_LOGS_ONLY", endpoint1.getScope());
+        assertEquals("CRITICAL", endpoint1.getMinSeverity());
+        assertEquals("SCRIPT_CONSOLE_ACCESS", endpoint1.getActionFilter());
+    }
+
+    @Test
+    void resolveActiveEndpointsWithProgressiveDisclosure(JenkinsRule j) {
+        AuditLoggerConfiguration configuration = new AuditLoggerConfiguration();
+
+        // 1. When webhooks are disabled entirely
+        configuration.setEnableWebhookAlerts(false);
+        configuration.setWebhookUrl("https://legacy.example.com/webhook");
+        assertTrue(configuration.resolveActiveEndpoints("ANOMALY", "HIGH", "TEST").isEmpty());
+
+        // 2. Single webhook mode (multi-webhook disabled)
+        configuration.setEnableWebhookAlerts(true);
+        configuration.setEnableMultiWebhook(false);
+        var singleTargets = configuration.resolveActiveEndpoints("ANOMALY", "HIGH", "TEST");
+        assertEquals(1, singleTargets.size());
+        assertEquals("https://legacy.example.com/webhook", singleTargets.get(0).getPlainWebhookUrl());
+
+        // Low severity doesn't meet default HIGH threshold on single endpoint
+        assertTrue(configuration.resolveActiveEndpoints("ANOMALY", "LOW", "TEST").isEmpty());
+
+        // 3. Multi-webhook mode enabled
+        configuration.setEnableMultiWebhook(true);
+        WebhookEndpoint epCrit = new WebhookEndpoint("SecOps", "https://hooks.slack.com/secops");
+        epCrit.setScope("CRITICAL_LOGS_ONLY");
+        epCrit.setMinSeverity("CRITICAL");
+        epCrit.setActionFilter("SCRIPT_CONSOLE_ACCESS");
+
+        WebhookEndpoint epAll = new WebhookEndpoint("General", "https://hooks.slack.com/general");
+        epAll.setScope("ALL_ALERTS");
+        epAll.setMinSeverity("HIGH");
+
+        configuration.setWebhookEndpoints(java.util.List.of(epCrit, epAll));
+
+        // Direct audit log with SCRIPT_CONSOLE_ACCESS & CRITICAL matches BOTH epCrit and epAll
+        var targets = configuration.resolveActiveEndpoints("AUDIT_LOG", "CRITICAL", "SCRIPT_CONSOLE_ACCESS");
+        assertEquals(2, targets.size());
+
+        // Anomaly alert with HIGH severity matches ONLY epAll
+        var anomalyTargets = configuration.resolveActiveEndpoints("ANOMALY", "HIGH", "FAILED_LOGINS");
+        assertEquals(1, anomalyTargets.size());
+        assertEquals("General", anomalyTargets.get(0).getName());
+
+        // Direct audit log with USER_DELETED & CRITICAL matches ONLY epAll (because epCrit actionFilter is SCRIPT_CONSOLE_ACCESS)
+        var userDelTargets = configuration.resolveActiveEndpoints("AUDIT_LOG", "CRITICAL", "USER_DELETED");
+        assertEquals(1, userDelTargets.size());
+        assertEquals("General", userDelTargets.get(0).getName());
+    }
+
+    @Test
+    void testWebhookValidation(JenkinsRule j) {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        assertEquals(hudson.util.FormValidation.Kind.ERROR, config.doTestWebhookUrl("").kind);
+        assertEquals(hudson.util.FormValidation.Kind.ERROR, config.doTestWebhookUrl("ftp://bad.com").kind);
+    }
+
     private static JSONObject findOption(JSONArray options, String id) {
         for (int index = 0; index < options.size(); index++) {
             JSONObject option = options.getJSONObject(index);

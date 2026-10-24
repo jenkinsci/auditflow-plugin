@@ -21,10 +21,16 @@ import org.kohsuke.stapler.verb.GET;
 import hudson.BulkChange;
 import hudson.Extension;
 import hudson.model.Descriptor;
+import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
+import hudson.util.Secret;
 import jenkins.model.GlobalConfiguration;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
+import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.verb.POST;
+import java.util.Collections;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Global configuration for Jenkins Audit Logger plugin.
@@ -140,6 +146,8 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private boolean enableComplianceReports = false;
     private Boolean enableWebhookAlerts = false;
     private String webhookUrl = "";
+    private Boolean enableMultiWebhook = false;
+    private List<WebhookEndpoint> webhookEndpoints = new CopyOnWriteArrayList<>();
 
     // UI
     private boolean enableRiskLevels = true;
@@ -184,6 +192,8 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         if (maskCreditCards == null) maskCreditCards = true;
         if (enableEmailAlerts == null) enableEmailAlerts = false;
         if (enableWebhookAlerts == null) enableWebhookAlerts = false;
+        if (enableMultiWebhook == null) enableMultiWebhook = false;
+        if (webhookEndpoints == null) webhookEndpoints = new CopyOnWriteArrayList<>();
         if (enableDashboardStats == null) enableDashboardStats = true;
         if (showMetricTotal == null) showMetricTotal = true;
         if (showMetricLogins == null) showMetricLogins = true;
@@ -219,7 +229,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean configure(StaplerRequest2 req, JSONObject json) throws Descriptor.FormException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         try (BulkChange bulkChange = new BulkChange(this)) {
-            applyJsonConfiguration(json);
+            applyJsonConfiguration(req, json);
             StartupPhaseManager.setGracePeriodSeconds(startupGracePeriodSeconds);
             bulkChange.commit();
 
@@ -237,7 +247,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         }
     }
 
-    private void applyJsonConfiguration(JSONObject json) {
+    private void applyJsonConfiguration(StaplerRequest2 req, JSONObject json) {
         if (json == null) {
             return;
         }
@@ -347,6 +357,59 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         setEnableWebhookAlerts(isOptionalBlockEnabled(anomalyConfig, "enableWebhookAlerts") || isOptionalBlockEnabled(json, "enableWebhookAlerts"));
         JSONObject webhookAlertsConfig = webhookAlertsBlock != null ? webhookAlertsBlock : (anomalyConfig.has("webhookUrl") ? anomalyConfig : json);
         if (webhookAlertsConfig.has("webhookUrl")) setWebhookUrl(webhookAlertsConfig.optString("webhookUrl", webhookUrl));
+
+        JSONObject multiWebhookBlock = getOptionalBlock(webhookAlertsConfig, "enableMultiWebhook");
+        if (multiWebhookBlock == null) {
+            multiWebhookBlock = getOptionalBlock(json, "enableMultiWebhook");
+        }
+        setEnableMultiWebhook(isOptionalBlockEnabled(webhookAlertsConfig, "enableMultiWebhook") || isOptionalBlockEnabled(json, "enableMultiWebhook"));
+
+        JSONObject multiConfig = multiWebhookBlock != null ? multiWebhookBlock : webhookAlertsConfig;
+        if (multiConfig.has("webhookEndpoints")) {
+            Object endpointsRaw = multiConfig.get("webhookEndpoints");
+            if (req != null) {
+                try {
+                    List<WebhookEndpoint> eps = req.bindJSONToList(WebhookEndpoint.class, endpointsRaw);
+                    setWebhookEndpoints(eps);
+                } catch (Exception e) {
+                    parseEndpointsFromJson(endpointsRaw);
+                }
+            } else {
+                parseEndpointsFromJson(endpointsRaw);
+            }
+        }
+    }
+
+    private void parseEndpointsFromJson(Object raw) {
+        List<WebhookEndpoint> list = new CopyOnWriteArrayList<>();
+        if (raw instanceof net.sf.json.JSONArray) {
+            net.sf.json.JSONArray arr = (net.sf.json.JSONArray) raw;
+            for (int i = 0; i < arr.size(); i++) {
+                Object item = arr.get(i);
+                if (item instanceof JSONObject) {
+                    WebhookEndpoint ep = parseEndpointObject((JSONObject) item);
+                    if (ep != null) list.add(ep);
+                }
+            }
+        } else if (raw instanceof JSONObject) {
+            WebhookEndpoint ep = parseEndpointObject((JSONObject) raw);
+            if (ep != null) list.add(ep);
+        }
+        setWebhookEndpoints(list);
+    }
+
+    private WebhookEndpoint parseEndpointObject(JSONObject obj) {
+        if (obj == null) return null;
+        String name = obj.optString("name", "");
+        String url = obj.optString("webhookUrl", "");
+        WebhookEndpoint ep = new WebhookEndpoint(name, Secret.fromString(url));
+        if (obj.has("id")) ep.setId(obj.optString("id", ""));
+        if (obj.has("channel")) ep.setChannel(obj.optString("channel", ""));
+        if (obj.has("enabled")) ep.setEnabled(obj.optBoolean("enabled", true));
+        if (obj.has("scope")) ep.setScope(obj.optString("scope", WebhookEndpoint.SCOPE_ALL));
+        if (obj.has("minSeverity")) ep.setMinSeverity(obj.optString("minSeverity", "HIGH"));
+        if (obj.has("actionFilter")) ep.setActionFilter(obj.optString("actionFilter", ""));
+        return ep;
     }
 
     private static JSONObject getOptionalBlock(JSONObject json, String key) {
@@ -667,6 +730,18 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         this.webhookUrl = webhookUrl;
     }
 
+    @DataBoundSetter
+    public void setEnableMultiWebhook(boolean enableMultiWebhook) {
+        this.enableMultiWebhook = enableMultiWebhook;
+    }
+
+    @DataBoundSetter
+    public void setWebhookEndpoints(List<WebhookEndpoint> webhookEndpoints) {
+        this.webhookEndpoints = webhookEndpoints != null
+                ? new CopyOnWriteArrayList<>(webhookEndpoints)
+                : new CopyOnWriteArrayList<>();
+    }
+
 
     @DataBoundSetter
     public void setLogRetentionDays(int logRetentionDays) {
@@ -816,6 +891,50 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isEnableComplianceReports() { return enableComplianceReports; }
     public boolean isEnableWebhookAlerts() { return enableWebhookAlerts; }
     public String getWebhookUrl() { return webhookUrl != null ? webhookUrl : ""; }
+    public boolean isEnableMultiWebhook() { return enableMultiWebhook != null ? enableMultiWebhook : false; }
+
+    public List<WebhookEndpoint> getWebhookEndpoints() {
+        if (webhookEndpoints == null) {
+            webhookEndpoints = new CopyOnWriteArrayList<>();
+        }
+        return Collections.unmodifiableList(webhookEndpoints);
+    }
+
+    /**
+     * Resolves active webhook endpoints for a given security event.
+     * If multi-channel routing is enabled and endpoints are configured, routes to matching endpoints.
+     * Otherwise, falls back to the legacy single webhook URL if configured.
+     */
+    public List<WebhookEndpoint> resolveActiveEndpoints(String eventType, String severity, String action) {
+        List<WebhookEndpoint> targets = new ArrayList<>();
+        if (!isEnableWebhookAlerts()) {
+            return targets;
+        }
+        if (isEnableMultiWebhook() && webhookEndpoints != null && !webhookEndpoints.isEmpty()) {
+            for (WebhookEndpoint ep : webhookEndpoints) {
+                if (ep != null && ep.matches(eventType, severity, action)) {
+                    targets.add(ep);
+                }
+            }
+        } else if (webhookUrl != null && !webhookUrl.trim().isEmpty()) {
+            WebhookEndpoint defaultEp = new WebhookEndpoint("Default Webhook", Secret.fromString(webhookUrl.trim()));
+            defaultEp.setScope(WebhookEndpoint.SCOPE_ALL);
+            defaultEp.setMinSeverity("HIGH");
+            if (defaultEp.matches(eventType, severity, action)) {
+                targets.add(defaultEp);
+            }
+        }
+        return targets;
+    }
+
+    @POST
+    public FormValidation doTestWebhookUrl(@QueryParameter String webhookUrl) {
+        Jenkins jenkins = Jenkins.getInstanceOrNull();
+        if (jenkins != null) {
+            jenkins.checkPermission(Jenkins.ADMINISTER);
+        }
+        return WebhookEndpoint.testWebhookConnection(webhookUrl);
+    }
 
     public boolean isEnableRiskLevels() { return enableRiskLevels; }
     public boolean isEnableEventCategories() { return enableEventCategories; }

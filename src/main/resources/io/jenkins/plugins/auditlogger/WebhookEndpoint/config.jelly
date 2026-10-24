@@ -1,0 +1,28 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+    <f:entry title="Endpoint Name" field="name" description="A friendly name for this destination (e.g. 'SecOps Slack', 'DevOps Alert Channel', 'Teams On-Call').">
+        <f:textbox />
+    </f:entry>
+    <f:entry title="Channel / Target Note" field="channel" description="Optional target channel note or identifier (e.g. '#secops-critical', '#devops-audit').">
+        <f:textbox />
+    </f:entry>
+    <f:entry title="Webhook URL" field="webhookUrl" description="The Incoming Webhook URL (e.g. Slack incoming webhook, Microsoft Teams Workflows endpoint).">
+        <f:password />
+    </f:entry>
+    <f:entry title="Enabled" field="enabled" description="Uncheck to temporarily disable alerts to this endpoint without deleting the configuration.">
+        <f:checkbox default="true" />
+    </f:entry>
+    <f:entry title="Event Scope" field="scope" description="Choose which category of security events this channel should receive.">
+        <f:select />
+    </f:entry>
+    <f:entry title="Minimum Severity" field="minSeverity" description="Only forward events whose severity meets or exceeds this threshold.">
+        <f:select />
+    </f:entry>
+    <f:entry title="Specific Action Labels (Optional)" field="actionFilter" description="Comma-separated event action names to target (e.g. 'SCRIPT_CONSOLE_ACCESS, SYSTEM_RESTART, USER_DELETED'). Leave blank to match all actions that meet the severity threshold.">
+        <f:textbox />
+    </f:entry>
+    <f:validateButton title="Test Endpoint"
+                      progress="Testing webhook endpoint..."
+                      method="testEndpoint"
+                      with="webhookUrl" />
+</j:jelly>

@@ -404,7 +404,13 @@ public class AnomalyDetector {
             sendEmailNotification(alert, currentConfig.getAlertEmailAddresses());
         }
         if (currentConfig != null && currentConfig.isEnableWebhookAlerts()) {
-            sendWebhookNotification(alert, currentConfig.getWebhookUrl());
+            List<WebhookEndpoint> endpoints = currentConfig.resolveActiveEndpoints(
+                    "ANOMALY", alert.severity, alert.type != null ? alert.type.name() : "");
+            for (WebhookEndpoint ep : endpoints) {
+                if (ep != null && !ep.getPlainWebhookUrl().isEmpty()) {
+                    sendWebhookNotification(alert, ep.getPlainWebhookUrl());
+                }
+            }
         }
     }
 

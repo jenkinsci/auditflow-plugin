@@ -117,13 +117,32 @@
                     <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
                 </f:entry>
             </f:optionalBlock>
-            <f:optionalBlock title="Webhook notifications (send anomaly alerts to a webhook endpoint using JSON payload)"
+            <f:optionalBlock title="Webhook notifications (send alerts to external webhook endpoints such as Slack or Microsoft Teams)"
                              name="enableWebhookAlerts"
                              checked="${descriptor.isEnableWebhookAlerts()}">
-                <f:entry title="Webhook URL"
-                         description="Enter a valid HTTP webhook endpoint such as Slack, Microsoft Teams, or another supported service. AuditFlow sends a JSON payload whenever an alert is created. Example: https://hooks.slack.com/services/T000/B000/XXXX">
+                <f:entry title="Default Webhook URL"
+                         description="Enter a valid HTTP webhook endpoint such as Slack, Microsoft Teams, or another supported service. Example: https://hooks.slack.com/services/T000/B000/XXXX">
                     <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
                 </f:entry>
+                <f:validateButton title="Test Webhook"
+                                  progress="Testing webhook endpoint..."
+                                  method="testWebhookUrl"
+                                  with="webhookUrl"/>
+
+                <!-- Progressive Disclosure: Multi-Channel Routing -->
+                <f:optionalBlock title="Enable Multi-Channel Routing (route alerts to different Slack/Teams channels by event scope &amp; severity)"
+                                 name="enableMultiWebhook"
+                                 checked="${descriptor.isEnableMultiWebhook()}">
+                    <f:entry title="Webhook Destinations" description="Configure multiple channels to receive targeted audit logs and anomaly alerts.">
+                        <f:repeatableProperty field="webhookEndpoints" add="Add Webhook Endpoint">
+                            <f:entry>
+                                <div align="right">
+                                    <f:repeatableDeleteButton value="Delete Endpoint"/>
+                                </div>
+                            </f:entry>
+                        </f:repeatableProperty>
+                    </f:entry>
+                </f:optionalBlock>
             </f:optionalBlock>
         </f:optionalBlock>
     </f:section>
