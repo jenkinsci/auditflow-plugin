@@ -107,7 +107,7 @@
 
     <f:section title="Alert Notifications &amp; Webhooks">
         <f:block>
-            <h4>Anomaly Alert Notifications</h4>
+            
             <div class="jenkins-section__description">
                 Configure notification destinations (email, webhooks) for audit events and anomaly alert delivery.
             </div>
@@ -220,7 +220,7 @@
             <h4>Performance</h4>
         </f:block>
         <f:entry title="Startup grace period (seconds)"
-                 description="Suppress startup and reload noise for this many seconds after Jenkins starts. Useful when you want cleaner configuration change logs.">
+                 description="Suppress startup and reload noise during jenkisn startup. Useful when you want cleaner configuration change logs.">
             <f:number name="startupGracePeriodSeconds" value="${descriptor.getStartupGracePeriodSeconds()}"/>
         </f:entry>
         <f:entry title="Batch write size"
