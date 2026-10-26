@@ -102,37 +102,43 @@ class WebhookEndpointTest {
         assertFalse(ep.matches("AUDIT_LOG", "CRITICAL", "USER_DELETED"));
         assertFalse(ep.matches("AUDIT_LOG", "CRITICAL", null));
 
-        // 7. Category Filters
-        ep.setActionFilter("");
-        ep.setNotifySecurity(false);
-        assertFalse(ep.matches("AUDIT_LOG", "CRITICAL", "SCRIPT_CONSOLE_ACCESS"));
-        assertTrue(ep.matches("AUDIT_LOG", "CRITICAL", "FAILED_LOGIN"));
-
-        ep.setNotifySecurity(true);
-        ep.setNotifyAuth(false);
-        assertFalse(ep.matches("AUDIT_LOG", "CRITICAL", "FAILED_LOGIN"));
+        // 7. Category Tags and Mixed Filters
+        ep.setActionFilter("CATEGORY:SECURITY");
         assertTrue(ep.matches("AUDIT_LOG", "CRITICAL", "SCRIPT_CONSOLE_ACCESS"));
+        assertFalse(ep.matches("AUDIT_LOG", "CRITICAL", "FAILED_LOGIN"));
 
-        ep.setNotifyAuth(true);
-        ep.setNotifyAnomalies(false);
-        assertFalse(ep.matches("ANOMALY", "HIGH", "FAILED_LOGINS"));
-        ep.setNotifyAnomalies(true);
+        ep.setActionFilter("CATEGORY:AUTH");
+        assertTrue(ep.matches("AUDIT_LOG", "CRITICAL", "FAILED_LOGIN"));
+        assertFalse(ep.matches("AUDIT_LOG", "CRITICAL", "SCRIPT_CONSOLE_ACCESS"));
+
+        // Mixed Category and specific action: CATEGORY:AUTH + SCRIPT_CONSOLE_ACCESS
+        ep.setActionFilter("CATEGORY:AUTH, SCRIPT_CONSOLE_ACCESS");
+        assertTrue(ep.matches("AUDIT_LOG", "CRITICAL", "FAILED_LOGIN"));
+        assertTrue(ep.matches("AUDIT_LOG", "CRITICAL", "LOGIN"));
+        assertTrue(ep.matches("AUDIT_LOG", "CRITICAL", "SCRIPT_CONSOLE_ACCESS"));
+        assertFalse(ep.matches("AUDIT_LOG", "CRITICAL", "JOB_DELETED"));
+
+        // Anomaly category tag
+        ep.setActionFilter("CATEGORY:ANOMALIES");
         assertTrue(ep.matches("ANOMALY", "HIGH", "FAILED_LOGINS"));
+        assertFalse(ep.matches("AUDIT_LOG", "CRITICAL", "SCRIPT_CONSOLE_ACCESS"));
 
-        ep.setNotifyCredentials(false);
-        assertFalse(ep.matches("AUDIT_LOG", "HIGH", "CREDENTIAL_DELETED"));
-        ep.setNotifyCredentials(true);
+        // Specific anomaly type tag
+        ep.setActionFilter("BRUTE_FORCE_LOGIN");
+        assertTrue(ep.matches("ANOMALY", "HIGH", "BRUTE_FORCE_LOGIN"));
+        assertFalse(ep.matches("ANOMALY", "HIGH", "MULTI_IP_LOGIN"));
+
+        ep.setActionFilter("CATEGORY:CREDENTIALS");
         assertTrue(ep.matches("AUDIT_LOG", "HIGH", "CREDENTIAL_DELETED"));
-
-        ep.setNotifyJobs(false);
         assertFalse(ep.matches("AUDIT_LOG", "HIGH", "JOB_DELETED"));
-        ep.setNotifyJobs(true);
-        assertTrue(ep.matches("AUDIT_LOG", "HIGH", "JOB_DELETED"));
 
-        ep.setNotifyNodes(false);
+        ep.setActionFilter("CATEGORY:JOBS");
+        assertTrue(ep.matches("AUDIT_LOG", "HIGH", "JOB_DELETED"));
         assertFalse(ep.matches("AUDIT_LOG", "HIGH", "NODE_OFFLINE"));
-        ep.setNotifyNodes(true);
+
+        ep.setActionFilter("CATEGORY:NODES");
         assertTrue(ep.matches("AUDIT_LOG", "HIGH", "NODE_OFFLINE"));
+        assertFalse(ep.matches("AUDIT_LOG", "HIGH", "JOB_DELETED"));
     }
 
     @Test

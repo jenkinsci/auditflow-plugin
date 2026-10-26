@@ -1,16 +1,26 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
-    <f:entry title="Endpoint Name" field="name" description="A friendly name for this destination (e.g. 'SecOps Slack', 'DevOps Alert Channel', 'Teams On-Call').">
-        <f:textbox oninput="this.dispatchEvent(new Event('change'))" />
-    </f:entry>
-    <f:entry title="Channel / Target Note" field="channel" description="Optional target channel note or identifier (e.g. '#secops-critical', '#devops-audit').">
-        <f:textbox />
-    </f:entry>
+    <st:adjunct includes="io.jenkins.plugins.auditlogger.WebhookEndpoint.auditflow-event-picker"/>
+    <f:block>
+        <div class="auditflow-endpoint-header">
+            <div class="auditflow-endpoint-header__title-wrap">
+                <input type="text"
+                       name="_.name"
+                       value="${instance != null ? instance.name : ''}"
+                       placeholder="Destination Name (e.g. #secops-alerts, DevOps Slack)"
+                       class="jenkins-input auditflow-endpoint-header__title-input"
+                       oninput="this.dispatchEvent(new Event('change', { bubbles: true }))" />
+            </div>
+            <div class="auditflow-endpoint-header__toggle-wrap">
+                <label class="auditflow-endpoint-header__toggle-label">
+                    <f:checkbox field="enabled" default="true" />
+                    <span>Enabled</span>
+                </label>
+            </div>
+        </div>
+    </f:block>
     <f:entry title="Webhook URL" field="webhookUrl" description="The Incoming Webhook URL (e.g. Slack incoming webhook, Microsoft Teams Workflows endpoint).">
         <f:password field="webhookUrl" oninput="this.dispatchEvent(new Event('change'))" />
-    </f:entry>
-    <f:entry title="Enabled" field="enabled" description="Uncheck to temporarily disable alerts to this endpoint without deleting the configuration.">
-        <f:checkbox default="true" />
     </f:entry>
     <f:entry title="Event Scope" field="scope" description="Choose which category of security events this channel should receive.">
         <f:select />
@@ -18,30 +28,20 @@
     <f:entry title="Minimum Severity" field="minSeverity" description="Only forward events whose severity meets or exceeds this threshold.">
         <f:select />
     </f:entry>
-    <f:block>
-        <div style="font-weight: 600; margin-top: 10px; margin-bottom: 4px;">Event Categories to Forward</div>
-        <div class="jenkins-section__description">Choose which functional categories of events this webhook destination should receive.</div>
-    </f:block>
-    <f:entry title="Authentication &amp; Sessions" field="notifyAuth" description="Logins, logouts, authentication failures, session timeouts, and API tokens">
-        <f:checkbox default="true" />
-    </f:entry>
-    <f:entry title="System &amp; Security Config" field="notifySecurity" description="Script console executions, security realm edits, auth strategies, and system restarts">
-        <f:checkbox default="true" />
-    </f:entry>
-    <f:entry title="Credentials &amp; Secrets" field="notifyCredentials" description="Credential creations, updates, usage, and deletions">
-        <f:checkbox default="true" />
-    </f:entry>
-    <f:entry title="Jobs &amp; Build Lifecycles" field="notifyJobs" description="Job CRUD, configuration updates, and build completions/failures">
-        <f:checkbox default="true" />
-    </f:entry>
-    <f:entry title="Nodes &amp; Agents" field="notifyNodes" description="Node/agent creation, configuration, connection, disconnection, and deletion">
-        <f:checkbox default="true" />
-    </f:entry>
-    <f:entry title="Security Anomalies" field="notifyAnomalies" description="Heuristics-flagged security anomalies (brute force, multi-IP logins, unusual IPs, privilege spikes)">
-        <f:checkbox default="true" />
-    </f:entry>
-    <f:entry title="Specific Action Labels (Optional)" field="actionFilter" description="Comma-separated event action names to target (e.g. 'SCRIPT_CONSOLE_ACCESS, SYSTEM_RESTART, USER_DELETED'). Leave blank to match all actions that meet the severity and category criteria.">
-        <f:textbox />
+    <f:entry title="Included Events &amp; Categories (Search to Add)" field="actionFilter"
+             description="Search and select categories or specific event actions to forward to this channel. Leave empty to forward all events meeting the scope and severity threshold.">
+        <div class="auditflow-event-picker">
+            <input type="hidden" name="_.actionFilter" class="auditflow-event-picker__value" value="${instance.actionFilter}" />
+            <div class="auditflow-event-picker__box">
+                <span class="auditflow-event-picker__chips"></span>
+                <input type="text"
+                       class="auditflow-event-picker__input"
+                       placeholder="Type to search &amp; add categories or events (default: all)..."
+                       autocomplete="off"
+                       spellcheck="false" />
+            </div>
+            <div class="auditflow-event-picker__menu" style="display: none;"></div>
+        </div>
     </f:entry>
     <f:validateButton title="Test Endpoint"
                       progress="Testing webhook endpoint..."

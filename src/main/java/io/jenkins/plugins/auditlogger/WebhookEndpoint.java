@@ -262,24 +262,75 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
             return false;
         }
 
-        // Category filter check
-        if (!isCategorySatisfied(eventType, action)) {
-            return false;
-        }
-
-        // Specific action filter check
+        // Tag / Included Events Filter check (unified OR-based evaluation)
         if (actionFilter != null && !actionFilter.trim().isEmpty()) {
-            Set<String> allowedActions = Arrays.stream(actionFilter.split(","))
+            Set<String> tags = Arrays.stream(actionFilter.split(","))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
                     .map(s -> s.toUpperCase(Locale.ENGLISH))
                     .collect(Collectors.toSet());
-            if (action == null || !allowedActions.contains(action.trim().toUpperCase(Locale.ENGLISH))) {
-                return false;
+
+            if (!tags.isEmpty()) {
+                String actUpper = action != null ? action.trim().toUpperCase(Locale.ENGLISH) : "";
+                boolean matched = false;
+
+                for (String tag : tags) {
+                    if (tag.startsWith("CATEGORY:")) {
+                        if (isCategoryTagMatched(tag, eventType, actUpper)) {
+                            matched = true;
+                            break;
+                        }
+                    } else if (!actUpper.isEmpty() && actUpper.equals(tag)) {
+                        matched = true;
+                        break;
+                    }
+                }
+
+                if (!matched) {
+                    return false;
+                }
             }
         }
 
         return true;
+    }
+
+    /**
+     * Checks if a category tag (e.g. CATEGORY:AUTH, CATEGORY:SECURITY) matches the given event.
+     */
+    public static boolean isCategoryTagMatched(String tag, String eventType, String actionUpper) {
+        if (tag == null) return false;
+        String t = tag.trim().toUpperCase(Locale.ENGLISH);
+        if ("CATEGORY:ANOMALIES".equals(t)) {
+            return "ANOMALY".equalsIgnoreCase(eventType);
+        }
+        if ("ANOMALY".equalsIgnoreCase(eventType)) {
+            return false;
+        }
+
+        switch (t) {
+            case "CATEGORY:AUTH":
+            case "CATEGORY:AUTHENTICATION":
+                return actionUpper.contains("LOGIN") || actionUpper.contains("LOGOUT")
+                        || actionUpper.contains("AUTH") || actionUpper.contains("SESSION");
+            case "CATEGORY:SECURITY":
+            case "CATEGORY:SYSTEM":
+                return actionUpper.contains("SCRIPT") || actionUpper.contains("SECURITY")
+                        || actionUpper.contains("RESTART") || actionUpper.contains("AUTH_STRATEGY")
+                        || actionUpper.contains("USER_CONFIG") || actionUpper.contains("PRIVILEGE");
+            case "CATEGORY:CREDENTIALS":
+            case "CATEGORY:SECRETS":
+                return actionUpper.contains("CREDENTIAL") || actionUpper.contains("SECRET");
+            case "CATEGORY:JOBS":
+            case "CATEGORY:BUILDS":
+                return actionUpper.contains("JOB") || actionUpper.contains("BUILD")
+                        || actionUpper.contains("PIPELINE");
+            case "CATEGORY:NODES":
+            case "CATEGORY:AGENTS":
+                return actionUpper.contains("NODE") || actionUpper.contains("AGENT");
+            default:
+                return false;
+        }
     }
 
     /**
