@@ -42,7 +42,7 @@
     <f:section title="Security Anomaly Detection">
         <f:block>
             <div class="jenkins-section__description">
-                Real-time security anomaly and risk detection rules (Phase 2 expanded).
+                Real-time security anomaly and risk detection rules across authentications, access patterns, and administrative changes. Notification channels (email, webhooks) can be configured in the Notifications section below.
             </div>
         </f:block>
 
@@ -102,48 +102,37 @@
                     <f:number name="anomalyUserLifecycleWindowMinutes" value="${descriptor.getAnomalyUserLifecycleWindowMinutes()}"/>
                 </f:entry>
             </f:optionalBlock>
+        </f:optionalBlock>
+    </f:section>
 
-            <f:block>
-                <h4>Anomaly Alert Notifications</h4>
-                <div class="jenkins-section__description">
-                    Configure notification destinations for audit and alert delivery.
-                </div>
-            </f:block>
-            <f:optionalBlock title="Email notifications (send anomaly alerts through Jenkins mail settings)"
-                             name="enableEmailAlerts"
-                             checked="${descriptor.isEnableEmailAlerts()}">
-                <f:entry title="Alert email addresses"
-                         description="Comma-separated recipients for anomaly emails, for example: secops@example.com, admins@example.com">
-                    <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
-                </f:entry>
-            </f:optionalBlock>
-            <f:optionalBlock title="Webhook notifications (send alerts to external webhook endpoints such as Slack or Microsoft Teams)"
-                             name="enableWebhookAlerts"
-                             checked="${descriptor.isEnableWebhookAlerts()}">
-                <f:entry title="Default Webhook URL"
-                         description="Enter a valid HTTP webhook endpoint such as Slack, Microsoft Teams, or another supported service. Example: https://hooks.slack.com/services/T000/B000/XXXX">
-                    <f:textbox name="webhookUrl" value="${descriptor.getWebhookUrl()}"/>
-                </f:entry>
-                <f:validateButton title="Test Webhook"
-                                  progress="Testing webhook endpoint..."
-                                  method="testWebhookUrl"
-                                  with="webhookUrl"/>
-
-                <!-- Progressive Disclosure: Multi-Channel Routing -->
-                <f:optionalBlock title="Enable Multi-Channel Routing (route alerts to different Slack/Teams channels by event scope &amp; severity)"
-                                 name="enableMultiWebhook"
-                                 checked="${descriptor.isEnableMultiWebhook()}">
-                    <f:entry title="Webhook Destinations" description="Configure multiple channels to receive targeted audit logs and anomaly alerts.">
-                        <f:repeatableProperty field="webhookEndpoints" add="Add Webhook Endpoint">
-                            <f:entry>
-                                <div align="right">
-                                    <f:repeatableDeleteButton value="Delete Endpoint"/>
-                                </div>
-                            </f:entry>
-                        </f:repeatableProperty>
+    <f:section title="Alert Notifications &amp; Webhooks">
+        <f:block>
+            <h4>Anomaly Alert Notifications</h4>
+            <div class="jenkins-section__description">
+                Configure notification destinations (email, webhooks) for audit events and anomaly alert delivery.
+            </div>
+        </f:block>
+        <f:optionalBlock title="Email notifications (send security and anomaly alerts through Jenkins mail settings)"
+                         name="enableEmailAlerts"
+                         checked="${descriptor.isEnableEmailAlerts()}">
+            <f:entry title="Alert email addresses"
+                     description="Comma-separated recipients for security alerts, for example: secops@example.com, admins@example.com">
+                <f:textbox name="alertEmailAddresses" value="${descriptor.getAlertEmailAddresses()}"/>
+            </f:entry>
+        </f:optionalBlock>
+        <f:optionalBlock title="Webhook notifications (send alerts to external webhook endpoints such as Slack or Microsoft Teams)"
+                         name="enableWebhookAlerts"
+                         checked="${descriptor.isEnableWebhookAlerts()}">
+            <f:entry title="Webhook Destinations"
+                     description="Configure destination endpoints to receive targeted audit logs and security alerts. Enter a valid HTTP webhook endpoint such as Slack, Microsoft Teams, or another supported service. Example: https://hooks.slack.com/services/T000/B000/XXXX">
+                <f:repeatableProperty field="webhookEndpoints" add="Add Webhook Destination">
+                    <f:entry>
+                        <div align="right">
+                            <f:repeatableDeleteButton value="Delete Destination"/>
+                        </div>
                     </f:entry>
-                </f:optionalBlock>
-            </f:optionalBlock>
+                </f:repeatableProperty>
+            </f:entry>
         </f:optionalBlock>
     </f:section>
 

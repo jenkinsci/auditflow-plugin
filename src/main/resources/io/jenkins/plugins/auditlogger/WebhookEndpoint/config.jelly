@@ -18,7 +18,29 @@
     <f:entry title="Minimum Severity" field="minSeverity" description="Only forward events whose severity meets or exceeds this threshold.">
         <f:select />
     </f:entry>
-    <f:entry title="Specific Action Labels (Optional)" field="actionFilter" description="Comma-separated event action names to target (e.g. 'SCRIPT_CONSOLE_ACCESS, SYSTEM_RESTART, USER_DELETED'). Leave blank to match all actions that meet the severity threshold.">
+    <f:block>
+        <div style="font-weight: 600; margin-top: 10px; margin-bottom: 4px;">Event Categories to Forward</div>
+        <div class="jenkins-section__description">Choose which functional categories of events this webhook destination should receive.</div>
+    </f:block>
+    <f:entry title="Authentication &amp; Sessions" field="notifyAuth" description="Logins, logouts, authentication failures, session timeouts, and API tokens">
+        <f:checkbox default="true" />
+    </f:entry>
+    <f:entry title="System &amp; Security Config" field="notifySecurity" description="Script console executions, security realm edits, auth strategies, and system restarts">
+        <f:checkbox default="true" />
+    </f:entry>
+    <f:entry title="Credentials &amp; Secrets" field="notifyCredentials" description="Credential creations, updates, usage, and deletions">
+        <f:checkbox default="true" />
+    </f:entry>
+    <f:entry title="Jobs &amp; Build Lifecycles" field="notifyJobs" description="Job CRUD, configuration updates, and build completions/failures">
+        <f:checkbox default="true" />
+    </f:entry>
+    <f:entry title="Nodes &amp; Agents" field="notifyNodes" description="Node/agent creation, configuration, connection, disconnection, and deletion">
+        <f:checkbox default="true" />
+    </f:entry>
+    <f:entry title="Security Anomalies" field="notifyAnomalies" description="Heuristics-flagged security anomalies (brute force, multi-IP logins, unusual IPs, privilege spikes)">
+        <f:checkbox default="true" />
+    </f:entry>
+    <f:entry title="Specific Action Labels (Optional)" field="actionFilter" description="Comma-separated event action names to target (e.g. 'SCRIPT_CONSOLE_ACCESS, SYSTEM_RESTART, USER_DELETED'). Leave blank to match all actions that meet the severity and category criteria.">
         <f:textbox />
     </f:entry>
     <f:validateButton title="Test Endpoint"

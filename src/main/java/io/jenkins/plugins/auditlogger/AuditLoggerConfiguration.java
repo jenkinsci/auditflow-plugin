@@ -192,8 +192,14 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         if (maskCreditCards == null) maskCreditCards = true;
         if (enableEmailAlerts == null) enableEmailAlerts = false;
         if (enableWebhookAlerts == null) enableWebhookAlerts = false;
-        if (enableMultiWebhook == null) enableMultiWebhook = false;
+        if (enableMultiWebhook == null) enableMultiWebhook = true;
         if (webhookEndpoints == null) webhookEndpoints = new CopyOnWriteArrayList<>();
+        if (webhookEndpoints.isEmpty() && webhookUrl != null && !webhookUrl.trim().isEmpty()) {
+            WebhookEndpoint defaultEp = new WebhookEndpoint("Default Webhook", Secret.fromString(webhookUrl.trim()));
+            defaultEp.setScope(WebhookEndpoint.SCOPE_ALL);
+            defaultEp.setMinSeverity("HIGH");
+            webhookEndpoints.add(defaultEp);
+        }
         if (enableDashboardStats == null) enableDashboardStats = true;
         if (showMetricTotal == null) showMetricTotal = true;
         if (showMetricLogins == null) showMetricLogins = true;
@@ -362,11 +368,19 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         if (multiWebhookBlock == null) {
             multiWebhookBlock = getOptionalBlock(json, "enableMultiWebhook");
         }
-        setEnableMultiWebhook(isOptionalBlockEnabled(webhookAlertsConfig, "enableMultiWebhook") || isOptionalBlockEnabled(json, "enableMultiWebhook"));
+        setEnableMultiWebhook(isOptionalBlockEnabled(webhookAlertsConfig, "enableMultiWebhook") || isOptionalBlockEnabled(json, "enableMultiWebhook") || isEnableWebhookAlerts());
 
         JSONObject multiConfig = multiWebhookBlock != null ? multiWebhookBlock : webhookAlertsConfig;
+        Object endpointsRaw = null;
         if (multiConfig.has("webhookEndpoints")) {
-            Object endpointsRaw = multiConfig.get("webhookEndpoints");
+            endpointsRaw = multiConfig.get("webhookEndpoints");
+        } else if (webhookAlertsConfig.has("webhookEndpoints")) {
+            endpointsRaw = webhookAlertsConfig.get("webhookEndpoints");
+        } else if (json.has("webhookEndpoints")) {
+            endpointsRaw = json.get("webhookEndpoints");
+        }
+
+        if (endpointsRaw != null) {
             if (req != null) {
                 try {
                     List<WebhookEndpoint> eps = req.bindJSONToList(WebhookEndpoint.class, endpointsRaw);
@@ -409,6 +423,12 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         if (obj.has("scope")) ep.setScope(obj.optString("scope", WebhookEndpoint.SCOPE_ALL));
         if (obj.has("minSeverity")) ep.setMinSeverity(obj.optString("minSeverity", "HIGH"));
         if (obj.has("actionFilter")) ep.setActionFilter(obj.optString("actionFilter", ""));
+        if (obj.has("notifyAuth")) ep.setNotifyAuth(obj.optBoolean("notifyAuth", true));
+        if (obj.has("notifySecurity")) ep.setNotifySecurity(obj.optBoolean("notifySecurity", true));
+        if (obj.has("notifyCredentials")) ep.setNotifyCredentials(obj.optBoolean("notifyCredentials", true));
+        if (obj.has("notifyJobs")) ep.setNotifyJobs(obj.optBoolean("notifyJobs", true));
+        if (obj.has("notifyNodes")) ep.setNotifyNodes(obj.optBoolean("notifyNodes", true));
+        if (obj.has("notifyAnomalies")) ep.setNotifyAnomalies(obj.optBoolean("notifyAnomalies", true));
         return ep;
     }
 

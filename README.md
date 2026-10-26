@@ -47,14 +47,15 @@ AuditFlow automatically captures and categorizes controller events:
 
 ## Webhook Routing & Alerting
 
-Configure webhook notifications via **Manage Jenkins** → **System** → **AuditFlow Configuration**:
+Configure webhook notifications via **Manage Jenkins** → **System** → **Alert Notifications & Webhooks**:
 
-- **Simple Mode**: Define a single default Incoming Webhook URL (Slack or Teams) for all enabled alerts.
-- **Multi-Channel Routing**: Enable advanced routing to send specific alerts to dedicated team channels:
-  - **Scope**: Route all alerts, anomalies only, or critical audit logs only.
-  - **Min Severity**: Filter by `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW`.
-  - **Action Filter**: Comma-separated actions (e.g. `SCRIPT_CONSOLE_ACCESS, CREDENTIAL_DELETED, SYSTEM_RESTART`).
-  - **Rich Payloads**: Formatted Slack blocks with color bars and Microsoft Teams adaptive cards.
+- **Unified Webhook Destinations**: Add one or more destination channels (Slack, Microsoft Teams, or custom endpoints) with fine-grained routing:
+  - **Scope**: Route all alerts, anomalies only, or direct critical audit logs only.
+  - **Min Severity**: Filter by `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, or `ALL`.
+  - **Event Categories**: Target functional areas (*Authentication*, *System & Security Config*, *Credentials*, *Jobs & Builds*, *Nodes & Agents*, *Security Anomalies*).
+  - **Action Filter**: Comma-separated action names for specific matching (e.g. `SCRIPT_CONSOLE_ACCESS, SYSTEM_RESTART`).
+  - **Rich Payloads**: Formatted Slack attachments with severity color bars, direct links to `/manage/auditflow-logs/`, and Microsoft Teams compatibility.
+  - **Test Endpoint**: Dedicated test button per destination for instant connectivity checks.
 
 ---
 
@@ -123,9 +124,9 @@ Additional endpoints:
 ## Quickstart Configuration
 
 Navigate to **Manage Jenkins** → **System** → **AuditFlow Configuration**:
-1. Check event categories to record under **What to Track**.
-2. Configure **Log Retention** and **Data Masking** options.
-3. Enter your **Webhook URL** and test connectivity with the **Test Webhook** button.
+1. Check event categories to record under **Event Logging Controls**.
+2. Configure **Security Anomaly Detection** heuristics.
+3. Under **Alert Notifications & Webhooks**, add **Webhook Destinations** and test connectivity with the **Test Endpoint** button.
 4. Access the live log viewer anytime at **Manage Jenkins** → **AuditFlow Logs**.
 
 ---

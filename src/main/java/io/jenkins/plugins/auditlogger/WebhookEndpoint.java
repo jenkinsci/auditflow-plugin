@@ -49,6 +49,12 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
     private String scope = SCOPE_ALL;
     private String minSeverity = "HIGH";
     private String actionFilter = "";
+    private Boolean notifyAuth = true;
+    private Boolean notifySecurity = true;
+    private Boolean notifyCredentials = true;
+    private Boolean notifyJobs = true;
+    private Boolean notifyNodes = true;
+    private Boolean notifyAnomalies = true;
 
     @DataBoundConstructor
     public WebhookEndpoint(String name, Secret webhookUrl) {
@@ -59,6 +65,12 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
         this.scope = SCOPE_ALL;
         this.minSeverity = "HIGH";
         this.actionFilter = "";
+        this.notifyAuth = true;
+        this.notifySecurity = true;
+        this.notifyCredentials = true;
+        this.notifyJobs = true;
+        this.notifyNodes = true;
+        this.notifyAnomalies = true;
     }
 
     public WebhookEndpoint(String name, String webhookUrl) {
@@ -78,6 +90,12 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
         if (actionFilter == null) {
             actionFilter = "";
         }
+        if (notifyAuth == null) notifyAuth = true;
+        if (notifySecurity == null) notifySecurity = true;
+        if (notifyCredentials == null) notifyCredentials = true;
+        if (notifyJobs == null) notifyJobs = true;
+        if (notifyNodes == null) notifyNodes = true;
+        if (notifyAnomalies == null) notifyAnomalies = true;
         return this;
     }
 
@@ -157,9 +175,63 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
         this.actionFilter = actionFilter != null ? actionFilter.trim() : "";
     }
 
+    public boolean isNotifyAuth() {
+        return notifyAuth != null ? notifyAuth : true;
+    }
+
+    @DataBoundSetter
+    public void setNotifyAuth(boolean notifyAuth) {
+        this.notifyAuth = notifyAuth;
+    }
+
+    public boolean isNotifySecurity() {
+        return notifySecurity != null ? notifySecurity : true;
+    }
+
+    @DataBoundSetter
+    public void setNotifySecurity(boolean notifySecurity) {
+        this.notifySecurity = notifySecurity;
+    }
+
+    public boolean isNotifyCredentials() {
+        return notifyCredentials != null ? notifyCredentials : true;
+    }
+
+    @DataBoundSetter
+    public void setNotifyCredentials(boolean notifyCredentials) {
+        this.notifyCredentials = notifyCredentials;
+    }
+
+    public boolean isNotifyJobs() {
+        return notifyJobs != null ? notifyJobs : true;
+    }
+
+    @DataBoundSetter
+    public void setNotifyJobs(boolean notifyJobs) {
+        this.notifyJobs = notifyJobs;
+    }
+
+    public boolean isNotifyNodes() {
+        return notifyNodes != null ? notifyNodes : true;
+    }
+
+    @DataBoundSetter
+    public void setNotifyNodes(boolean notifyNodes) {
+        this.notifyNodes = notifyNodes;
+    }
+
+    public boolean isNotifyAnomalies() {
+        return notifyAnomalies != null ? notifyAnomalies : true;
+    }
+
+    @DataBoundSetter
+    public void setNotifyAnomalies(boolean notifyAnomalies) {
+        this.notifyAnomalies = notifyAnomalies;
+    }
+
     /**
      * Determines whether this endpoint matches an event based on its enabled state,
-     * configured scope, severity threshold, and optional action filter.
+     * configured scope, severity threshold, category filters, and optional action filter.
      *
      * @param eventType the event scope type: "ANOMALY" or "AUDIT_LOG" / "CRITICAL_LOG"
      * @param severity the event severity ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")
@@ -190,6 +262,11 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
             return false;
         }
 
+        // Category filter check
+        if (!isCategorySatisfied(eventType, action)) {
+            return false;
+        }
+
         // Specific action filter check
         if (actionFilter != null && !actionFilter.trim().isEmpty()) {
             Set<String> allowedActions = Arrays.stream(actionFilter.split(","))
@@ -200,6 +277,43 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
             if (action == null || !allowedActions.contains(action.trim().toUpperCase(Locale.ENGLISH))) {
                 return false;
             }
+        }
+
+        return true;
+    }
+
+    /**
+     * Checks if the event category is enabled for this destination.
+     */
+    public boolean isCategorySatisfied(String eventType, String action) {
+        if ("ANOMALY".equalsIgnoreCase(eventType)) {
+            return isNotifyAnomalies();
+        }
+        if (action == null || action.trim().isEmpty()) {
+            return true;
+        }
+        String u = action.trim().toUpperCase(Locale.ENGLISH);
+
+        // Security / Admin
+        if (u.contains("SCRIPT") || u.contains("SECURITY") || u.contains("RESTART")
+                || u.contains("AUTH_STRATEGY") || u.contains("USER_CONFIG") || u.contains("PRIVILEGE")) {
+            return isNotifySecurity();
+        }
+        // Authentication & Sessions
+        if (u.contains("LOGIN") || u.contains("LOGOUT") || u.contains("AUTH") || u.contains("SESSION")) {
+            return isNotifyAuth();
+        }
+        // Credentials
+        if (u.contains("CREDENTIAL") || u.contains("SECRET")) {
+            return isNotifyCredentials();
+        }
+        // Jobs & Builds
+        if (u.contains("JOB") || u.contains("BUILD") || u.contains("PIPELINE")) {
+            return isNotifyJobs();
+        }
+        // Nodes & Agents
+        if (u.contains("NODE") || u.contains("AGENT")) {
+            return isNotifyNodes();
         }
 
         return true;

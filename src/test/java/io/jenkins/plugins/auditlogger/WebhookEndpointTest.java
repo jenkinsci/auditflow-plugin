@@ -101,6 +101,38 @@ class WebhookEndpointTest {
         assertTrue(ep.matches("AUDIT_LOG", "CRITICAL", "SYSTEM_RESTART"));
         assertFalse(ep.matches("AUDIT_LOG", "CRITICAL", "USER_DELETED"));
         assertFalse(ep.matches("AUDIT_LOG", "CRITICAL", null));
+
+        // 7. Category Filters
+        ep.setActionFilter("");
+        ep.setNotifySecurity(false);
+        assertFalse(ep.matches("AUDIT_LOG", "CRITICAL", "SCRIPT_CONSOLE_ACCESS"));
+        assertTrue(ep.matches("AUDIT_LOG", "CRITICAL", "FAILED_LOGIN"));
+
+        ep.setNotifySecurity(true);
+        ep.setNotifyAuth(false);
+        assertFalse(ep.matches("AUDIT_LOG", "CRITICAL", "FAILED_LOGIN"));
+        assertTrue(ep.matches("AUDIT_LOG", "CRITICAL", "SCRIPT_CONSOLE_ACCESS"));
+
+        ep.setNotifyAuth(true);
+        ep.setNotifyAnomalies(false);
+        assertFalse(ep.matches("ANOMALY", "HIGH", "FAILED_LOGINS"));
+        ep.setNotifyAnomalies(true);
+        assertTrue(ep.matches("ANOMALY", "HIGH", "FAILED_LOGINS"));
+
+        ep.setNotifyCredentials(false);
+        assertFalse(ep.matches("AUDIT_LOG", "HIGH", "CREDENTIAL_DELETED"));
+        ep.setNotifyCredentials(true);
+        assertTrue(ep.matches("AUDIT_LOG", "HIGH", "CREDENTIAL_DELETED"));
+
+        ep.setNotifyJobs(false);
+        assertFalse(ep.matches("AUDIT_LOG", "HIGH", "JOB_DELETED"));
+        ep.setNotifyJobs(true);
+        assertTrue(ep.matches("AUDIT_LOG", "HIGH", "JOB_DELETED"));
+
+        ep.setNotifyNodes(false);
+        assertFalse(ep.matches("AUDIT_LOG", "HIGH", "NODE_OFFLINE"));
+        ep.setNotifyNodes(true);
+        assertTrue(ep.matches("AUDIT_LOG", "HIGH", "NODE_OFFLINE"));
     }
 
     @Test
