@@ -3,37 +3,47 @@
 
     var CATALOG = [
         // Categories
-        { id: 'CATEGORY:AUTH', label: 'Category: Authentication & Sessions', type: 'category', scope: 'audit', desc: 'Logins, failures, logouts, API auth, sessions' },
-        { id: 'CATEGORY:SECURITY', label: 'Category: System & Security Config', type: 'category', scope: 'audit', desc: 'Script console, security realm, auth strategy, restarts' },
-        { id: 'CATEGORY:CREDENTIALS', label: 'Category: Credentials & Secrets', type: 'category', scope: 'audit', desc: 'Credential creations, access, updates, deletions' },
-        { id: 'CATEGORY:JOBS', label: 'Category: Jobs & Builds', type: 'category', scope: 'audit', desc: 'Job CRUD, build completions & failures' },
-        { id: 'CATEGORY:NODES', label: 'Category: Nodes & Agents', type: 'category', scope: 'audit', desc: 'Node online/offline, creation, disconnection' },
-        { id: 'CATEGORY:ANOMALIES', label: 'Category: Security Anomalies', type: 'category', scope: 'anomaly', desc: 'All heuristics-flagged security anomalies' },
+        { id: 'CATEGORY:AUTH', label: 'Category: Authentication & Sessions', type: 'category', scope: 'audit', severity: 'CRITICAL', desc: 'Logins, failures, logouts, API auth, sessions' },
+        { id: 'CATEGORY:SECURITY', label: 'Category: System & Security Config', type: 'category', scope: 'audit', severity: 'CRITICAL', desc: 'Script console, security realm, auth strategy, restarts' },
+        { id: 'CATEGORY:CREDENTIALS', label: 'Category: Credentials & Secrets', type: 'category', scope: 'audit', severity: 'HIGH', desc: 'Credential creations, access, updates, deletions' },
+        { id: 'CATEGORY:JOBS', label: 'Category: Jobs & Builds', type: 'category', scope: 'audit', severity: 'HIGH', desc: 'Job CRUD, build completions & failures' },
+        { id: 'CATEGORY:NODES', label: 'Category: Nodes & Agents', type: 'category', scope: 'audit', severity: 'CRITICAL', desc: 'Node launch failure, online/offline, creation, disconnection' },
+        { id: 'CATEGORY:ANOMALIES', label: 'Category: Security Anomalies', type: 'category', scope: 'anomaly', severity: 'CRITICAL', desc: 'All heuristics-flagged security anomalies' },
 
         // Anomaly Types
-        { id: 'BRUTE_FORCE_LOGIN', label: 'Brute Force Login Attempts', type: 'anomaly', scope: 'anomaly', desc: 'Rapid repeated authentication failures' },
-        { id: 'MULTI_IP_LOGIN', label: 'Concurrent Multi-IP Logins', type: 'anomaly', scope: 'anomaly', desc: 'Concurrent sessions from distinct IP addresses' },
-        { id: 'UNUSUAL_IP', label: 'Unusual IP Address Activity', type: 'anomaly', scope: 'anomaly', desc: 'Activity from new/unseen IP addresses' },
-        { id: 'SUSPICIOUS_AUTH_PATTERN', label: 'Suspicious Auth Pattern', type: 'anomaly', scope: 'anomaly', desc: 'Successful login following brute force' },
-        { id: 'ADMIN_PRIVILEGE_CHANGE', label: 'Admin Privilege Spike', type: 'anomaly', scope: 'anomaly', desc: 'Security matrix or admin rights changes' },
-        { id: 'USER_LIFECYCLE_ANOMALY', label: 'User Lifecycle Burst', type: 'anomaly', scope: 'anomaly', desc: 'Rapid creation or mass deletion of accounts' },
+        { id: 'BRUTE_FORCE_LOGIN', label: 'Brute Force Login Attempts', type: 'anomaly', scope: 'anomaly', severity: 'CRITICAL', desc: 'Rapid repeated authentication failures' },
+        { id: 'SUSPICIOUS_AUTH_PATTERN', label: 'Suspicious Auth Pattern', type: 'anomaly', scope: 'anomaly', severity: 'CRITICAL', desc: 'Successful login following brute force' },
+        { id: 'ADMIN_PRIVILEGE_CHANGE', label: 'Admin Privilege Spike', type: 'anomaly', scope: 'anomaly', severity: 'CRITICAL', desc: 'Security matrix or admin rights changes' },
+        { id: 'UNUSUAL_IP', label: 'Unusual IP Address Activity', type: 'anomaly', scope: 'anomaly', severity: 'HIGH', desc: 'Activity from new/unseen IP addresses' },
+        { id: 'MULTI_IP_LOGIN', label: 'Concurrent Multi-IP Logins', type: 'anomaly', scope: 'anomaly', severity: 'HIGH', desc: 'Concurrent sessions from distinct IP addresses' },
+        { id: 'USER_LIFECYCLE_ANOMALY', label: 'User Lifecycle Burst', type: 'anomaly', scope: 'anomaly', severity: 'HIGH', desc: 'Rapid creation or mass deletion of accounts' },
 
         // Direct Audit Actions
-        { id: 'SCRIPT_CONSOLE_ACCESS', label: 'Script Console Evaluation', type: 'action', scope: 'audit', desc: 'Remoting / Script console code evaluation' },
-        { id: 'SCRIPT_EXECUTION', label: 'Script Execution', type: 'action', scope: 'audit', desc: 'Pipeline or groovy script execution' },
-        { id: 'FAILED_LOGIN', label: 'Failed Login Attempt', type: 'action', scope: 'audit', desc: 'Single failed authentication attempt' },
-        { id: 'LOGIN', label: 'Successful Login', type: 'action', scope: 'audit', desc: 'User logged into Jenkins controller' },
-        { id: 'API_AUTH', label: 'API Token Auth', type: 'action', scope: 'audit', desc: 'API / programmatic authentication' },
-        { id: 'SYSTEM_RESTART', label: 'System Restart', type: 'action', scope: 'audit', desc: 'Jenkins controller restart' },
-        { id: 'SECURITY_REALM_CHANGED', label: 'Security Realm Changed', type: 'action', scope: 'audit', desc: 'Authentication realm updated' },
-        { id: 'AUTH_STRATEGY_CHANGED', label: 'Authorization Strategy Changed', type: 'action', scope: 'audit', desc: 'Role / permissions strategy modified' },
-        { id: 'CREDENTIAL_DELETED', label: 'Credential Deleted', type: 'action', scope: 'audit', desc: 'Secret removed from credential store' },
-        { id: 'CREDENTIAL_CREATED', label: 'Credential Created', type: 'action', scope: 'audit', desc: 'New credential stored' },
-        { id: 'CREDENTIAL_ACCESSED', label: 'Credential Accessed', type: 'action', scope: 'audit', desc: 'Secret used during build' },
-        { id: 'JOB_DELETED', label: 'Job Deleted', type: 'action', scope: 'audit', desc: 'Pipeline or project deleted' },
-        { id: 'BUILD_FAILURE', label: 'Build Failure', type: 'action', scope: 'audit', desc: 'Pipeline or project build failed' },
-        { id: 'NODE_OFFLINE', label: 'Node Offline', type: 'action', scope: 'audit', desc: 'Build agent disconnected or went offline' }
+        { id: 'SCRIPT_CONSOLE_ACCESS', label: 'Script Console Evaluation', type: 'action', scope: 'audit', severity: 'CRITICAL', desc: 'Remoting / Script console code evaluation' },
+        { id: 'SCRIPT_EXECUTION', label: 'Script Execution', type: 'action', scope: 'audit', severity: 'CRITICAL', desc: 'Pipeline or groovy script execution' },
+        { id: 'FAILED_LOGIN', label: 'Failed Login Attempt', type: 'action', scope: 'audit', severity: 'CRITICAL', desc: 'Single failed authentication attempt' },
+        { id: 'SYSTEM_RESTART', label: 'System Restart', type: 'action', scope: 'audit', severity: 'CRITICAL', desc: 'Jenkins controller restart' },
+        { id: 'SECURITY_REALM_CHANGED', label: 'Security Realm Changed', type: 'action', scope: 'audit', severity: 'CRITICAL', desc: 'Authentication realm updated' },
+        { id: 'AUTH_STRATEGY_CHANGED', label: 'Authorization Strategy Changed', type: 'action', scope: 'audit', severity: 'CRITICAL', desc: 'Role / permissions strategy modified' },
+        { id: 'CREDENTIAL_DELETED', label: 'Credential Deleted', type: 'action', scope: 'audit', severity: 'HIGH', desc: 'Secret removed from credential store' },
+        { id: 'JOB_DELETED', label: 'Job Deleted', type: 'action', scope: 'audit', severity: 'HIGH', desc: 'Pipeline or project deleted' },
+        { id: 'BUILD_FAILURE', label: 'Build Failure', type: 'action', scope: 'audit', severity: 'HIGH', desc: 'Pipeline or project build failed' },
+        { id: 'NODE_OFFLINE', label: 'Node Offline', type: 'action', scope: 'audit', severity: 'HIGH', desc: 'Build agent disconnected or went offline' },
+        { id: 'LOGIN', label: 'Successful Login', type: 'action', scope: 'audit', severity: 'LOW', desc: 'User logged into Jenkins controller' },
+        { id: 'LOGOUT', label: 'Successful Logout', type: 'action', scope: 'audit', severity: 'LOW', desc: 'User logged out of Jenkins' },
+        { id: 'API_AUTH', label: 'API Token Auth', type: 'action', scope: 'audit', severity: 'LOW', desc: 'API / programmatic authentication' },
+        { id: 'CREDENTIAL_ACCESSED', label: 'Credential Accessed', type: 'action', scope: 'audit', severity: 'LOW', desc: 'Secret used during build' },
+        { id: 'CREDENTIAL_CREATED', label: 'Credential Created', type: 'action', scope: 'audit', severity: 'INFO', desc: 'New credential stored' }
     ];
+
+    var SEVERITY_SCORES = {
+        'CRITICAL': 4,
+        'HIGH': 3,
+        'MEDIUM': 2,
+        'LOW': 1,
+        'INFO': 0,
+        'ALL': 0
+    };
 
     var CATALOG_BY_ID = {};
     for (var i = 0; i < CATALOG.length; i++) {
@@ -44,6 +54,18 @@
         var current = container;
         while (current && current !== document.body) {
             var select = current.querySelector('select[name="_.scope"], select[name="scope"]');
+            if (select) {
+                return select;
+            }
+            current = current.parentElement;
+        }
+        return null;
+    }
+
+    function findMinSeveritySelect(container) {
+        var current = container;
+        while (current && current !== document.body) {
+            var select = current.querySelector('select[name="_.minSeverity"], select[name="minSeverity"]');
             if (select) {
                 return select;
             }
@@ -81,11 +103,21 @@
         }
 
         var scopeSelect = findScopeSelect(container);
+        var minSeveritySelect = findMinSeveritySelect(container);
         var highlightedIndex = -1;
         var currentFiltered = [];
 
         function getCurrentScope() {
             return scopeSelect ? scopeSelect.value : 'ALL_ALERTS';
+        }
+
+        function getCurrentMinSeverity() {
+            return minSeveritySelect && minSeveritySelect.value ? minSeveritySelect.value.toUpperCase() : 'HIGH';
+        }
+
+        function getMinSeverityScore() {
+            var s = getCurrentMinSeverity();
+            return SEVERITY_SCORES[s] !== undefined ? SEVERITY_SCORES[s] : 3;
         }
 
         function syncToHidden() {
@@ -104,6 +136,9 @@
 
         function renderChips() {
             chipsContainer.innerHTML = '';
+            var currentMinScore = getMinSeverityScore();
+            var currentMinSev = getCurrentMinSeverity();
+
             for (var i = 0; i < tags.length; i++) {
                 (function(tagIndex) {
                     var tagId = tags[tagIndex];
@@ -111,13 +146,24 @@
                     var meta = CATALOG_BY_ID[upper];
                     var type = meta ? meta.type : (tagId.indexOf('CATEGORY:') === 0 ? 'category' : 'action');
                     var label = meta ? meta.label : tagId;
+                    var itemSev = meta && meta.severity ? meta.severity : null;
+                    var itemScore = itemSev && SEVERITY_SCORES[itemSev] !== undefined ? SEVERITY_SCORES[itemSev] : null;
+                    var isBelowThreshold = itemScore !== null && itemScore < currentMinScore;
 
                     var chip = document.createElement('span');
-                    chip.className = 'auditflow-event-chip auditflow-event-chip--' + type;
+                    chip.className = 'auditflow-event-chip auditflow-event-chip--' + type + (isBelowThreshold ? ' auditflow-event-chip--warning' : '');
 
                     var text = document.createElement('span');
                     text.textContent = label;
                     chip.appendChild(text);
+
+                    if (isBelowThreshold) {
+                        var warnBadge = document.createElement('span');
+                        warnBadge.className = 'auditflow-event-chip__warn-badge';
+                        warnBadge.textContent = '⚠ < ' + currentMinSev;
+                        warnBadge.title = 'This event severity (' + itemSev + ') is below the endpoint minimum severity (' + currentMinSev + ') and will not be dispatched.';
+                        chip.appendChild(warnBadge);
+                    }
 
                     var removeBtn = document.createElement('span');
                     removeBtn.className = 'auditflow-event-chip__remove';
@@ -172,6 +218,7 @@
 
         function getAvailableOptions(query) {
             var scope = getCurrentScope();
+            var minScore = getMinSeverityScore();
             var q = (query || '').trim().toLowerCase();
 
             var tagSet = {};
@@ -191,6 +238,12 @@
                     continue;
                 }
                 if (scope === 'CRITICAL_LOGS_ONLY' && item.scope !== 'audit') {
+                    continue;
+                }
+
+                // Minimum severity filtering
+                var itemScore = item.severity && SEVERITY_SCORES[item.severity] !== undefined ? SEVERITY_SCORES[item.severity] : 0;
+                if (itemScore < minScore) {
                     continue;
                 }
 
@@ -214,10 +267,11 @@
             menu.innerHTML = '';
             highlightedIndex = -1;
 
+            var currentMinSev = getCurrentMinSeverity();
             if (currentFiltered.length === 0 && !q) {
                 var empty = document.createElement('div');
                 empty.className = 'auditflow-event-picker__empty';
-                empty.textContent = 'All available events matching current scope are selected.';
+                empty.textContent = 'No additional events match current scope and ' + (currentMinSev === 'ALL' ? 'all severities' : currentMinSev + '+ severity') + '.';
                 menu.appendChild(empty);
                 return;
             }
@@ -254,6 +308,13 @@
                         badge.className = 'auditflow-event-picker__item-badge auditflow-event-picker__item-badge--' + option.type;
                         badge.textContent = option.type.toUpperCase();
                         left.appendChild(badge);
+
+                        if (option.severity && option.type !== 'category') {
+                            var sevBadge = document.createElement('span');
+                            sevBadge.className = 'auditflow-event-picker__sev-badge auditflow-event-picker__sev-badge--' + option.severity.toLowerCase();
+                            sevBadge.textContent = option.severity;
+                            left.appendChild(sevBadge);
+                        }
 
                         var lbl = document.createElement('span');
                         lbl.className = 'auditflow-event-picker__item-label';
@@ -332,6 +393,15 @@
 
         if (scopeSelect) {
             scopeSelect.addEventListener('change', function() {
+                if (menu.style.display !== 'none') {
+                    renderMenu();
+                }
+            });
+        }
+
+        if (minSeveritySelect) {
+            minSeveritySelect.addEventListener('change', function() {
+                renderChips();
                 if (menu.style.display !== 'none') {
                     renderMenu();
                 }

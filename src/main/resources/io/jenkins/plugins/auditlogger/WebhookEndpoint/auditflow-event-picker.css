@@ -118,6 +118,25 @@
     border: 1px solid #cbd5e1;
 }
 
+.auditflow-event-chip--warning {
+    border-color: #f59e0b !important;
+    background: #fffbeb !important;
+}
+
+.auditflow-event-chip__warn-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: #b45309;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    padding: 0 4px;
+    border-radius: 4px;
+    margin-left: 4px;
+    cursor: help;
+}
+
 .auditflow-event-chip__remove {
     display: inline-flex;
     align-items: center;
@@ -230,6 +249,48 @@
 .auditflow-event-picker__item-badge--action {
     background: #e2e8f0;
     color: #475569;
+}
+
+/* Severity Badges */
+.auditflow-event-picker__sev-badge {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-right: 6px;
+    text-transform: uppercase;
+}
+
+.auditflow-event-picker__sev-badge--critical {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+}
+
+.auditflow-event-picker__sev-badge--high {
+    background: #ffedd5;
+    color: #9a3412;
+    border: 1px solid #fdba74;
+}
+
+.auditflow-event-picker__sev-badge--medium {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+}
+
+.auditflow-event-picker__sev-badge--low {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #86efac;
+}
+
+.auditflow-event-picker__sev-badge--info {
+    background: #e0e7ff;
+    color: #3730a3;
+    border: 1px solid #a5b4fc;
 }
 
 .auditflow-event-picker__empty {

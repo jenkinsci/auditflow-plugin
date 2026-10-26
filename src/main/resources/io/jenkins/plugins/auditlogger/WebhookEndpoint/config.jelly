@@ -29,7 +29,7 @@
         <f:select />
     </f:entry>
     <f:entry title="Included Events &amp; Categories (Search to Add)" field="actionFilter"
-             description="Search and select categories or specific event actions to forward to this channel. Leave empty to forward all events meeting the scope and severity threshold.">
+             description="Search and select categories or specific event actions to forward to this channel (suggestions automatically adapt to your chosen Minimum Severity above). Leave empty to forward all events meeting the scope and severity threshold.">
         <div class="auditflow-event-picker">
             <input type="hidden" name="_.actionFilter" class="auditflow-event-picker__value" value="${instance.actionFilter}" />
             <div class="auditflow-event-picker__box">
