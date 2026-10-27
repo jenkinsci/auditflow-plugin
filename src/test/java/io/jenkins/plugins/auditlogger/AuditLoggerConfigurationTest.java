@@ -185,7 +185,7 @@ class AuditLoggerConfigurationTest {
         assertTrue(html.contains("Event Logging Controls"));
         assertTrue(html.contains("Operational Monitoring &amp; Export"));
         assertTrue(html.contains("Display Time Zone"));
-        assertTrue(html.contains("Notifications"));
+        assertTrue(html.contains("Alert Notifications &amp; Webhooks"));
         assertTrue(html.contains("Export and Integrations"));
         assertTrue(html.contains("Advanced"));
         assertTrue(html.contains("Enter a valid HTTP webhook endpoint"));
@@ -194,13 +194,13 @@ class AuditLoggerConfigurationTest {
 
         int eventLoggingIndex = html.indexOf("Event Logging Controls");
         int anomalyIndex = html.indexOf("Security Anomaly Detection");
-        int notificationsIndex = html.indexOf("Anomaly Alert Notifications");
+        int notificationsIndex = html.indexOf("Alert Notifications &amp; Webhooks");
         int operationalIndex = html.indexOf("Operational Monitoring &amp; Export");
         int timeZoneIndex = html.indexOf("Display Time Zone");
         int exportIndex = html.indexOf("Export and Integrations");
 
         assertTrue(eventLoggingIndex < anomalyIndex, "Event Logging before Anomaly Detection");
-        assertTrue(anomalyIndex < notificationsIndex, "Anomaly Detection contains Notifications");
+        assertTrue(anomalyIndex < notificationsIndex, "Anomaly Detection before Notifications");
         assertTrue(notificationsIndex < operationalIndex, "Notifications before Operational Monitoring");
         assertTrue(operationalIndex < timeZoneIndex, "Operational Monitoring before Display Time Zone");
         assertTrue(timeZoneIndex < exportIndex, "Display Time Zone before Export and Integrations");
