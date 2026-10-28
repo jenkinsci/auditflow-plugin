@@ -49,6 +49,14 @@ public class AuditLogRestApi implements RootAction {
             return;
         }
 
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        if (config != null && !config.isEnableAuditApi()) {
+            resp.setStatus(403);
+            resp.setContentType("application/json; charset=UTF-8");
+            resp.getWriter().write("{\"error\": \"Audit API is disabled\"}");
+            return;
+        }
+
         try {
             String user = req.getParameter("user");
             String action = req.getParameter("action");
@@ -93,7 +101,6 @@ public class AuditLogRestApi implements RootAction {
 
             // hey, grabbing our new anomalies from the detector!
             AnomalyDetector detector = AuditLogStorage.getInstance().getAnomalyDetector();
-            AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
             List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(10, config);
             JSONArray anomalyArray = new JSONArray();
             for (AnomalyDetector.AnomalyAlert alert : alerts) {

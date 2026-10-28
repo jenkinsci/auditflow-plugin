@@ -264,18 +264,7 @@ public class AuditLogStorage {
         // This prevents data loss when the user's next request doesn't reach AuditRequestCapture.
         List<AuditLogEntry> expired = RequestHolder.drainExpiredEntries();
         for (AuditLogEntry e : expired) {
-            writeQueue.offer(e);
-            writeQueueSize.incrementAndGet();
-            // Also add to in-memory buffer
-            bufferLock.writeLock().lock();
-            try {
-                memoryBuffer.addLast(e);
-                while (memoryBuffer.size() > MAX_ENTRIES_IN_MEMORY) {
-                    memoryBuffer.removeFirst();
-                }
-            } finally {
-                bufferLock.writeLock().unlock();
-            }
+            addEntry(e);
         }
 
         List<AuditLogEntry> batch = new ArrayList<>();
@@ -514,6 +503,12 @@ public class AuditLogStorage {
         return json.getBytes(StandardCharsets.UTF_8).length + NEWLINE_BYTES;
     }
 
+    public void pruneExpiredLogFiles(int retentionDays) {
+        synchronized (writerLock) {
+            pruneExpiredLogFiles(getAuditLogsDir(), retentionDays);
+        }
+    }
+
     private void pruneExpiredLogFiles(AuditLoggerConfiguration config) {
         int retentionDays = config != null ? config.getLogRetentionDays() : 90;
         pruneExpiredLogFiles(getAuditLogsDir(), retentionDays);
@@ -532,6 +527,9 @@ public class AuditLogStorage {
         LocalDate cutoffDate = currentUtcDate().minusDays(retentionDays);
         for (File file : files) {
             if (!isManagedLogFile(file)) {
+                continue;
+            }
+            if (LOG_FILE_NAME.equals(file.getName())) {
                 continue;
             }
             if (currentLogFile != null && currentLogFile.equals(file) && currentWriter != null) {
@@ -563,9 +561,8 @@ public class AuditLogStorage {
 
         String name = file.getName();
         if (LOG_FILE_NAME.equals(name)) {
-            LocalDate lastEntryDate = readLastEntryDate(file);
-            if (lastEntryDate != null) {
-                return lastEntryDate;
+            if (currentLogDate != null) {
+                return currentLogDate;
             }
             return Instant.ofEpochMilli(file.lastModified()).atZone(ZoneOffset.UTC).toLocalDate();
         }
@@ -619,26 +616,6 @@ public class AuditLogStorage {
         }
 
         return Integer.MAX_VALUE - 1;
-    }
-
-    private LocalDate readLastEntryDate(File file) {
-        AuditLogEntry lastEntry = null;
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.trim().isEmpty()) {
-                    continue;
-                }
-                AuditLogEntry parsed = parseJsonLine(line.trim());
-                if (parsed != null) {
-                    lastEntry = parsed;
-                }
-            }
-        } catch (IOException e) {
-            LOGGER.log(Level.FINE, "Failed to inspect active audit log date", e);
-        }
-        return lastEntry != null ? toLogDate(lastEntry.getTimestamp()) : null;
     }
 
     private List<File> listAuditLogFiles() {

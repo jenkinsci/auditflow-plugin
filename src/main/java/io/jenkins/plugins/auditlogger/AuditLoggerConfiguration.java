@@ -318,26 +318,48 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         setEnableAnomalyBanner(anomalyConfig.optBoolean("enableAnomalyBanner", json.optBoolean("enableAnomalyBanner", false)));
 
         JSONObject dashboardStatsBlock = getOptionalBlock(json, "enableDashboardStats");
-        setEnableDashboardStats(isOptionalBlockEnabled(json, "enableDashboardStats"));
-        setEnableRiskLevels(json.optBoolean("enableRiskLevels", false));
+        if (json.has("enableDashboardStats")) {
+            setEnableDashboardStats(isOptionalBlockEnabled(json, "enableDashboardStats"));
+        }
+        if (json.has("enableRiskLevels")) {
+            setEnableRiskLevels(json.optBoolean("enableRiskLevels", enableRiskLevels));
+        }
         if (json.has("displayTimeZoneId")) setDisplayTimeZoneId(json.optString("displayTimeZoneId", displayTimeZoneId));
         JSONObject dashboardStatsConfig = dashboardStatsBlock != null ? dashboardStatsBlock : json;
-        setShowMetricTotal(dashboardStatsConfig.optBoolean("showMetricTotal", false));
-        setShowMetricLogins(dashboardStatsConfig.optBoolean("showMetricLogins", false));
-        setShowMetricFailedLogins(dashboardStatsConfig.optBoolean("showMetricFailedLogins", false));
-        setShowMetricBuilds(dashboardStatsConfig.optBoolean("showMetricBuilds", false));
-        setShowMetricJobs(dashboardStatsConfig.optBoolean("showMetricJobs", false));
-        setShowMetricConfig(dashboardStatsConfig.optBoolean("showMetricConfig", false));
+        if (dashboardStatsConfig.has("showMetricTotal")) {
+            setShowMetricTotal(dashboardStatsConfig.optBoolean("showMetricTotal", showMetricTotal));
+        }
+        if (dashboardStatsConfig.has("showMetricLogins")) {
+            setShowMetricLogins(dashboardStatsConfig.optBoolean("showMetricLogins", showMetricLogins));
+        }
+        if (dashboardStatsConfig.has("showMetricFailedLogins")) {
+            setShowMetricFailedLogins(dashboardStatsConfig.optBoolean("showMetricFailedLogins", showMetricFailedLogins));
+        }
+        if (dashboardStatsConfig.has("showMetricBuilds")) {
+            setShowMetricBuilds(dashboardStatsConfig.optBoolean("showMetricBuilds", showMetricBuilds));
+        }
+        if (dashboardStatsConfig.has("showMetricJobs")) {
+            setShowMetricJobs(dashboardStatsConfig.optBoolean("showMetricJobs", showMetricJobs));
+        }
+        if (dashboardStatsConfig.has("showMetricConfig")) {
+            setShowMetricConfig(dashboardStatsConfig.optBoolean("showMetricConfig", showMetricConfig));
+        }
 
         // ── Export toggles ──
         setEnableCsvExport(json.optBoolean("enableCsvExport", false));
         setEnableJsonExport(json.optBoolean("enableJsonExport", false));
-        setEnableAuditApi(json.optBoolean("enableAuditApi", false));
+        if (json.has("enableAuditApi")) {
+            setEnableAuditApi(json.optBoolean("enableAuditApi", enableAuditApi));
+        }
 
         // ── Advanced (non-boolean fields keep json.has() guard) ──
         if (json.has("logRetentionDays")) setLogRetentionDays(json.optInt("logRetentionDays", logRetentionDays));
         if (json.has("maxLogFileSizeMB")) setMaxLogFileSizeMB(json.optInt("maxLogFileSizeMB", maxLogFileSizeMB));
-        setEnableLogRotation(json.optBoolean("enableLogRotation", false));
+        if (json.has("enableLogRotation")) {
+            setEnableLogRotation(json.optBoolean("enableLogRotation", true));
+        } else {
+            setEnableLogRotation(enableLogRotation != null ? enableLogRotation : true);
+        }
         if (json.has("startupGracePeriodSeconds")) setStartupGracePeriodSeconds(json.optInt("startupGracePeriodSeconds", startupGracePeriodSeconds));
         if (json.has("batchWriteSize")) setBatchWriteSize(json.optInt("batchWriteSize", batchWriteSize));
         if (json.has("batchFlushIntervalSeconds")) setBatchFlushIntervalSeconds(json.optInt("batchFlushIntervalSeconds", batchFlushIntervalSeconds));
@@ -391,6 +413,10 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
             } else {
                 parseEndpointsFromJson(endpointsRaw);
             }
+        } else if (webhookAlertsBlock != null || json.has("enableWebhookAlerts")) {
+            // When all destinations are removed in the UI, Stapler omits webhookEndpoints entirely from JSON.
+            // Explicitly clear the endpoints list to avoid retaining deleted destinations in memory.
+            setWebhookEndpoints(Collections.emptyList());
         }
     }
 
@@ -1007,7 +1033,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isEnableJsonExport() { return enableJsonExport; }
     public boolean isEnablePdfExport() { return enablePdfExport; }
 
-    public boolean isEnableAuditApi() { return true; }
+    public boolean isEnableAuditApi() { return enableAuditApi; }
 
     /** Return anomaly detection rules as a JSON string for dashboard JS consumption. */
     public String getAnomalyConfigJson() {

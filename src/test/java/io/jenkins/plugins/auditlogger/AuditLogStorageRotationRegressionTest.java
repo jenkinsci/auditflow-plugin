@@ -115,6 +115,7 @@ class AuditLogStorageRotationRegressionTest {
 
             writeJsonLine(logsDir.resolve(legacyRotatedName(expiredDay, "010000")), entry("expired", "LOGIN", toEpochMillis(expiredDay, 1)));
             writeJsonLine(logsDir.resolve("audit_" + keptDay + ".jsonl"), entry("kept", "LOGIN", toEpochMillis(keptDay, 1)));
+            writeJsonLine(logsDir.resolve("audit.jsonl"), entry("oldActive", "LOGIN", toEpochMillis(expiredDay, 1)));
 
             Method pruneExpired = AuditLogStorage.class.getDeclaredMethod(
                     "pruneExpiredLogFiles", java.io.File.class, int.class);
@@ -123,6 +124,7 @@ class AuditLogStorageRotationRegressionTest {
 
             assertFalse(Files.exists(logsDir.resolve("audit_" + expiredDay + ".jsonl")));
             assertTrue(Files.exists(logsDir.resolve("audit_" + keptDay + ".jsonl")));
+            assertTrue(Files.exists(logsDir.resolve("audit.jsonl")), "Active audit.jsonl must never be deleted by retention pruning");
         } finally {
             storage.shutdown();
         }

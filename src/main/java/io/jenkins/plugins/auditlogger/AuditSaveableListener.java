@@ -81,6 +81,13 @@ public class AuditSaveableListener extends SaveableListener {
             if (o instanceof User) {
                 User user = (User) o;
                 String target = user.getId();
+                String duplicateKey = "USER_DELETED:" + target;
+                if (StartupPhaseManager.wasRecentlyLogged(duplicateKey)) {
+                    LOGGER.log(Level.FINE, "Skipping duplicate user deletion log for: {0}", duplicateKey);
+                    return;
+                }
+                StartupPhaseManager.markAsLogged(duplicateKey);
+
                 String username = currentUser(target);
                 String details = String.format("User account deleted: %s by %s", target, username);
                 AuditLogEntry entry = new AuditLogEntry(username, "USER_DELETED", target, details);

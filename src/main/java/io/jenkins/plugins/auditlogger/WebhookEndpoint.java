@@ -272,6 +272,7 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
 
             if (!tags.isEmpty()) {
                 String actUpper = action != null ? action.trim().toUpperCase(Locale.ENGLISH) : "";
+                String normalizedAct = actUpper.startsWith("[CLI] ") ? actUpper.substring(6).trim() : actUpper;
                 boolean matched = false;
 
                 for (String tag : tags) {
@@ -280,7 +281,7 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
                             matched = true;
                             break;
                         }
-                    } else if (!actUpper.isEmpty() && actUpper.equals(tag)) {
+                    } else if (!actUpper.isEmpty() && (actUpper.equals(tag) || normalizedAct.equals(tag))) {
                         matched = true;
                         break;
                     }
@@ -317,7 +318,9 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
             case "CATEGORY:SYSTEM":
                 return actionUpper.contains("SCRIPT") || actionUpper.contains("SECURITY")
                         || actionUpper.contains("RESTART") || actionUpper.contains("AUTH_STRATEGY")
-                        || actionUpper.contains("USER_CONFIG") || actionUpper.contains("PRIVILEGE");
+                        || actionUpper.contains("USER_CONFIG") || actionUpper.contains("PRIVILEGE")
+                        || actionUpper.contains("GLOBAL_CONFIG") || actionUpper.contains("USER_CREATED")
+                        || actionUpper.contains("USER_DELETED") || actionUpper.contains("CLI_EXECUTION");
             case "CATEGORY:CREDENTIALS":
             case "CATEGORY:SECRETS":
                 return actionUpper.contains("CREDENTIAL") || actionUpper.contains("SECRET");

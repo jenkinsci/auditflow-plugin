@@ -80,6 +80,33 @@ class AuditLoggerManagementLinkPaginationRegressionTest {
             AuditLoggerManagementLink.buildOnboardingStorageKey(" regression-admin ", "v1.0.1"));
     }
 
+    @Test
+    void globalSearchMatchesSeverity() {
+        AuditLogEntry critEntry = entry("alice", "SCRIPT_EXECUTION", 1_000L);
+        critEntry.setSeverity("CRITICAL");
+
+        AuditLogEntry lowEntry = entry("bob", "BUILD_COMPLETED", 2_000L);
+        lowEntry.setSeverity("LOW");
+
+        AuditLoggerManagementLink.AuditViewRequest request = new AuditLoggerManagementLink.AuditViewRequest(
+                "CRITICAL",
+                "all",
+                null,
+                null,
+                null,
+                "all",
+                "timestampMs",
+                false,
+                1,
+                10);
+
+        List<AuditLogEntry> filtered = AuditLoggerManagementLink.filterAndSortEntries(
+                Arrays.asList(critEntry, lowEntry), request, ZoneId.of("UTC"));
+
+        assertEquals(1, filtered.size());
+        assertEquals("CRITICAL", filtered.get(0).getSeverity());
+    }
+
     private static AuditLogEntry entry(String user, String action, long timestamp) {
         return new AuditLogEntry(user, action, "jenkins", "management link regression", timestamp);
     }

@@ -113,4 +113,24 @@ class WebhookDispatcherTest {
         assertDoesNotThrow(() -> dispatcher.dispatchAnomaly(null, config));
         assertDoesNotThrow(() -> dispatcher.dispatchAnomaly(alert, null));
     }
+
+    @Test
+    void testRfc8259JsonEscaping() {
+        assertEquals("", WebhookDispatcher.escapeJson(null));
+        assertEquals("simple text", WebhookDispatcher.escapeJson("simple text"));
+        assertEquals("quote: \\\"hello\\\"", WebhookDispatcher.escapeJson("quote: \"hello\""));
+        assertEquals("line1\\nline2", WebhookDispatcher.escapeJson("line1\r\nline2"));
+        assertEquals("indented:\\tcode", WebhookDispatcher.escapeJson("indented:\tcode"));
+        assertEquals("backspace:\\b formfeed:\\f", WebhookDispatcher.escapeJson("backspace:\b formfeed:\f"));
+        assertEquals("control:\\u0007", WebhookDispatcher.escapeJson("control:\u0007"));
+    }
+
+    @Test
+    void testScriptConsoleDerivesCriticalSeverity() {
+        AuditLogEntry scriptEntry = new AuditLogEntry("admin", "SCRIPT_CONSOLE_ACCESS", "Remoting", "println 'test'");
+        assertEquals("CRITICAL", scriptEntry.getSeverity());
+
+        AuditLogEntry execEntry = new AuditLogEntry("admin", "SCRIPT_EXECUTION", "Remoting", "println 'test'");
+        assertEquals("CRITICAL", execEntry.getSeverity());
+    }
 }

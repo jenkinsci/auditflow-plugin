@@ -139,9 +139,10 @@ public class AuditLogEntry implements Serializable {
         if (action == null) return "INFO";
         String u = action.toUpperCase();
 
-        // 1. CRITICAL: Security failures, failed logins, system restarts, launch failures
+        // 1. CRITICAL: Security failures, failed logins, system restarts, launch failures, script console
         if (u.contains("FAILED_LOGIN") || u.contains("LOGIN_FAILED") || u.contains("DENIED") || u.contains("RESTART")
-                || u.contains("SECURITY_CONFIG") || "NODE_LAUNCH_FAILURE".equals(u) || "AUTH_STRATEGY_CHANGED".equals(u)) {
+                || u.contains("SECURITY_CONFIG") || "NODE_LAUNCH_FAILURE".equals(u) || "AUTH_STRATEGY_CHANGED".equals(u)
+                || u.contains("SCRIPT_CONSOLE") || "SCRIPT_EXECUTION".equals(u)) {
             return "CRITICAL";
         }
 

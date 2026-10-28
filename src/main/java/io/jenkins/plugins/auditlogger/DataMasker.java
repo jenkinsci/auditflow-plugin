@@ -51,11 +51,11 @@ public class DataMasker {
         return text;
     }
 
-    private static String maskEmails(String text) {
+    static String maskEmails(String text) {
         return EMAIL_PATTERN.matcher(text).replaceAll(match -> {
             String email = match.group();
             int atIndex = email.indexOf('@');
-            if (atIndex > 1) {
+            if (atIndex >= 1) {
                 return email.charAt(0) + "****" + email.substring(atIndex);
             }
             return email;

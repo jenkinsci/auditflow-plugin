@@ -85,4 +85,23 @@ class AuditUserListenerTest {
         assertEquals(1, filteredDeleted.size(), "Searching 'USER DELETED' with spaces should match USER_DELETED action");
         assertEquals("USER_DELETED", filteredDeleted.get(0).getAction());
     }
+
+    @Test
+    void testUserDeletionDedup(JenkinsRule j) throws Exception {
+        User user = User.getById("dedup-target-user", true);
+        AuditLogStorage storage = AuditLogStorage.getInstance();
+
+        // Simulate request capture marking it as logged
+        StartupPhaseManager.markAsLogged("USER_DELETED:dedup-target-user");
+
+        // user.delete() should be suppressed by AuditSaveableListener
+        user.delete();
+
+        List<AuditLogEntry> entries = storage.getAllEntries();
+        long deleteCount = entries.stream()
+                .filter(e -> "USER_DELETED".equals(e.getAction()) && "dedup-target-user".equals(e.getTarget()))
+                .count();
+
+        assertEquals(0, deleteCount, "Duplicate user deletion within suppression window should be suppressed");
+    }
 }

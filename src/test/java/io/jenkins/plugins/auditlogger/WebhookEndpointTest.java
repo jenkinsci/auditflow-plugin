@@ -209,4 +209,29 @@ class WebhookEndpointTest {
         org.htmlunit.WebResponse resp4 = wc.getPage(new org.htmlunit.WebRequest(urlEmpty, org.htmlunit.HttpMethod.GET)).getWebResponse();
         assertTrue(resp4.getContentAsString().contains("Webhook URL cannot be empty."));
     }
+
+    @Test
+    void testCliPrefixedActionMatchesActionTag(JenkinsRule j) {
+        WebhookEndpoint ep = new WebhookEndpoint("SecOps", "https://hooks.slack.com/services/test");
+        ep.setMinSeverity("ALL");
+        ep.setActionFilter("JOB_DELETED, SCRIPT_CONSOLE_ACCESS");
+
+        assertTrue(ep.matches("AUDIT_LOG", "HIGH", "JOB_DELETED"));
+        assertTrue(ep.matches("AUDIT_LOG", "HIGH", "[CLI] JOB_DELETED"));
+        assertTrue(ep.matches("AUDIT_LOG", "CRITICAL", "[CLI] SCRIPT_CONSOLE_ACCESS"));
+        assertFalse(ep.matches("AUDIT_LOG", "HIGH", "[CLI] BUILD_FAILURE"));
+    }
+
+    @Test
+    void testCategorySecurityMatchesExpandedEvents(JenkinsRule j) {
+        WebhookEndpoint ep = new WebhookEndpoint("SecOps", "https://hooks.slack.com/services/test");
+        ep.setMinSeverity("ALL");
+        ep.setActionFilter("CATEGORY:SECURITY");
+
+        assertTrue(ep.matches("AUDIT_LOG", "MEDIUM", "GLOBAL_CONFIG_UPDATED"));
+        assertTrue(ep.matches("AUDIT_LOG", "INFO", "USER_CREATED"));
+        assertTrue(ep.matches("AUDIT_LOG", "HIGH", "USER_DELETED"));
+        assertTrue(ep.matches("AUDIT_LOG", "HIGH", "CLI_EXECUTION"));
+        assertTrue(ep.matches("AUDIT_LOG", "HIGH", "[CLI] CLI_EXECUTION"));
+    }
 }

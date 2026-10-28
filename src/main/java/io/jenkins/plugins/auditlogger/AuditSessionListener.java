@@ -75,13 +75,19 @@ public class AuditSessionListener implements HttpSessionListener {
                 String reason = durationMs > 15 * 60 * 1000 ? "INACTIVITY_TIMEOUT"
                         : durationMs < 5000 ? "IMMEDIATE_DISCONNECT" : "USER_LOGOUT";
 
+                String ip = metadata.sourceIp;
+                if ((ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) && metadata.username != null) {
+                    String cached = RequestHolder.getCachedUserIp(metadata.username);
+                    if (cached != null) ip = cached;
+                }
+
                 AuditLogEntry entry = new AuditLogEntry(
                         metadata.username, "SESSION_TERMINATED",
                         "HTTP Session",
                         String.format("Reason: %s | Duration: %d mins | IP: %s",
                                 reason, durationMs / 60000,
-                                metadata.sourceIp != null ? metadata.sourceIp : "unknown"));
-                entry.setSourceIp(metadata.sourceIp);
+                                ip != null ? ip : "unknown"));
+                entry.setSourceIp(ip);
                 entry.setUserAgent(metadata.userAgent);
                 entry.setSessionId(sessionId);
                 AuditLogStorage.getInstance().addEntry(entry);
@@ -92,8 +98,18 @@ public class AuditSessionListener implements HttpSessionListener {
     }
 
     public static void associateUsernameWithSession(String sessionId, String username) {
+        associateSession(sessionId, username, null, null);
+    }
+
+    public static void associateSession(String sessionId, String username, String sourceIp, String userAgent) {
         activeSessions.computeIfPresent(sessionId, (k, metadata) -> {
             metadata.username = username;
+            if ((metadata.sourceIp == null || metadata.sourceIp.isEmpty()) && sourceIp != null && !"unknown".equalsIgnoreCase(sourceIp) && !"N/A".equalsIgnoreCase(sourceIp)) {
+                metadata.sourceIp = sourceIp;
+            }
+            if ((metadata.userAgent == null || metadata.userAgent.isEmpty()) && userAgent != null && !"N/A".equalsIgnoreCase(userAgent)) {
+                metadata.userAgent = userAgent;
+            }
             return metadata;
         });
     }

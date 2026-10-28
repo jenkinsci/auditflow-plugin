@@ -252,6 +252,16 @@ class AuditLoggerConfigurationTest {
         assertEquals("CRITICAL_LOGS_ONLY", endpoint1.getScope());
         assertEquals("CRITICAL", endpoint1.getMinSeverity());
         assertEquals("SCRIPT_CONSOLE_ACCESS", endpoint1.getActionFilter());
+
+        // Now simulate deleting all destinations in UI: form submits enableWebhookAlerts without webhookEndpoints
+        JSONObject clearJson = new JSONObject();
+        JSONObject clearWebhookAlerts = new JSONObject();
+        clearWebhookAlerts.put("webhookUrl", "https://default.example.com/webhook");
+        clearJson.put("enableWebhookAlerts", clearWebhookAlerts);
+
+        configuration.configure((org.kohsuke.stapler.StaplerRequest2) null, clearJson);
+        assertTrue(configuration.isEnableWebhookAlerts());
+        assertTrue(configuration.getWebhookEndpoints().isEmpty(), "Endpoints should be cleared when none are submitted");
     }
 
     @Test
@@ -306,6 +316,20 @@ class AuditLoggerConfigurationTest {
         AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
         assertEquals(hudson.util.FormValidation.Kind.ERROR, config.doTestWebhookUrl("").kind);
         assertEquals(hudson.util.FormValidation.Kind.ERROR, config.doTestWebhookUrl("ftp://bad.com").kind);
+    }
+
+    @Test
+    void testConfigurePreservesLogRotationAndDashboardWhenOmitted(JenkinsRule j) throws Exception {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        config.setEnableLogRotation(true);
+        config.setEnableDashboardStats(true);
+
+        JSONObject emptyJson = new JSONObject();
+        config.configure((org.kohsuke.stapler.StaplerRequest2) null, emptyJson);
+
+        assertTrue(config.isEnableLogRotation(), "Log rotation must remain enabled when omitted from form JSON");
+        assertTrue(config.isEnableDashboardStats(), "Dashboard stats must remain enabled when omitted from form JSON");
+        assertTrue(config.isEnableAuditApi(), "Audit API must remain enabled when omitted from form JSON");
     }
 
     private static JSONObject findOption(JSONArray options, String id) {

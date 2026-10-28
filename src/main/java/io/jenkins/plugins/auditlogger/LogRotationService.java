@@ -16,7 +16,6 @@ import java.util.logging.Logger;
 @Extension
 public class LogRotationService extends PeriodicWork {
     private static final Logger LOGGER = Logger.getLogger(LogRotationService.class.getName());
-    private static final String ACTIVE_LOG = "audit.jsonl";
 
     @Override
     public long getRecurrencePeriod() {
@@ -38,33 +37,10 @@ public class LogRotationService extends PeriodicWork {
         }
     }
 
-    private void deleteOldLogs(int retentionDays) {
-        File logsDir = getAuditLogsDir();
-        if (!logsDir.exists()) return;
-
-        long retentionMs = (long) retentionDays * 24 * 60 * 60 * 1000;
-        long cutoff = System.currentTimeMillis() - retentionMs;
-
-        File[] files = logsDir.listFiles((dir, name) ->
-                name.startsWith("audit") && (name.endsWith(".jsonl") || name.endsWith(".log"))
-                        && !ACTIVE_LOG.equals(name)); // never delete active log
-
-        if (files == null) return;
-
-        for (File file : files) {
-            if (file.lastModified() < cutoff) {
-                if (file.delete()) {
-                    LOGGER.info("Deleted old audit log: " + file.getName());
-                } else {
-                    LOGGER.warning("Failed to delete old audit log: " + file.getName());
-                }
-            }
+    void deleteOldLogs(int retentionDays) {
+        AuditLogStorage storage = AuditLogStorage.getInstance();
+        if (storage != null) {
+            storage.pruneExpiredLogFiles(retentionDays);
         }
-    }
-
-    private File getAuditLogsDir() {
-        Jenkins jenkins = Jenkins.getInstanceOrNull();
-        if (jenkins == null) return new File("auditflow-logs");
-        return new File(jenkins.getRootDir(), "auditflow-logs");
     }
 }

@@ -3,6 +3,7 @@ package io.jenkins.plugins.auditlogger;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -88,6 +89,33 @@ class AnomalyDetectorPhase2Test {
             }
         }
         assertTrue(foundSuspicious, "Should trigger SUSPICIOUS_AUTH_PATTERN alert");
+
+        // Subsequent login should NOT trigger another alert because failure window was reset
+        detector.dismissAllAlerts();
+        AuditLogEntry secondSuccess = AuditLogEntry.withAuth("charlie", "LOGIN", "Jenkins", "Successful login again", "192.168.1.5", "form");
+        detector.analyze(secondSuccess, config);
+        assertEquals(0, detector.getAlerts(10).size(), "Subsequent successful login should not re-trigger suspicious auth alert");
+    }
+
+    @Test
+    void testSuspiciousAuthPatternIgnoresOldFailuresOutsideWindow(JenkinsRule j) {
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalySuspiciousAuth(true);
+        config.setAnomalyFailedLoginsWindowMinutes(15);
+
+        long now = System.currentTimeMillis();
+        long twentyMinsAgo = now - 20 * 60_000L;
+        // Simulate failed logins from 20 minutes ago
+        for (int i = 0; i < 3; i++) {
+            detector.analyze(new AuditLogEntry("dave", "FAILED_LOGIN", "Jenkins", "Bad password", twentyMinsAgo + i * 1000), config);
+        }
+
+        // Dave logs in now
+        AuditLogEntry successEntry = new AuditLogEntry("dave", "LOGIN", "Jenkins", "Successful login", now);
+        detector.analyze(successEntry, config);
+
+        boolean found = detector.getAlerts(10).stream().anyMatch(a -> a.type == AnomalyDetector.AnomalyType.SUSPICIOUS_AUTH_PATTERN);
+        assertFalse(found, "Old failed logins outside the window should not trigger suspicious auth alert");
     }
 
     @Test

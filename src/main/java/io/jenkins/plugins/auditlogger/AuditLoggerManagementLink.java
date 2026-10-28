@@ -513,6 +513,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
                     nvl(entry.getSourceIp()),
                     nvl(entry.getAuthMethod()),
                     nvl(entry.getTriggerType()),
+                    nvl(entry.getSeverity()),
                     entry.getReadableTimestamp(displayZone))
                     .toLowerCase(Locale.ENGLISH);
             return haystack.contains(needle) || haystack.replace('_', ' ').contains(needleNorm);
@@ -992,10 +993,12 @@ public class AuditLoggerManagementLink extends ManagementLink {
         }
     }
 
-    @GET
     public void doDismissAlert(StaplerRequest2 req, StaplerResponse2 res) throws IOException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         String alertId = req.getParameter("alertId");
+        if (alertId == null || alertId.trim().isEmpty()) {
+            alertId = req.getParameter("id");
+        }
         boolean success = false;
         int dismissedCount = 0;
         String currentUser = resolveCurrentUser(req);

@@ -54,6 +54,14 @@ public class DataMaskerTest {
     }
 
     @Test
+    public void testMaskEmailAddresses() {
+        String input = "Contact user alice@example.com or a@example.com";
+        String masked = DataMasker.maskEmails(input);
+        assertTrue(masked.contains("a****@example.com"));
+        assertFalse(masked.contains("alice@example.com"));
+    }
+
+    @Test
     public void testNullAndEmptyHandling() {
         assertNull(DataMasker.maskString(null));
         assertEquals("", DataMasker.maskString(""));
