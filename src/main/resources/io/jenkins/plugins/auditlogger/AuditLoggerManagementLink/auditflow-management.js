@@ -487,9 +487,9 @@
             } else if (type === 'CREDENTIAL_EXPOSURE') {
                 if (actionSelect) actionSelect.value = 'CREDENTIAL_ACCESSED';
             } else if (type === 'ADMIN_PRIVILEGE_CHANGE') {
-                if (actionSelect) actionSelect.value = 'SECURITY_CONFIG_UPDATED';
+                if (actionSelect) actionSelect.value = 'SECURITY';
             } else if (type === 'USER_LIFECYCLE_ANOMALY') {
-                if (actionSelect) actionSelect.value = 'USER_CONFIG_UPDATED';
+                if (actionSelect) actionSelect.value = 'USER';
             }
         } else if (extractedTarget) {
             if (searchInput) searchInput.value = extractedTarget;
@@ -504,7 +504,9 @@
             } else if (type === 'CREDENTIAL_EXPOSURE') {
                 if (actionSelect) actionSelect.value = 'CREDENTIAL_ACCESSED';
             } else if (type === 'ADMIN_PRIVILEGE_CHANGE') {
-                if (actionSelect) actionSelect.value = 'SECURITY_CONFIG_UPDATED';
+                if (actionSelect) actionSelect.value = 'SECURITY';
+            } else if (type === 'USER_LIFECYCLE_ANOMALY') {
+                if (actionSelect) actionSelect.value = 'USER';
             }
         } else {
             // Fallback when neither actor nor target could be extracted
@@ -515,10 +517,9 @@
             } else if (type === 'SUSPICIOUS_AUTH_PATTERN') {
                 if (actionSelect) actionSelect.value = 'AUTH';
             } else if (type === 'ADMIN_PRIVILEGE_CHANGE') {
-                if (actionSelect) actionSelect.value = 'SECURITY_CONFIG_UPDATED';
+                if (actionSelect) actionSelect.value = 'SECURITY';
             } else if (type === 'USER_LIFECYCLE_ANOMALY') {
-                if (searchInput) searchInput.value = 'USER';
-                if (columnSelect) columnSelect.value = 'action';
+                if (actionSelect) actionSelect.value = 'USER';
             } else if (type === 'CREDENTIAL_EXPOSURE') {
                 if (actionSelect) actionSelect.value = 'CREDENTIAL_ACCESSED';
             } else if (alert.details) {

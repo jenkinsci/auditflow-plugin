@@ -119,6 +119,13 @@ public class AuditLogIndex {
         if ("AUTH".equalsIgnoreCase(cleanReq)) {
             return cleanEntry.contains("LOGIN") || cleanEntry.contains("AUTH");
         }
+        if ("USER".equalsIgnoreCase(cleanReq)) {
+            return cleanEntry.startsWith("USER_") || cleanEntry.contains("USER");
+        }
+        if ("SECURITY".equalsIgnoreCase(cleanReq)) {
+            return cleanEntry.contains("SECURITY") || cleanEntry.contains("PRIVILEGE")
+                    || cleanEntry.contains("AUTH_STRATEGY") || cleanEntry.contains("ROLE_CONFIG");
+        }
         return "SCRIPT_CONSOLE_ACCESS".equalsIgnoreCase(cleanReq)
                 && "SCRIPT_CONSOLE_ACCESSED".equalsIgnoreCase(cleanEntry);
     }
