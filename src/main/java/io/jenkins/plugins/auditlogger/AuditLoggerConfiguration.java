@@ -418,6 +418,19 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
             // Explicitly clear the endpoints list to avoid retaining deleted destinations in memory.
             setWebhookEndpoints(Collections.emptyList());
         }
+
+        // If webhook alerts was enabled, but all destination endpoints are empty and no legacy webhookUrl exists,
+        // automatically disable webhook alerts and multi-webhook mode so empty configuration is not persisted.
+        boolean hasValidEndpoints = this.webhookEndpoints != null && !this.webhookEndpoints.isEmpty();
+        boolean hasLegacyUrl = this.webhookUrl != null && !this.webhookUrl.trim().isEmpty();
+        if (!hasValidEndpoints && !hasLegacyUrl) {
+            this.enableWebhookAlerts = false;
+            this.enableMultiWebhook = false;
+        } else if (!this.enableWebhookAlerts) {
+            this.enableMultiWebhook = false;
+        } else {
+            this.enableMultiWebhook = hasValidEndpoints;
+        }
     }
 
     private void parseEndpointsFromJson(Object raw) {
@@ -442,6 +455,9 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         if (obj == null) return null;
         String name = obj.optString("name", "");
         String url = obj.optString("webhookUrl", "");
+        if (url == null || url.trim().isEmpty()) {
+            return null;
+        }
         WebhookEndpoint ep = new WebhookEndpoint(name, Secret.fromString(url));
         if (obj.has("id")) ep.setId(obj.optString("id", ""));
         if (obj.has("channel")) ep.setChannel(obj.optString("channel", ""));
@@ -783,9 +799,17 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
 
     @DataBoundSetter
     public void setWebhookEndpoints(List<WebhookEndpoint> webhookEndpoints) {
-        this.webhookEndpoints = webhookEndpoints != null
-                ? new CopyOnWriteArrayList<>(webhookEndpoints)
-                : new CopyOnWriteArrayList<>();
+        if (webhookEndpoints == null || webhookEndpoints.isEmpty()) {
+            this.webhookEndpoints = new CopyOnWriteArrayList<>();
+            return;
+        }
+        List<WebhookEndpoint> cleaned = new ArrayList<>();
+        for (WebhookEndpoint ep : webhookEndpoints) {
+            if (ep != null && !ep.getPlainWebhookUrl().isEmpty()) {
+                cleaned.add(ep);
+            }
+        }
+        this.webhookEndpoints = new CopyOnWriteArrayList<>(cleaned);
     }
 
 

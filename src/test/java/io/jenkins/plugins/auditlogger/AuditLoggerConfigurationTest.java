@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.kohsuke.stapler.verb.GET;
 
 import java.time.ZoneId;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -330,6 +331,63 @@ class AuditLoggerConfigurationTest {
         assertTrue(config.isEnableLogRotation(), "Log rotation must remain enabled when omitted from form JSON");
         assertTrue(config.isEnableDashboardStats(), "Dashboard stats must remain enabled when omitted from form JSON");
         assertTrue(config.isEnableAuditApi(), "Audit API must remain enabled when omitted from form JSON");
+    }
+
+    @Test
+    void testSetWebhookEndpointsFiltersBlankUrls(JenkinsRule j) {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        WebhookEndpoint valid = new WebhookEndpoint("Valid", "https://hooks.slack.com/services/123");
+        WebhookEndpoint blank1 = new WebhookEndpoint("Blank1", "");
+        WebhookEndpoint blank2 = new WebhookEndpoint("Blank2", "   ");
+
+        config.setWebhookEndpoints(List.of(valid, blank1, blank2));
+
+        assertEquals(1, config.getWebhookEndpoints().size());
+        assertEquals("Valid", config.getWebhookEndpoints().get(0).getName());
+    }
+
+    @Test
+    void testEmptyWebhookDestinationsAutoDisablesAlertsOnConfigure(JenkinsRule j) throws Exception {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        config.setWebhookUrl("");
+
+        JSONObject json = new JSONObject();
+        json.put("enableWebhookAlerts", true);
+
+        JSONArray endpoints = new JSONArray();
+        JSONObject blankEndpoint = new JSONObject();
+        blankEndpoint.put("name", "Blank");
+        blankEndpoint.put("webhookUrl", "");
+        endpoints.add(blankEndpoint);
+        json.put("webhookEndpoints", endpoints);
+
+        config.configure((org.kohsuke.stapler.StaplerRequest2) null, json);
+
+        assertFalse(config.isEnableWebhookAlerts(), "Webhook alerts must be disabled when all destinations are empty");
+        assertFalse(config.isEnableMultiWebhook(), "Multi-webhook mode must be disabled when all destinations are empty");
+        assertTrue(config.getWebhookEndpoints().isEmpty(), "Empty webhook endpoints must be filtered out");
+    }
+
+    @Test
+    void testValidWebhookDestinationsPreservesAlertsOnConfigure(JenkinsRule j) throws Exception {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        config.setWebhookUrl("");
+
+        JSONObject json = new JSONObject();
+        json.put("enableWebhookAlerts", true);
+
+        JSONArray endpoints = new JSONArray();
+        JSONObject validEndpoint = new JSONObject();
+        validEndpoint.put("name", "Valid Slack");
+        validEndpoint.put("webhookUrl", "https://hooks.slack.com/services/T00/B00/X00");
+        endpoints.add(validEndpoint);
+        json.put("webhookEndpoints", endpoints);
+
+        config.configure((org.kohsuke.stapler.StaplerRequest2) null, json);
+
+        assertTrue(config.isEnableWebhookAlerts(), "Webhook alerts must remain enabled when valid destinations exist");
+        assertTrue(config.isEnableMultiWebhook(), "Multi-webhook mode must be enabled when valid destinations exist");
+        assertEquals(1, config.getWebhookEndpoints().size());
     }
 
     private static JSONObject findOption(JSONArray options, String id) {
