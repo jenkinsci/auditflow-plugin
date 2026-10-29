@@ -639,6 +639,16 @@ public class AnomalyDetector {
                 failedLogins.remove(candidates.get(i).getKey(), candidates.get(i).getValue());
             }
         }
+
+        if (userIpHistory.size() > MAX_TRACKED_USERS) {
+            int removeCount = userIpHistory.size() - MAX_TRACKED_USERS;
+            java.util.Iterator<String> it = userIpHistory.keySet().iterator();
+            while (it.hasNext() && removeCount > 0) {
+                it.next();
+                it.remove();
+                removeCount--;
+            }
+        }
     }
 
     private void trimAlerts() {

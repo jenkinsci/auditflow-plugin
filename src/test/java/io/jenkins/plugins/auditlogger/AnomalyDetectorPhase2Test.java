@@ -165,4 +165,24 @@ class AnomalyDetectorPhase2Test {
         assertEquals("adminUser", alerts.get(0).user);
         assertEquals("HIGH", alerts.get(0).severity);
     }
+
+    @Test
+    void testUserIpHistoryPruningWhenExceedingMaxUsers(JenkinsRule j) throws Exception {
+        java.lang.reflect.Field userIpHistoryField = AnomalyDetector.class.getDeclaredField("userIpHistory");
+        userIpHistoryField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        java.util.concurrent.ConcurrentHashMap<String, java.util.Set<String>> userIpHistory =
+                (java.util.concurrent.ConcurrentHashMap<String, java.util.Set<String>>) userIpHistoryField.get(detector);
+
+        for (int i = 0; i < 10_050; i++) {
+            userIpHistory.put("user-" + i, java.util.Collections.singleton("192.168.1." + (i % 250)));
+        }
+        assertTrue(userIpHistory.size() > 10_000);
+
+        java.lang.reflect.Method cleanup = AnomalyDetector.class.getDeclaredMethod("cleanupOldAlerts", long.class, int.class);
+        cleanup.setAccessible(true);
+        cleanup.invoke(detector, System.currentTimeMillis(), 15);
+
+        assertTrue(userIpHistory.size() <= 10_000, "userIpHistory should be pruned to MAX_TRACKED_USERS");
+    }
 }

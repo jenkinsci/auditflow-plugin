@@ -32,7 +32,7 @@ public class WebhookDispatcher {
     private static final int MAX_RETRIES = 3;
     private static final WebhookDispatcher INSTANCE = new WebhookDispatcher();
 
-    private final ScheduledExecutorService executor;
+    private ScheduledExecutorService executor;
     private HttpClient httpClient;
 
     public static WebhookDispatcher getInstance() {
@@ -40,7 +40,14 @@ public class WebhookDispatcher {
     }
 
     public WebhookDispatcher() {
-        this.executor = Executors.newScheduledThreadPool(2, new ThreadFactory() {
+        this.executor = createExecutor();
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+    }
+
+    private static ScheduledExecutorService createExecutor() {
+        return Executors.newScheduledThreadPool(2, new ThreadFactory() {
             private final AtomicInteger count = new AtomicInteger(1);
             @Override
             public Thread newThread(Runnable r) {
@@ -49,9 +56,13 @@ public class WebhookDispatcher {
                 return t;
             }
         });
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
+    }
+
+    synchronized ScheduledExecutorService getExecutor() {
+        if (executor == null || executor.isShutdown() || executor.isTerminated()) {
+            executor = createExecutor();
+        }
+        return executor;
     }
 
     /** Package-private setter for unit tests to inject custom HttpClient */
@@ -92,7 +103,7 @@ public class WebhookDispatcher {
         for (WebhookEndpoint ep : endpoints) {
             String url = ep.getPlainWebhookUrl();
             if (!url.isEmpty()) {
-                executor.submit(() -> sendWithRetry(url, jsonPayload, 0));
+                getExecutor().submit(() -> sendWithRetry(url, jsonPayload, 0));
             }
         }
     }
@@ -122,7 +133,7 @@ public class WebhookDispatcher {
         for (WebhookEndpoint ep : endpoints) {
             String url = ep.getPlainWebhookUrl();
             if (!url.isEmpty()) {
-                executor.submit(() -> sendWithRetry(url, jsonPayload, 0));
+                getExecutor().submit(() -> sendWithRetry(url, jsonPayload, 0));
             }
         }
     }
@@ -263,6 +274,7 @@ public class WebhookDispatcher {
         if (url == null || url.trim().isEmpty()) {
             return;
         }
+        String maskedUrl = maskWebhookUrl(url);
         try {
             HttpClient client = getHttpClient();
             HttpRequest request = HttpRequest.newBuilder()
@@ -276,28 +288,68 @@ public class WebhookDispatcher {
                     .thenAccept(resp -> {
                         int code = resp.statusCode();
                         if (code >= 200 && code < 300) {
-                            LOGGER.info("AuditFlow webhook successfully delivered to " + url + " (HTTP " + code + ")");
+                            LOGGER.info("AuditFlow webhook successfully delivered to " + maskedUrl + " (HTTP " + code + ")");
                         } else if ((code == 429 || code >= 500) && attempt < MAX_RETRIES) {
                             long delaySec = (long) Math.pow(2, attempt);
-                            LOGGER.warning("Webhook returned HTTP " + code + " for " + url + ". Retrying in " + delaySec + "s (attempt " + (attempt + 1) + "/" + MAX_RETRIES + ")");
-                            executor.schedule(() -> sendWithRetry(url, json, attempt + 1), delaySec, TimeUnit.SECONDS);
+                            LOGGER.warning("Webhook returned HTTP " + code + " for " + maskedUrl + ". Retrying in " + delaySec + "s (attempt " + (attempt + 1) + "/" + MAX_RETRIES + ")");
+                            getExecutor().schedule(() -> sendWithRetry(url, json, attempt + 1), delaySec, TimeUnit.SECONDS);
                         } else {
                             String snippet = resp.body() != null && !resp.body().trim().isEmpty() ? " - Response: " + resp.body().trim() : "";
-                            LOGGER.warning("Webhook failed with HTTP " + code + " for " + url + snippet);
+                            LOGGER.warning("Webhook failed with HTTP " + code + " for " + maskedUrl + snippet);
                         }
                     })
                     .exceptionally(ex -> {
                         if (attempt < MAX_RETRIES) {
                             long delaySec = (long) Math.pow(2, attempt);
-                            LOGGER.warning("Webhook request failed for " + url + ": " + ex.getMessage() + ". Retrying in " + delaySec + "s");
-                            executor.schedule(() -> sendWithRetry(url, json, attempt + 1), delaySec, TimeUnit.SECONDS);
+                            LOGGER.warning("Webhook request failed for " + maskedUrl + ": " + ex.getMessage() + ". Retrying in " + delaySec + "s");
+                            getExecutor().schedule(() -> sendWithRetry(url, json, attempt + 1), delaySec, TimeUnit.SECONDS);
                         } else {
-                            LOGGER.log(Level.WARNING, "Webhook permanently failed for " + url + " after " + MAX_RETRIES + " attempts", ex);
+                            LOGGER.log(Level.WARNING, "Webhook permanently failed for " + maskedUrl + " after " + MAX_RETRIES + " attempts", ex);
                         }
                         return null;
                     });
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Failed to initiate webhook request to " + url, e);
+            LOGGER.log(Level.WARNING, "Failed to initiate webhook request to " + maskedUrl, e);
+        }
+    }
+
+    /**
+     * Redacts secret tokens and query parameters from webhook URLs for safe logging.
+     * Example: https://hooks.slack.com/services/T00/B00/SECRET -> https://hooks.slack.com/services/***
+     */
+    public static String maskWebhookUrl(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return "";
+        }
+        String u = url.trim();
+        try {
+            URI uri = URI.create(u);
+            String host = uri.getHost();
+            String scheme = uri.getScheme();
+            if (host == null) {
+                return "***";
+            }
+            String path = uri.getPath();
+            if (path == null || path.isEmpty() || "/".equals(path)) {
+                return (scheme != null ? scheme : "https") + "://" + host + "/***";
+            }
+            String[] segments = path.split("/");
+            StringBuilder masked = new StringBuilder();
+            masked.append(scheme != null ? scheme : "https").append("://").append(host);
+            if (segments.length > 1 && !segments[1].isEmpty()) {
+                masked.append("/").append(segments[1]);
+            }
+            masked.append("/***");
+            return masked.toString();
+        } catch (Exception ignored) {
+            int protoIdx = u.indexOf("://");
+            if (protoIdx != -1) {
+                int slashIdx = u.indexOf('/', protoIdx + 3);
+                if (slashIdx != -1) {
+                    return u.substring(0, slashIdx) + "/***";
+                }
+            }
+            return "***";
         }
     }
 
@@ -387,15 +439,17 @@ public class WebhookDispatcher {
         return "";
     }
 
-    public void shutdown() {
-        executor.shutdown();
-        try {
-            if (!executor.awaitTermination(3, TimeUnit.SECONDS)) {
+    public synchronized void shutdown() {
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(3, TimeUnit.SECONDS)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
                 executor.shutdownNow();
+                Thread.currentThread().interrupt();
             }
-        } catch (InterruptedException e) {
-            executor.shutdownNow();
-            Thread.currentThread().interrupt();
         }
     }
 }

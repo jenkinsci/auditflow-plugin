@@ -133,4 +133,33 @@ class WebhookDispatcherTest {
         AuditLogEntry execEntry = new AuditLogEntry("admin", "SCRIPT_EXECUTION", "Remoting", "println 'test'");
         assertEquals("CRITICAL", execEntry.getSeverity());
     }
+
+    @Test
+    void testMaskWebhookUrl() {
+        assertEquals("", WebhookDispatcher.maskWebhookUrl(null));
+        assertEquals("", WebhookDispatcher.maskWebhookUrl("   "));
+        assertEquals("https://hooks.slack.com/services/***",
+                WebhookDispatcher.maskWebhookUrl("https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"));
+        assertEquals("https://discord.com/api/***",
+                WebhookDispatcher.maskWebhookUrl("https://discord.com/api/webhooks/123456/abcdef-secret-token"));
+        assertEquals("https://example.com/webhook/***",
+                WebhookDispatcher.maskWebhookUrl("https://example.com/webhook?key=sensitive_secret_token"));
+    }
+
+    @Test
+    void testExecutorReinitializationAfterShutdown() {
+        WebhookDispatcher dispatcher = new WebhookDispatcher();
+        assertNotNull(dispatcher.getExecutor());
+        assertFalse(dispatcher.getExecutor().isShutdown());
+
+        dispatcher.shutdown();
+        assertTrue(dispatcher.getExecutor().isShutdown() || !dispatcher.getExecutor().isTerminated());
+
+        // Calling getExecutor() must self-heal and return a new active executor
+        var activeExecutor = dispatcher.getExecutor();
+        assertNotNull(activeExecutor);
+        assertFalse(activeExecutor.isShutdown());
+
+        dispatcher.shutdown();
+    }
 }

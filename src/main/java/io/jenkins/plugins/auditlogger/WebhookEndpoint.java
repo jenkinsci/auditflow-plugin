@@ -532,7 +532,7 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
                 return FormValidation.error("Webhook endpoint returned HTTP " + status + snippet);
             }
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Webhook endpoint test failed for " + url, e);
+            LOGGER.log(Level.WARNING, "Webhook endpoint test failed for " + WebhookDispatcher.maskWebhookUrl(url), e);
             return FormValidation.error("Connection failed: " + e.getMessage());
         }
     }
