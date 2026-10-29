@@ -100,7 +100,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
             response.put("logs", toDisplayEntries(page.entries, displayZone));
             response.put("summary", buildSummary(filteredEntries, displayZone));
             response.put("insights", buildInsights(filteredEntries, config, displayZone));
-            AnomalyDetector detector = AuditLogStorage.getInstance() != null ? AuditLogStorage.getInstance().getAnomalyDetector() : null;
+            AnomalyDetector detector = AuditLogStorage.getInstance().getAnomalyDetector();
             List<AnomalyDetector.AnomalyAlert> apiAlerts = detector != null ? detector.getAlerts(10, config) : java.util.Collections.emptyList();
             response.put("anomalies", mapAnomalyAlerts(apiAlerts));
             response.put("anomalyConfig", buildAnomalyConfig(config));
@@ -976,7 +976,7 @@ public class AuditLoggerManagementLink extends ManagementLink {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
 
         try {
-            AnomalyDetector detector = AuditLogStorage.getInstance() != null ? AuditLogStorage.getInstance().getAnomalyDetector() : null;
+            AnomalyDetector detector = AuditLogStorage.getInstance().getAnomalyDetector();
             AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
             List<AnomalyDetector.AnomalyAlert> alerts = detector != null ? detector.getAlerts(50, config) : java.util.Collections.emptyList();
 

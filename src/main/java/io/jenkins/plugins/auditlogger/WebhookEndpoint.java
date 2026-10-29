@@ -435,9 +435,14 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
             return items;
         }
 
+        @POST
         public FormValidation doCheckName(
                 @QueryParameter("value") String value,
                 @QueryParameter("name") String name) {
+            Jenkins jenkins = Jenkins.getInstanceOrNull();
+            if (jenkins != null) {
+                jenkins.checkPermission(Jenkins.ADMINISTER);
+            }
             String target = (value != null && !value.trim().isEmpty()) ? value : name;
             if (target == null || target.trim().isEmpty()) {
                 return FormValidation.error("Endpoint name cannot be empty.");
@@ -445,9 +450,14 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
             return FormValidation.ok();
         }
 
+        @POST
         public FormValidation doCheckWebhookUrl(
                 @QueryParameter("value") String value,
                 @QueryParameter("webhookUrl") String webhookUrl) {
+            Jenkins jenkins = Jenkins.getInstanceOrNull();
+            if (jenkins != null) {
+                jenkins.checkPermission(Jenkins.ADMINISTER);
+            }
             String raw = (value != null && !value.trim().isEmpty()) ? value : webhookUrl;
             if (raw == null || raw.trim().isEmpty()) {
                 return FormValidation.error("Webhook URL cannot be empty.");

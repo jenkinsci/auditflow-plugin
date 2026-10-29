@@ -189,25 +189,30 @@ class WebhookEndpointTest {
     void testCheckWebhookUrlViaWebClient(JenkinsRule j) throws Exception {
         JenkinsRule.WebClient wc = j.createWebClient();
 
-        // 1. Valid with parameter 'value'
-        java.net.URL urlValue = new java.net.URL(j.getURL(), "descriptorByName/io.jenkins.plugins.auditlogger.WebhookEndpoint/checkWebhookUrl?value=" + java.net.URLEncoder.encode("https://hooks.slack.com/123", java.nio.charset.StandardCharsets.UTF_8));
-        org.htmlunit.WebResponse resp1 = wc.getPage(new org.htmlunit.WebRequest(urlValue, org.htmlunit.HttpMethod.GET)).getWebResponse();
+        // 1. Valid with parameter 'value' via POST
+        java.net.URL urlValue = wc.createCrumbedUrl("descriptorByName/io.jenkins.plugins.auditlogger.WebhookEndpoint/checkWebhookUrl?value=" + java.net.URLEncoder.encode("https://hooks.slack.com/123", java.nio.charset.StandardCharsets.UTF_8));
+        org.htmlunit.WebResponse resp1 = wc.getPage(new org.htmlunit.WebRequest(urlValue, org.htmlunit.HttpMethod.POST)).getWebResponse();
         assertEquals("<div/>", resp1.getContentAsString().trim());
 
-        // 2. Valid with parameter 'webhookUrl'
-        java.net.URL urlWebhookUrl = new java.net.URL(j.getURL(), "descriptorByName/io.jenkins.plugins.auditlogger.WebhookEndpoint/checkWebhookUrl?webhookUrl=" + java.net.URLEncoder.encode("https://hooks.slack.com/123", java.nio.charset.StandardCharsets.UTF_8));
-        org.htmlunit.WebResponse resp2 = wc.getPage(new org.htmlunit.WebRequest(urlWebhookUrl, org.htmlunit.HttpMethod.GET)).getWebResponse();
+        // 2. Valid with parameter 'webhookUrl' via POST
+        java.net.URL urlWebhookUrl = wc.createCrumbedUrl("descriptorByName/io.jenkins.plugins.auditlogger.WebhookEndpoint/checkWebhookUrl?webhookUrl=" + java.net.URLEncoder.encode("https://hooks.slack.com/123", java.nio.charset.StandardCharsets.UTF_8));
+        org.htmlunit.WebResponse resp2 = wc.getPage(new org.htmlunit.WebRequest(urlWebhookUrl, org.htmlunit.HttpMethod.POST)).getWebResponse();
         assertEquals("<div/>", resp2.getContentAsString().trim());
 
-        // 3. Invalid format with parameter 'webhookUrl'
-        java.net.URL urlInvalid = new java.net.URL(j.getURL(), "descriptorByName/io.jenkins.plugins.auditlogger.WebhookEndpoint/checkWebhookUrl?webhookUrl=invalid");
-        org.htmlunit.WebResponse resp3 = wc.getPage(new org.htmlunit.WebRequest(urlInvalid, org.htmlunit.HttpMethod.GET)).getWebResponse();
+        // 3. Invalid format with parameter 'webhookUrl' via POST
+        java.net.URL urlInvalid = wc.createCrumbedUrl("descriptorByName/io.jenkins.plugins.auditlogger.WebhookEndpoint/checkWebhookUrl?webhookUrl=invalid");
+        org.htmlunit.WebResponse resp3 = wc.getPage(new org.htmlunit.WebRequest(urlInvalid, org.htmlunit.HttpMethod.POST)).getWebResponse();
         assertTrue(resp3.getContentAsString().contains("Webhook URL must start with http:// or https://"));
 
-        // 4. Empty with parameter 'webhookUrl'
-        java.net.URL urlEmpty = new java.net.URL(j.getURL(), "descriptorByName/io.jenkins.plugins.auditlogger.WebhookEndpoint/checkWebhookUrl?webhookUrl=");
-        org.htmlunit.WebResponse resp4 = wc.getPage(new org.htmlunit.WebRequest(urlEmpty, org.htmlunit.HttpMethod.GET)).getWebResponse();
+        // 4. Empty with parameter 'webhookUrl' via POST
+        java.net.URL urlEmpty = wc.createCrumbedUrl("descriptorByName/io.jenkins.plugins.auditlogger.WebhookEndpoint/checkWebhookUrl?webhookUrl=");
+        org.htmlunit.WebResponse resp4 = wc.getPage(new org.htmlunit.WebRequest(urlEmpty, org.htmlunit.HttpMethod.POST)).getWebResponse();
         assertTrue(resp4.getContentAsString().contains("Webhook URL cannot be empty."));
+
+        // 5. Verify GET is rejected due to @POST annotation
+        org.junit.jupiter.api.Assertions.assertThrows(
+                org.htmlunit.FailingHttpStatusCodeException.class,
+                () -> wc.getPage(new org.htmlunit.WebRequest(urlValue, org.htmlunit.HttpMethod.GET)));
     }
 
     @Test

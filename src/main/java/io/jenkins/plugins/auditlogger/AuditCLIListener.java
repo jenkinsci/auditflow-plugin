@@ -25,7 +25,10 @@ public class AuditCLIListener implements CLIListener {
             }
 
             String username = resolveCurrentUser(context);
-            String command = context.getCommand() != null ? context.getCommand() : "unknown";
+            String command = context.getCommand();
+            if (command.isEmpty()) {
+                command = "unknown";
+            }
 
             String details = "CLI Command: " + command + " | Exit Code: " + exitCode
                     + (context.getArgs() != null && !context.getArgs().isEmpty()
