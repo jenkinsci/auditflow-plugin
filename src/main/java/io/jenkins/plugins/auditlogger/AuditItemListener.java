@@ -19,6 +19,7 @@ public class AuditItemListener extends ItemListener {
 
     @Override
     public void onCreated(Item item) {
+        if (item == null) return;
         String target = item.getFullName();
         String user = currentUser(target);
         String details = String.format("Job created: %s (type: %s) by %s", target, item.getClass().getSimpleName(), user);
@@ -27,6 +28,7 @@ public class AuditItemListener extends ItemListener {
 
     @Override
     public void onDeleted(Item item) {
+        if (item == null) return;
         String target = item.getFullName();
         String user = currentUser(target);
         String details = String.format("Job deleted: %s by %s", target, user);
@@ -35,6 +37,7 @@ public class AuditItemListener extends ItemListener {
 
     @Override
     public void onRenamed(Item item, String oldName, String newName) {
+        if (item == null) return;
         String target = item.getFullName();
         String user = currentUser(target);
         String details = String.format("Job renamed from '%s' to '%s' by %s", oldName, newName, user);
@@ -43,6 +46,7 @@ public class AuditItemListener extends ItemListener {
 
     @Override
     public void onCopied(Item src, Item copy) {
+        if (src == null || copy == null) return;
         String target = copy.getFullName();
         String user = currentUser(target);
         String details = String.format("Job copied from '%s' by %s", src.getFullName(), user);
@@ -51,6 +55,7 @@ public class AuditItemListener extends ItemListener {
 
     @Override
     public void onLocationChanged(Item item, String oldFullName, String newFullName) {
+        if (item == null) return;
         String user = currentUser(newFullName);
         String details = String.format("Job moved from '%s' by %s", oldFullName, user);
         checkCliAndLog("JOB_MOVED", newFullName, details, user);

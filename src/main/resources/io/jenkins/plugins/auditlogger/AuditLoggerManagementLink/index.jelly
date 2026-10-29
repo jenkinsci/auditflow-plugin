@@ -251,6 +251,12 @@
                                             <option value="CREDENTIAL_UPDATED">Credential Updated</option>
                                             <option value="CREDENTIAL_DELETED">Credential Deleted</option>
                                         </optgroup>
+                                        <optgroup label="Users">
+                                            <option value="USER">All User Actions</option>
+                                            <option value="USER_CREATED">User Created</option>
+                                            <option value="USER_DELETED">User Deleted</option>
+                                            <option value="USER_CONFIG_UPDATED">User Config</option>
+                                        </optgroup>
                                         <optgroup label="Plugins">
                                             <option value="PLUGIN_INSTALLED">Plugin Installed</option>
                                             <option value="PLUGIN_REMOVED">Plugin Removed</option>
@@ -266,7 +272,7 @@
                                             <option value="SCRIPT_APPROVED">Script Approved</option>
                                             <option value="UNSAFE_SCRIPT_BLOCKED">Unsafe Script Blocked</option>
                                             <option value="GLOBAL_CONFIG_UPDATED">Global Config</option>
-                                            <option value="USER_CONFIG_UPDATED">User Config</option>
+                                            <option value="SECURITY">All Security &amp; Admin</option>
                                             <option value="SECURITY_CONFIG_UPDATED">Security Config</option>
                                             <option value="AUTH_STRATEGY_CHANGED">Auth Strategy Changed</option>
                                         </optgroup>

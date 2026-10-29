@@ -34,15 +34,16 @@ public class ComplianceReportGenerator {
         Map<String, Object> summary = new LinkedHashMap<>();
 
         long authEvents = period.stream()
-                .filter(e -> e.getAction().contains("LOGIN") || e.getAction().contains("AUTH")).count();
+                .filter(e -> e.getAction() != null && (e.getAction().contains("LOGIN") || e.getAction().contains("AUTH"))).count();
         long failedLogins = period.stream()
                 .filter(e -> "FAILED_LOGIN".equals(e.getAction())).count();
         long configChanges = period.stream()
-                .filter(e -> e.getAction().contains("CONFIG") || e.getAction().contains("UPDATED")).count();
+                .filter(e -> e.getAction() != null && (e.getAction().contains("CONFIG") || e.getAction().contains("UPDATED"))).count();
         long highRisk = period.stream()
                 .filter(e -> "CRITICAL".equals(e.getSeverity()) || "HIGH".equals(e.getSeverity())).count();
         long uniqueUsers = period.stream()
-                .map(AuditLogEntry::getUsername).distinct().count();
+                .map(e -> e.getUsername() != null ? e.getUsername() : "UNKNOWN")
+                .distinct().count();
 
         summary.put("authenticationEvents", authEvents);
         summary.put("failedLoginAttempts", failedLogins);
@@ -81,10 +82,11 @@ public class ComplianceReportGenerator {
         Map<String, Object> summary = new LinkedHashMap<>();
 
         long authUsers = period.stream()
-                .filter(e -> e.getAction().contains("LOGIN"))
-                .map(AuditLogEntry::getUsername).distinct().count();
+                .filter(e -> e.getAction() != null && e.getAction().contains("LOGIN"))
+                .map(e -> e.getUsername() != null ? e.getUsername() : "UNKNOWN")
+                .distinct().count();
         long credEvents = period.stream()
-                .filter(e -> e.getAction().contains("CREDENTIAL") || e.getAction().contains("PASSWORD")).count();
+                .filter(e -> e.getAction() != null && (e.getAction().contains("CREDENTIAL") || e.getAction().contains("PASSWORD"))).count();
 
         summary.put("authenticatedAccessPoints", authUsers);
         summary.put("credentialManagementEvents", credEvents);
@@ -117,10 +119,10 @@ public class ComplianceReportGenerator {
         Map<String, Object> summary = new LinkedHashMap<>();
 
         long dataAccess = period.stream()
-                .filter(e -> e.getAction().contains("ACCESS") || e.getAction().contains("READ")).count();
+                .filter(e -> e.getAction() != null && (e.getAction().contains("ACCESS") || e.getAction().contains("READ"))).count();
         long dataMod = period.stream()
-                .filter(e -> e.getAction().contains("UPDATE") || e.getAction().contains("DELETE")
-                        || e.getAction().contains("CREATE")).count();
+                .filter(e -> e.getAction() != null && (e.getAction().contains("UPDATE") || e.getAction().contains("DELETE")
+                        || e.getAction().contains("CREATE"))).count();
 
         summary.put("dataAccessEvents", dataAccess);
         summary.put("dataModificationEvents", dataMod);
@@ -135,19 +137,26 @@ public class ComplianceReportGenerator {
     }
 
     public static String formatReport(ComplianceReport report) {
+        if (report == null) {
+            return "";
+        }
         StringBuilder sb = new StringBuilder();
-        sb.append("=== ").append(report.reportType).append(" COMPLIANCE REPORT ===\n\n");
+        sb.append("=== ").append(report.reportType != null ? report.reportType : "AUDIT").append(" COMPLIANCE REPORT ===\n\n");
         DateTimeFormatter dtFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneOffset.UTC);
         DateTimeFormatter dFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
-        sb.append("Generated: ").append(dtFmt.format(report.generatedDate.toInstant())).append("\n");
-        sb.append("Period: ").append(dFmt.format(report.reportPeriodStart.toInstant()))
-                .append(" to ").append(dFmt.format(report.reportPeriodEnd.toInstant())).append("\n");
-        sb.append("Status: ").append(report.status).append("\n\n");
+        sb.append("Generated: ").append(report.generatedDate != null ? dtFmt.format(report.generatedDate.toInstant()) : "-").append("\n");
+        sb.append("Period: ").append(report.reportPeriodStart != null ? dFmt.format(report.reportPeriodStart.toInstant()) : "Beginning")
+                .append(" to ").append(report.reportPeriodEnd != null ? dFmt.format(report.reportPeriodEnd.toInstant()) : "Present").append("\n");
+        sb.append("Status: ").append(report.status != null ? report.status : "UNKNOWN").append("\n\n");
         sb.append("SUMMARY:\n");
-        report.summary.forEach((k, v) -> sb.append("  ").append(k).append(": ").append(v).append("\n"));
+        if (report.summary != null) {
+            report.summary.forEach((k, v) -> sb.append("  ").append(k).append(": ").append(v).append("\n"));
+        }
         sb.append("\nFINDINGS:\n");
-        report.findings.forEach((k, v) -> sb.append("  ").append(k).append(": ").append(v).append("\n"));
-        if (!report.recommendations.isEmpty()) {
+        if (report.findings != null) {
+            report.findings.forEach((k, v) -> sb.append("  ").append(k).append(": ").append(v).append("\n"));
+        }
+        if (report.recommendations != null && !report.recommendations.isEmpty()) {
             sb.append("\nRECOMMENDATIONS:\n");
             report.recommendations.forEach(r -> sb.append("  - ").append(r).append("\n"));
         }
@@ -155,8 +164,13 @@ public class ComplianceReportGenerator {
     }
 
     private static List<AuditLogEntry> filterPeriod(List<AuditLogEntry> entries, Date start, Date end) {
+        if (entries == null || entries.isEmpty()) {
+            return Collections.emptyList();
+        }
+        long startMs = start != null ? start.getTime() : 0L;
+        long endMs = end != null ? end.getTime() : Long.MAX_VALUE;
         return entries.stream()
-                .filter(e -> e.getTimestamp() >= start.getTime() && e.getTimestamp() <= end.getTime())
+                .filter(e -> e != null && e.getTimestamp() >= startMs && e.getTimestamp() <= endMs)
                 .collect(Collectors.toList());
     }
 }

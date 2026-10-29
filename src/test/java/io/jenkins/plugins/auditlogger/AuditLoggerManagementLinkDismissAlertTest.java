@@ -1,6 +1,8 @@
 package io.jenkins.plugins.auditlogger;
 
+import org.htmlunit.HttpMethod;
 import org.htmlunit.Page;
+import org.htmlunit.WebRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jvnet.hudson.test.JenkinsRule;
@@ -146,5 +148,28 @@ class AuditLoggerManagementLinkDismissAlertTest {
         assertEquals("admin", dismissLog.getUsername());
         assertEquals("All Alerts (0 items)", dismissLog.getTarget());
         assertTrue(dismissLog.getDetails().contains("0 active alerts were present"));
+    }
+
+    @Test
+    void testDismissAlertWithPostAndIdParam(JenkinsRule j) throws Exception {
+        j.jenkins.setSecurityRealm(j.createDummySecurityRealm());
+        j.jenkins.setAuthorizationStrategy(new MockAuthorizationStrategy()
+                .grant(Jenkins.ADMINISTER).everywhere().to("postadmin"));
+
+        AnomalyDetector detector = AuditLogStorage.getInstance().getAnomalyDetector();
+        AnomalyDetector.AnomalyAlert alert = new AnomalyDetector.AnomalyAlert(
+                AnomalyDetector.AnomalyType.BRUTE_FORCE_LOGIN,
+                "attacker",
+                "Brute force attempt",
+                "CRITICAL");
+        detector.addAlert(alert);
+
+        JenkinsRule.WebClient webClient = j.createWebClient().login("postadmin", "postadmin");
+        WebRequest postReq = new WebRequest(webClient.createCrumbedUrl("manage/auditflow-logs/dismissAlert?id=" + alert.alertId), HttpMethod.POST);
+        Page page = webClient.getPage(postReq);
+
+        assertEquals(200, page.getWebResponse().getStatusCode());
+        assertTrue(page.getWebResponse().getContentAsString().contains("\"success\":true"));
+        assertFalse(detector.getAlerts(10).stream().anyMatch(a -> a.alertId.equals(alert.alertId)));
     }
 }

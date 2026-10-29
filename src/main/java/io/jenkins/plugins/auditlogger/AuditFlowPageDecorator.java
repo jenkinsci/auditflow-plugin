@@ -160,7 +160,14 @@ public class AuditFlowPageDecorator extends PageDecorator {
                     return root.endsWith("/") ? root + "manage/auditflow-logs/" : root + "/manage/auditflow-logs/";
                 }
             }
+            org.kohsuke.stapler.StaplerRequest2 req = org.kohsuke.stapler.Stapler.getCurrentRequest2();
+            if (req != null) {
+                String contextPath = req.getContextPath();
+                if (contextPath != null) {
+                    return contextPath.endsWith("/") ? contextPath + "manage/auditflow-logs/" : contextPath + "/manage/auditflow-logs/";
+                }
+            }
         } catch (Exception ignored) {}
-        return "/jenkins/manage/auditflow-logs/";
+        return "/manage/auditflow-logs/";
     }
 }

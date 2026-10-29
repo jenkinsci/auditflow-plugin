@@ -1,0 +1,50 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+    <st:adjunct includes="io.jenkins.plugins.auditlogger.WebhookEndpoint.auditflow-event-picker"/>
+    <f:block>
+        <div class="auditflow-endpoint-header">
+            <div class="auditflow-endpoint-header__title-wrap">
+                <input type="text"
+                       name="_.name"
+                       value="${instance != null ? instance.name : ''}"
+                       placeholder="Destination Name (e.g. #secops-alerts, DevOps Slack)"
+                       class="jenkins-input auditflow-endpoint-header__title-input"
+                       oninput="this.dispatchEvent(new Event('change', { bubbles: true }))" />
+            </div>
+            <div class="auditflow-endpoint-header__toggle-wrap">
+                <label class="auditflow-endpoint-header__toggle-label">
+                    <f:checkbox field="enabled" default="true" />
+                    <span>Enabled</span>
+                </label>
+            </div>
+        </div>
+    </f:block>
+    <f:entry title="Webhook URL" field="webhookUrl" description="The Incoming Webhook URL (e.g. Slack incoming webhook, Microsoft Teams Workflows endpoint).">
+        <f:password field="webhookUrl" oninput="this.dispatchEvent(new Event('change'))" />
+    </f:entry>
+    <f:entry title="Event Scope" field="scope" description="Choose which category of security events this channel should receive.">
+        <f:select />
+    </f:entry>
+    <f:entry title="Minimum Severity" field="minSeverity" description="Only forward events whose severity meets or exceeds this threshold.">
+        <f:select />
+    </f:entry>
+    <f:entry title="Included Events &amp; Categories (Search to Add)" field="actionFilter"
+             description="Search and select categories or specific event actions to forward to this channel (suggestions automatically adapt to your chosen Minimum Severity above). Leave empty to forward all events meeting the scope and severity threshold.">
+        <div class="auditflow-event-picker">
+            <input type="hidden" name="_.actionFilter" class="auditflow-event-picker__value" value="${instance.actionFilter}" />
+            <div class="auditflow-event-picker__box">
+                <span class="auditflow-event-picker__chips"></span>
+                <input type="text"
+                       class="auditflow-event-picker__input"
+                       placeholder="Type to search &amp; add categories or events (default: all)..."
+                       autocomplete="off"
+                       spellcheck="false" />
+            </div>
+            <div class="auditflow-event-picker__menu" style="display: none;"></div>
+        </div>
+    </f:entry>
+    <f:validateButton title="Test Endpoint"
+                      progress="Testing webhook endpoint..."
+                      method="testEndpoint"
+                      with="webhookUrl" />
+</j:jelly>

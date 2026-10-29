@@ -65,4 +65,28 @@ public class ComplianceReportGeneratorTest {
         assertEquals("GDPR", report.reportType);
         assertEquals("COMPLIANT", report.status);
     }
+
+    @Test
+    public void testNullSafety() {
+        // Entries with null elements and sparse values
+        List<AuditLogEntry> sparseEntries = new ArrayList<>();
+        sparseEntries.add(new AuditLogEntry("user", "CUSTOM_ACTION", "target", "details", System.currentTimeMillis()));
+        sparseEntries.add(null);
+
+        assertDoesNotThrow(() -> {
+            ComplianceReportGenerator.ComplianceReport sox = ComplianceReportGenerator.generateSoxReport(sparseEntries, null, null);
+            assertNotNull(sox);
+            assertNotNull(ComplianceReportGenerator.formatReport(sox));
+
+            ComplianceReportGenerator.ComplianceReport pci = ComplianceReportGenerator.generatePciReport(sparseEntries, null, null);
+            assertNotNull(pci);
+            assertNotNull(ComplianceReportGenerator.formatReport(pci));
+
+            ComplianceReportGenerator.ComplianceReport gdpr = ComplianceReportGenerator.generateGdprReport(sparseEntries, null, null);
+            assertNotNull(gdpr);
+            assertNotNull(ComplianceReportGenerator.formatReport(gdpr));
+        });
+
+        assertEquals("", ComplianceReportGenerator.formatReport(null));
+    }
 }

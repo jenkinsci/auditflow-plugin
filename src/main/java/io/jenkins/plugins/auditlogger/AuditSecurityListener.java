@@ -80,7 +80,7 @@ public class AuditSecurityListener extends jenkins.security.SecurityListener {
             entry.setSessionId(sessionId);
 
             if (sessionId != null && !"N/A".equals(sessionId)) {
-                AuditSessionListener.associateUsernameWithSession(sessionId, username);
+                AuditSessionListener.associateSession(sessionId, username, ip, userAgent);
             }
 
             if (hasRequest) {

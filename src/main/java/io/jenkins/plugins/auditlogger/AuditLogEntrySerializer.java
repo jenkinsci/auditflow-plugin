@@ -14,6 +14,9 @@ public class AuditLogEntrySerializer implements JsonSerializer<AuditLogEntry> {
 
     @Override
     public JsonElement serialize(AuditLogEntry src, Type typeOfSrc, JsonSerializationContext context) {
+        if (src == null) {
+            return com.google.gson.JsonNull.INSTANCE;
+        }
         JsonObject obj = new JsonObject();
         obj.addProperty("timestamp", src.getFormattedTimestamp());
         obj.addProperty("timestampMs", src.getTimestamp());

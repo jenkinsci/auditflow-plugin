@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.kohsuke.stapler.verb.GET;
 
 import java.time.ZoneId;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -185,7 +186,7 @@ class AuditLoggerConfigurationTest {
         assertTrue(html.contains("Event Logging Controls"));
         assertTrue(html.contains("Operational Monitoring &amp; Export"));
         assertTrue(html.contains("Display Time Zone"));
-        assertTrue(html.contains("Notifications"));
+        assertTrue(html.contains("Alert Notifications &amp; Webhooks"));
         assertTrue(html.contains("Export and Integrations"));
         assertTrue(html.contains("Advanced"));
         assertTrue(html.contains("Enter a valid HTTP webhook endpoint"));
@@ -194,16 +195,199 @@ class AuditLoggerConfigurationTest {
 
         int eventLoggingIndex = html.indexOf("Event Logging Controls");
         int anomalyIndex = html.indexOf("Security Anomaly Detection");
-        int notificationsIndex = html.indexOf("Anomaly Alert Notifications");
+        int notificationsIndex = html.indexOf("Alert Notifications &amp; Webhooks");
         int operationalIndex = html.indexOf("Operational Monitoring &amp; Export");
         int timeZoneIndex = html.indexOf("Display Time Zone");
         int exportIndex = html.indexOf("Export and Integrations");
 
         assertTrue(eventLoggingIndex < anomalyIndex, "Event Logging before Anomaly Detection");
-        assertTrue(anomalyIndex < notificationsIndex, "Anomaly Detection contains Notifications");
+        assertTrue(anomalyIndex < notificationsIndex, "Anomaly Detection before Notifications");
         assertTrue(notificationsIndex < operationalIndex, "Notifications before Operational Monitoring");
         assertTrue(operationalIndex < timeZoneIndex, "Operational Monitoring before Display Time Zone");
         assertTrue(timeZoneIndex < exportIndex, "Display Time Zone before Export and Integrations");
+    }
+
+    @Test
+    void multiWebhookConfigurationJsonBinding(JenkinsRule j) throws Exception {
+        AuditLoggerConfiguration configuration = new AuditLoggerConfiguration();
+        JSONObject json = new JSONObject();
+        JSONObject webhookAlerts = new JSONObject();
+        webhookAlerts.put("webhookUrl", "https://default.example.com/webhook");
+
+        JSONObject multiWebhook = new JSONObject();
+        net.sf.json.JSONArray endpoints = new net.sf.json.JSONArray();
+
+        JSONObject ep1 = new JSONObject();
+        ep1.put("name", "SecOps Slack");
+        ep1.put("channel", "#secops-urgent");
+        ep1.put("webhookUrl", "https://hooks.slack.com/services/T00/B00/SEC");
+        ep1.put("enabled", true);
+        ep1.put("scope", "CRITICAL_LOGS_ONLY");
+        ep1.put("minSeverity", "CRITICAL");
+        ep1.put("actionFilter", "SCRIPT_CONSOLE_ACCESS");
+        endpoints.add(ep1);
+
+        JSONObject ep2 = new JSONObject();
+        ep2.put("name", "DevOps Alerts");
+        ep2.put("channel", "#devops");
+        ep2.put("webhookUrl", "https://hooks.slack.com/services/T00/B00/DEV");
+        ep2.put("enabled", true);
+        ep2.put("scope", "ALL_ALERTS");
+        ep2.put("minSeverity", "HIGH");
+        endpoints.add(ep2);
+
+        multiWebhook.put("webhookEndpoints", endpoints);
+        webhookAlerts.put("enableMultiWebhook", multiWebhook);
+        json.put("enableWebhookAlerts", webhookAlerts);
+
+        configuration.configure((org.kohsuke.stapler.StaplerRequest2) null, json);
+
+        assertTrue(configuration.isEnableWebhookAlerts());
+        assertEquals("https://default.example.com/webhook", configuration.getWebhookUrl());
+        assertTrue(configuration.isEnableMultiWebhook());
+        assertEquals(2, configuration.getWebhookEndpoints().size());
+
+        WebhookEndpoint endpoint1 = configuration.getWebhookEndpoints().get(0);
+        assertEquals("SecOps Slack", endpoint1.getName());
+        assertEquals("#secops-urgent", endpoint1.getChannel());
+        assertEquals("CRITICAL_LOGS_ONLY", endpoint1.getScope());
+        assertEquals("CRITICAL", endpoint1.getMinSeverity());
+        assertEquals("SCRIPT_CONSOLE_ACCESS", endpoint1.getActionFilter());
+
+        // Now simulate deleting all destinations in UI: form submits enableWebhookAlerts without webhookEndpoints
+        JSONObject clearJson = new JSONObject();
+        JSONObject clearWebhookAlerts = new JSONObject();
+        clearWebhookAlerts.put("webhookUrl", "https://default.example.com/webhook");
+        clearJson.put("enableWebhookAlerts", clearWebhookAlerts);
+
+        configuration.configure((org.kohsuke.stapler.StaplerRequest2) null, clearJson);
+        assertTrue(configuration.isEnableWebhookAlerts());
+        assertTrue(configuration.getWebhookEndpoints().isEmpty(), "Endpoints should be cleared when none are submitted");
+    }
+
+    @Test
+    void resolveActiveEndpointsWithProgressiveDisclosure(JenkinsRule j) {
+        AuditLoggerConfiguration configuration = new AuditLoggerConfiguration();
+
+        // 1. When webhooks are disabled entirely
+        configuration.setEnableWebhookAlerts(false);
+        configuration.setWebhookUrl("https://legacy.example.com/webhook");
+        assertTrue(configuration.resolveActiveEndpoints("ANOMALY", "HIGH", "TEST").isEmpty());
+
+        // 2. Single webhook mode (multi-webhook disabled)
+        configuration.setEnableWebhookAlerts(true);
+        configuration.setEnableMultiWebhook(false);
+        var singleTargets = configuration.resolveActiveEndpoints("ANOMALY", "HIGH", "TEST");
+        assertEquals(1, singleTargets.size());
+        assertEquals("https://legacy.example.com/webhook", singleTargets.get(0).getPlainWebhookUrl());
+
+        // Low severity doesn't meet default HIGH threshold on single endpoint
+        assertTrue(configuration.resolveActiveEndpoints("ANOMALY", "LOW", "TEST").isEmpty());
+
+        // 3. Multi-webhook mode enabled
+        configuration.setEnableMultiWebhook(true);
+        WebhookEndpoint epCrit = new WebhookEndpoint("SecOps", "https://hooks.slack.com/secops");
+        epCrit.setScope("CRITICAL_LOGS_ONLY");
+        epCrit.setMinSeverity("CRITICAL");
+        epCrit.setActionFilter("SCRIPT_CONSOLE_ACCESS");
+
+        WebhookEndpoint epAll = new WebhookEndpoint("General", "https://hooks.slack.com/general");
+        epAll.setScope("ALL_ALERTS");
+        epAll.setMinSeverity("HIGH");
+
+        configuration.setWebhookEndpoints(java.util.List.of(epCrit, epAll));
+
+        // Direct audit log with SCRIPT_CONSOLE_ACCESS & CRITICAL matches BOTH epCrit and epAll
+        var targets = configuration.resolveActiveEndpoints("AUDIT_LOG", "CRITICAL", "SCRIPT_CONSOLE_ACCESS");
+        assertEquals(2, targets.size());
+
+        // Anomaly alert with HIGH severity matches ONLY epAll
+        var anomalyTargets = configuration.resolveActiveEndpoints("ANOMALY", "HIGH", "FAILED_LOGINS");
+        assertEquals(1, anomalyTargets.size());
+        assertEquals("General", anomalyTargets.get(0).getName());
+
+        // Direct audit log with USER_DELETED & CRITICAL matches ONLY epAll (because epCrit actionFilter is SCRIPT_CONSOLE_ACCESS)
+        var userDelTargets = configuration.resolveActiveEndpoints("AUDIT_LOG", "CRITICAL", "USER_DELETED");
+        assertEquals(1, userDelTargets.size());
+        assertEquals("General", userDelTargets.get(0).getName());
+    }
+
+    @Test
+    void testWebhookValidation(JenkinsRule j) {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        assertEquals(hudson.util.FormValidation.Kind.ERROR, config.doTestWebhookUrl("").kind);
+        assertEquals(hudson.util.FormValidation.Kind.ERROR, config.doTestWebhookUrl("ftp://bad.com").kind);
+    }
+
+    @Test
+    void testConfigurePreservesLogRotationAndDashboardWhenOmitted(JenkinsRule j) throws Exception {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        config.setEnableLogRotation(true);
+        config.setEnableDashboardStats(true);
+
+        JSONObject emptyJson = new JSONObject();
+        config.configure((org.kohsuke.stapler.StaplerRequest2) null, emptyJson);
+
+        assertTrue(config.isEnableLogRotation(), "Log rotation must remain enabled when omitted from form JSON");
+        assertTrue(config.isEnableDashboardStats(), "Dashboard stats must remain enabled when omitted from form JSON");
+        assertTrue(config.isEnableAuditApi(), "Audit API must remain enabled when omitted from form JSON");
+    }
+
+    @Test
+    void testSetWebhookEndpointsFiltersBlankUrls(JenkinsRule j) {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        WebhookEndpoint valid = new WebhookEndpoint("Valid", "https://hooks.slack.com/services/123");
+        WebhookEndpoint blank1 = new WebhookEndpoint("Blank1", "");
+        WebhookEndpoint blank2 = new WebhookEndpoint("Blank2", "   ");
+
+        config.setWebhookEndpoints(List.of(valid, blank1, blank2));
+
+        assertEquals(1, config.getWebhookEndpoints().size());
+        assertEquals("Valid", config.getWebhookEndpoints().get(0).getName());
+    }
+
+    @Test
+    void testEmptyWebhookDestinationsAutoDisablesAlertsOnConfigure(JenkinsRule j) throws Exception {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        config.setWebhookUrl("");
+
+        JSONObject json = new JSONObject();
+        json.put("enableWebhookAlerts", true);
+
+        JSONArray endpoints = new JSONArray();
+        JSONObject blankEndpoint = new JSONObject();
+        blankEndpoint.put("name", "Blank");
+        blankEndpoint.put("webhookUrl", "");
+        endpoints.add(blankEndpoint);
+        json.put("webhookEndpoints", endpoints);
+
+        config.configure((org.kohsuke.stapler.StaplerRequest2) null, json);
+
+        assertFalse(config.isEnableWebhookAlerts(), "Webhook alerts must be disabled when all destinations are empty");
+        assertFalse(config.isEnableMultiWebhook(), "Multi-webhook mode must be disabled when all destinations are empty");
+        assertTrue(config.getWebhookEndpoints().isEmpty(), "Empty webhook endpoints must be filtered out");
+    }
+
+    @Test
+    void testValidWebhookDestinationsPreservesAlertsOnConfigure(JenkinsRule j) throws Exception {
+        AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
+        config.setWebhookUrl("");
+
+        JSONObject json = new JSONObject();
+        json.put("enableWebhookAlerts", true);
+
+        JSONArray endpoints = new JSONArray();
+        JSONObject validEndpoint = new JSONObject();
+        validEndpoint.put("name", "Valid Slack");
+        validEndpoint.put("webhookUrl", "https://hooks.slack.com/services/T00/B00/X00");
+        endpoints.add(validEndpoint);
+        json.put("webhookEndpoints", endpoints);
+
+        config.configure((org.kohsuke.stapler.StaplerRequest2) null, json);
+
+        assertTrue(config.isEnableWebhookAlerts(), "Webhook alerts must remain enabled when valid destinations exist");
+        assertTrue(config.isEnableMultiWebhook(), "Multi-webhook mode must be enabled when valid destinations exist");
+        assertEquals(1, config.getWebhookEndpoints().size());
     }
 
     private static JSONObject findOption(JSONArray options, String id) {

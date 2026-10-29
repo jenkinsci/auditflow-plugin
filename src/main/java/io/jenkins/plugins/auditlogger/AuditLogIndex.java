@@ -90,7 +90,7 @@ public class AuditLogIndex {
         else return Collections.emptyList();
 
         return results.stream()
-                .filter(e -> username == null || username.isEmpty() || e.getUsername().equalsIgnoreCase(username))
+                .filter(e -> username == null || username.isEmpty() || (e.getUsername() != null && e.getUsername().equalsIgnoreCase(username)))
                 .filter(e -> action == null || action.isEmpty() || matchesAction(e.getAction(), action))
                 .filter(e -> severity == null || severity.isEmpty() || severity.equals(e.getSeverity()))
                 .filter(e -> startTime == null || e.getTimestamp() >= startTime)
@@ -118,6 +118,13 @@ public class AuditLogIndex {
         }
         if ("AUTH".equalsIgnoreCase(cleanReq)) {
             return cleanEntry.contains("LOGIN") || cleanEntry.contains("AUTH");
+        }
+        if ("USER".equalsIgnoreCase(cleanReq)) {
+            return cleanEntry.startsWith("USER_") || cleanEntry.contains("USER");
+        }
+        if ("SECURITY".equalsIgnoreCase(cleanReq)) {
+            return cleanEntry.contains("SECURITY") || cleanEntry.contains("PRIVILEGE")
+                    || cleanEntry.contains("AUTH_STRATEGY") || cleanEntry.contains("ROLE_CONFIG");
         }
         return "SCRIPT_CONSOLE_ACCESS".equalsIgnoreCase(cleanReq)
                 && "SCRIPT_CONSOLE_ACCESSED".equalsIgnoreCase(cleanEntry);

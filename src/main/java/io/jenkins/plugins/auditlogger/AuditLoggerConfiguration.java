@@ -21,10 +21,16 @@ import org.kohsuke.stapler.verb.GET;
 import hudson.BulkChange;
 import hudson.Extension;
 import hudson.model.Descriptor;
+import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
+import hudson.util.Secret;
 import jenkins.model.GlobalConfiguration;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
+import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.verb.POST;
+import java.util.Collections;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Global configuration for Jenkins Audit Logger plugin.
@@ -140,6 +146,8 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     private boolean enableComplianceReports = false;
     private Boolean enableWebhookAlerts = false;
     private String webhookUrl = "";
+    private Boolean enableMultiWebhook = false;
+    private List<WebhookEndpoint> webhookEndpoints = new CopyOnWriteArrayList<>();
 
     // UI
     private boolean enableRiskLevels = true;
@@ -184,6 +192,14 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         if (maskCreditCards == null) maskCreditCards = true;
         if (enableEmailAlerts == null) enableEmailAlerts = false;
         if (enableWebhookAlerts == null) enableWebhookAlerts = false;
+        if (enableMultiWebhook == null) enableMultiWebhook = true;
+        if (webhookEndpoints == null) webhookEndpoints = new CopyOnWriteArrayList<>();
+        if (webhookEndpoints.isEmpty() && webhookUrl != null && !webhookUrl.trim().isEmpty()) {
+            WebhookEndpoint defaultEp = new WebhookEndpoint("Default Webhook", Secret.fromString(webhookUrl.trim()));
+            defaultEp.setScope(WebhookEndpoint.SCOPE_ALL);
+            defaultEp.setMinSeverity("HIGH");
+            webhookEndpoints.add(defaultEp);
+        }
         if (enableDashboardStats == null) enableDashboardStats = true;
         if (showMetricTotal == null) showMetricTotal = true;
         if (showMetricLogins == null) showMetricLogins = true;
@@ -219,7 +235,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean configure(StaplerRequest2 req, JSONObject json) throws Descriptor.FormException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         try (BulkChange bulkChange = new BulkChange(this)) {
-            applyJsonConfiguration(json);
+            applyJsonConfiguration(req, json);
             StartupPhaseManager.setGracePeriodSeconds(startupGracePeriodSeconds);
             bulkChange.commit();
 
@@ -237,7 +253,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         }
     }
 
-    private void applyJsonConfiguration(JSONObject json) {
+    private void applyJsonConfiguration(StaplerRequest2 req, JSONObject json) {
         if (json == null) {
             return;
         }
@@ -302,26 +318,48 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         setEnableAnomalyBanner(anomalyConfig.optBoolean("enableAnomalyBanner", json.optBoolean("enableAnomalyBanner", false)));
 
         JSONObject dashboardStatsBlock = getOptionalBlock(json, "enableDashboardStats");
-        setEnableDashboardStats(isOptionalBlockEnabled(json, "enableDashboardStats"));
-        setEnableRiskLevels(json.optBoolean("enableRiskLevels", false));
+        if (json.has("enableDashboardStats")) {
+            setEnableDashboardStats(isOptionalBlockEnabled(json, "enableDashboardStats"));
+        }
+        if (json.has("enableRiskLevels")) {
+            setEnableRiskLevels(json.optBoolean("enableRiskLevels", enableRiskLevels));
+        }
         if (json.has("displayTimeZoneId")) setDisplayTimeZoneId(json.optString("displayTimeZoneId", displayTimeZoneId));
         JSONObject dashboardStatsConfig = dashboardStatsBlock != null ? dashboardStatsBlock : json;
-        setShowMetricTotal(dashboardStatsConfig.optBoolean("showMetricTotal", false));
-        setShowMetricLogins(dashboardStatsConfig.optBoolean("showMetricLogins", false));
-        setShowMetricFailedLogins(dashboardStatsConfig.optBoolean("showMetricFailedLogins", false));
-        setShowMetricBuilds(dashboardStatsConfig.optBoolean("showMetricBuilds", false));
-        setShowMetricJobs(dashboardStatsConfig.optBoolean("showMetricJobs", false));
-        setShowMetricConfig(dashboardStatsConfig.optBoolean("showMetricConfig", false));
+        if (dashboardStatsConfig.has("showMetricTotal")) {
+            setShowMetricTotal(dashboardStatsConfig.optBoolean("showMetricTotal", showMetricTotal));
+        }
+        if (dashboardStatsConfig.has("showMetricLogins")) {
+            setShowMetricLogins(dashboardStatsConfig.optBoolean("showMetricLogins", showMetricLogins));
+        }
+        if (dashboardStatsConfig.has("showMetricFailedLogins")) {
+            setShowMetricFailedLogins(dashboardStatsConfig.optBoolean("showMetricFailedLogins", showMetricFailedLogins));
+        }
+        if (dashboardStatsConfig.has("showMetricBuilds")) {
+            setShowMetricBuilds(dashboardStatsConfig.optBoolean("showMetricBuilds", showMetricBuilds));
+        }
+        if (dashboardStatsConfig.has("showMetricJobs")) {
+            setShowMetricJobs(dashboardStatsConfig.optBoolean("showMetricJobs", showMetricJobs));
+        }
+        if (dashboardStatsConfig.has("showMetricConfig")) {
+            setShowMetricConfig(dashboardStatsConfig.optBoolean("showMetricConfig", showMetricConfig));
+        }
 
         // ── Export toggles ──
         setEnableCsvExport(json.optBoolean("enableCsvExport", false));
         setEnableJsonExport(json.optBoolean("enableJsonExport", false));
-        setEnableAuditApi(json.optBoolean("enableAuditApi", false));
+        if (json.has("enableAuditApi")) {
+            setEnableAuditApi(json.optBoolean("enableAuditApi", enableAuditApi));
+        }
 
         // ── Advanced (non-boolean fields keep json.has() guard) ──
         if (json.has("logRetentionDays")) setLogRetentionDays(json.optInt("logRetentionDays", logRetentionDays));
         if (json.has("maxLogFileSizeMB")) setMaxLogFileSizeMB(json.optInt("maxLogFileSizeMB", maxLogFileSizeMB));
-        setEnableLogRotation(json.optBoolean("enableLogRotation", false));
+        if (json.has("enableLogRotation")) {
+            setEnableLogRotation(json.optBoolean("enableLogRotation", true));
+        } else {
+            setEnableLogRotation(enableLogRotation != null ? enableLogRotation : true);
+        }
         if (json.has("startupGracePeriodSeconds")) setStartupGracePeriodSeconds(json.optInt("startupGracePeriodSeconds", startupGracePeriodSeconds));
         if (json.has("batchWriteSize")) setBatchWriteSize(json.optInt("batchWriteSize", batchWriteSize));
         if (json.has("batchFlushIntervalSeconds")) setBatchFlushIntervalSeconds(json.optInt("batchFlushIntervalSeconds", batchFlushIntervalSeconds));
@@ -347,6 +385,93 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         setEnableWebhookAlerts(isOptionalBlockEnabled(anomalyConfig, "enableWebhookAlerts") || isOptionalBlockEnabled(json, "enableWebhookAlerts"));
         JSONObject webhookAlertsConfig = webhookAlertsBlock != null ? webhookAlertsBlock : (anomalyConfig.has("webhookUrl") ? anomalyConfig : json);
         if (webhookAlertsConfig.has("webhookUrl")) setWebhookUrl(webhookAlertsConfig.optString("webhookUrl", webhookUrl));
+
+        JSONObject multiWebhookBlock = getOptionalBlock(webhookAlertsConfig, "enableMultiWebhook");
+        if (multiWebhookBlock == null) {
+            multiWebhookBlock = getOptionalBlock(json, "enableMultiWebhook");
+        }
+        setEnableMultiWebhook(isOptionalBlockEnabled(webhookAlertsConfig, "enableMultiWebhook") || isOptionalBlockEnabled(json, "enableMultiWebhook") || isEnableWebhookAlerts());
+
+        JSONObject multiConfig = multiWebhookBlock != null ? multiWebhookBlock : webhookAlertsConfig;
+        Object endpointsRaw = null;
+        if (multiConfig.has("webhookEndpoints")) {
+            endpointsRaw = multiConfig.get("webhookEndpoints");
+        } else if (webhookAlertsConfig.has("webhookEndpoints")) {
+            endpointsRaw = webhookAlertsConfig.get("webhookEndpoints");
+        } else if (json.has("webhookEndpoints")) {
+            endpointsRaw = json.get("webhookEndpoints");
+        }
+
+        if (endpointsRaw != null) {
+            if (req != null) {
+                try {
+                    List<WebhookEndpoint> eps = req.bindJSONToList(WebhookEndpoint.class, endpointsRaw);
+                    setWebhookEndpoints(eps);
+                } catch (Exception e) {
+                    parseEndpointsFromJson(endpointsRaw);
+                }
+            } else {
+                parseEndpointsFromJson(endpointsRaw);
+            }
+        } else if (webhookAlertsBlock != null || json.has("enableWebhookAlerts")) {
+            // When all destinations are removed in the UI, Stapler omits webhookEndpoints entirely from JSON.
+            // Explicitly clear the endpoints list to avoid retaining deleted destinations in memory.
+            setWebhookEndpoints(Collections.emptyList());
+        }
+
+        // If webhook alerts was enabled, but all destination endpoints are empty and no legacy webhookUrl exists,
+        // automatically disable webhook alerts and multi-webhook mode so empty configuration is not persisted.
+        boolean hasValidEndpoints = this.webhookEndpoints != null && !this.webhookEndpoints.isEmpty();
+        boolean hasLegacyUrl = this.webhookUrl != null && !this.webhookUrl.trim().isEmpty();
+        if (!hasValidEndpoints && !hasLegacyUrl) {
+            this.enableWebhookAlerts = false;
+            this.enableMultiWebhook = false;
+        } else if (!this.enableWebhookAlerts) {
+            this.enableMultiWebhook = false;
+        } else {
+            this.enableMultiWebhook = hasValidEndpoints;
+        }
+    }
+
+    private void parseEndpointsFromJson(Object raw) {
+        List<WebhookEndpoint> list = new CopyOnWriteArrayList<>();
+        if (raw instanceof net.sf.json.JSONArray) {
+            net.sf.json.JSONArray arr = (net.sf.json.JSONArray) raw;
+            for (int i = 0; i < arr.size(); i++) {
+                Object item = arr.get(i);
+                if (item instanceof JSONObject) {
+                    WebhookEndpoint ep = parseEndpointObject((JSONObject) item);
+                    if (ep != null) list.add(ep);
+                }
+            }
+        } else if (raw instanceof JSONObject) {
+            WebhookEndpoint ep = parseEndpointObject((JSONObject) raw);
+            if (ep != null) list.add(ep);
+        }
+        setWebhookEndpoints(list);
+    }
+
+    private WebhookEndpoint parseEndpointObject(JSONObject obj) {
+        if (obj == null) return null;
+        String name = obj.optString("name", "");
+        String url = obj.optString("webhookUrl", "");
+        if (url == null || url.trim().isEmpty()) {
+            return null;
+        }
+        WebhookEndpoint ep = new WebhookEndpoint(name, Secret.fromString(url));
+        if (obj.has("id")) ep.setId(obj.optString("id", ""));
+        if (obj.has("channel")) ep.setChannel(obj.optString("channel", ""));
+        if (obj.has("enabled")) ep.setEnabled(obj.optBoolean("enabled", true));
+        if (obj.has("scope")) ep.setScope(obj.optString("scope", WebhookEndpoint.SCOPE_ALL));
+        if (obj.has("minSeverity")) ep.setMinSeverity(obj.optString("minSeverity", "HIGH"));
+        if (obj.has("actionFilter")) ep.setActionFilter(obj.optString("actionFilter", ""));
+        if (obj.has("notifyAuth")) ep.setNotifyAuth(obj.optBoolean("notifyAuth", true));
+        if (obj.has("notifySecurity")) ep.setNotifySecurity(obj.optBoolean("notifySecurity", true));
+        if (obj.has("notifyCredentials")) ep.setNotifyCredentials(obj.optBoolean("notifyCredentials", true));
+        if (obj.has("notifyJobs")) ep.setNotifyJobs(obj.optBoolean("notifyJobs", true));
+        if (obj.has("notifyNodes")) ep.setNotifyNodes(obj.optBoolean("notifyNodes", true));
+        if (obj.has("notifyAnomalies")) ep.setNotifyAnomalies(obj.optBoolean("notifyAnomalies", true));
+        return ep;
     }
 
     private static JSONObject getOptionalBlock(JSONObject json, String key) {
@@ -667,6 +792,26 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
         this.webhookUrl = webhookUrl;
     }
 
+    @DataBoundSetter
+    public void setEnableMultiWebhook(boolean enableMultiWebhook) {
+        this.enableMultiWebhook = enableMultiWebhook;
+    }
+
+    @DataBoundSetter
+    public void setWebhookEndpoints(List<WebhookEndpoint> webhookEndpoints) {
+        if (webhookEndpoints == null || webhookEndpoints.isEmpty()) {
+            this.webhookEndpoints = new CopyOnWriteArrayList<>();
+            return;
+        }
+        List<WebhookEndpoint> cleaned = new ArrayList<>();
+        for (WebhookEndpoint ep : webhookEndpoints) {
+            if (ep != null && !ep.getPlainWebhookUrl().isEmpty()) {
+                cleaned.add(ep);
+            }
+        }
+        this.webhookEndpoints = new CopyOnWriteArrayList<>(cleaned);
+    }
+
 
     @DataBoundSetter
     public void setLogRetentionDays(int logRetentionDays) {
@@ -816,6 +961,50 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isEnableComplianceReports() { return enableComplianceReports; }
     public boolean isEnableWebhookAlerts() { return enableWebhookAlerts; }
     public String getWebhookUrl() { return webhookUrl != null ? webhookUrl : ""; }
+    public boolean isEnableMultiWebhook() { return enableMultiWebhook != null ? enableMultiWebhook : false; }
+
+    public List<WebhookEndpoint> getWebhookEndpoints() {
+        if (webhookEndpoints == null) {
+            webhookEndpoints = new CopyOnWriteArrayList<>();
+        }
+        return Collections.unmodifiableList(webhookEndpoints);
+    }
+
+    /**
+     * Resolves active webhook endpoints for a given security event.
+     * If multi-channel routing is enabled and endpoints are configured, routes to matching endpoints.
+     * Otherwise, falls back to the legacy single webhook URL if configured.
+     */
+    public List<WebhookEndpoint> resolveActiveEndpoints(String eventType, String severity, String action) {
+        List<WebhookEndpoint> targets = new ArrayList<>();
+        if (!isEnableWebhookAlerts()) {
+            return targets;
+        }
+        if (isEnableMultiWebhook() && webhookEndpoints != null && !webhookEndpoints.isEmpty()) {
+            for (WebhookEndpoint ep : webhookEndpoints) {
+                if (ep != null && ep.matches(eventType, severity, action)) {
+                    targets.add(ep);
+                }
+            }
+        } else if (webhookUrl != null && !webhookUrl.trim().isEmpty()) {
+            WebhookEndpoint defaultEp = new WebhookEndpoint("Default Webhook", Secret.fromString(webhookUrl.trim()));
+            defaultEp.setScope(WebhookEndpoint.SCOPE_ALL);
+            defaultEp.setMinSeverity("HIGH");
+            if (defaultEp.matches(eventType, severity, action)) {
+                targets.add(defaultEp);
+            }
+        }
+        return targets;
+    }
+
+    @POST
+    public FormValidation doTestWebhookUrl(@QueryParameter String webhookUrl) {
+        Jenkins jenkins = Jenkins.getInstanceOrNull();
+        if (jenkins != null) {
+            jenkins.checkPermission(Jenkins.ADMINISTER);
+        }
+        return WebhookEndpoint.testWebhookConnection(webhookUrl);
+    }
 
     public boolean isEnableRiskLevels() { return enableRiskLevels; }
     public boolean isEnableEventCategories() { return enableEventCategories; }
@@ -868,7 +1057,7 @@ public class AuditLoggerConfiguration extends GlobalConfiguration {
     public boolean isEnableJsonExport() { return enableJsonExport; }
     public boolean isEnablePdfExport() { return enablePdfExport; }
 
-    public boolean isEnableAuditApi() { return true; }
+    public boolean isEnableAuditApi() { return enableAuditApi; }
 
     /** Return anomaly detection rules as a JSON string for dashboard JS consumption. */
     public String getAnomalyConfigJson() {

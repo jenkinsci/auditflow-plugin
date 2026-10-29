@@ -95,4 +95,16 @@ public class AuditMetricsEngineTest {
         engine.record(null); // Should not throw
         assertEquals(0L, engine.getDashboardMetrics().get("totalEvents"));
     }
+
+    @Test
+    public void testNullUserAndActionResilience() {
+        AuditLogEntry entry = new AuditLogEntry(null, "JOB_CREATED", "target", "details");
+        assertDoesNotThrow(() -> engine.record(entry));
+
+        Map<String, Object> metrics = engine.getDashboardMetrics();
+        assertEquals(1L, metrics.get("totalEvents"));
+        assertEquals(1, metrics.get("uniqueUsers"));
+        List<Map<String, Object>> topUsers = engine.getTopUsers(5);
+        assertEquals("SYSTEM", topUsers.get(0).get("username"));
+    }
 }

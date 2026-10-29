@@ -58,22 +58,25 @@ public class AuditMetricsEngine {
     public void record(AuditLogEntry entry) {
         if (entry == null) return;
 
-        if (actionMetrics.size() < MAX_ACTIONS_TRACKED || actionMetrics.containsKey(entry.getAction())) {
-            ActionMetrics am = actionMetrics.computeIfAbsent(entry.getAction(), ActionMetrics::new);
+        String action = entry.getAction() != null ? entry.getAction() : "UNKNOWN";
+        String user = entry.getUsername() != null ? entry.getUsername() : "SYSTEM";
+
+        if (actionMetrics.size() < MAX_ACTIONS_TRACKED || actionMetrics.containsKey(action)) {
+            ActionMetrics am = actionMetrics.computeIfAbsent(action, ActionMetrics::new);
             am.count.increment();
-            am.userFrequency.computeIfAbsent(entry.getUsername(), ignored -> new AtomicInteger()).incrementAndGet();
+            am.userFrequency.computeIfAbsent(user, ignored -> new AtomicInteger()).incrementAndGet();
         }
 
-        if (userMetrics.size() < MAX_USERS_TRACKED || userMetrics.containsKey(entry.getUsername())) {
-            UserMetrics um = userMetrics.computeIfAbsent(entry.getUsername(), UserMetrics::new);
+        if (userMetrics.size() < MAX_USERS_TRACKED || userMetrics.containsKey(user)) {
+            UserMetrics um = userMetrics.computeIfAbsent(user, UserMetrics::new);
             um.eventCount.increment();
-            if (um.actionsPerformed.size() < 200) um.actionsPerformed.add(entry.getAction());
+            if (um.actionsPerformed.size() < 200) um.actionsPerformed.add(action);
             if (entry.getSourceIp() != null && um.sourceIps.size() < 100) {
                 um.sourceIps.add(entry.getSourceIp());
             }
-            if ("FAILED_LOGIN".equals(entry.getAction())) {
+            if ("FAILED_LOGIN".equals(action)) {
                 um.failedLogins.incrementAndGet();
-            } else if ("LOGIN".equals(entry.getAction())) {
+            } else if ("LOGIN".equals(action)) {
                 um.successfulLogins.incrementAndGet();
             }
         }

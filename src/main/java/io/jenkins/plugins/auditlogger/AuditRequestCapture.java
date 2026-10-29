@@ -288,6 +288,11 @@ public class AuditRequestCapture {
             else if ("POST".equalsIgnoreCase(method) && uri.contains("/user/") && (uri.endsWith("/doDelete") || uri.endsWith("/delete") || uri.contains("/doDeleteSubmit"))) {
                 String targetUser = RouteAwareUrlMatcher.extractUserName(uri);
                 if (targetUser != null && !targetUser.isEmpty()) {
+                    String duplicateKey = "USER_DELETED:" + targetUser;
+                    if (StartupPhaseManager.wasRecentlyLogged(duplicateKey)) {
+                        return;
+                    }
+                    StartupPhaseManager.markAsLogged(duplicateKey);
                     action = "USER_DELETED";
                     target = targetUser;
                     details = String.format("User account deleted: %s by %s", targetUser, username);

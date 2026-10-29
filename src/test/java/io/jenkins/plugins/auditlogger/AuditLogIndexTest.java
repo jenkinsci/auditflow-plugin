@@ -83,7 +83,30 @@ public class AuditLogIndexTest {
         assertTrue(AuditLogIndex.matchesAction("FAILED_LOGIN", "AUTH"));
         assertTrue(AuditLogIndex.matchesAction("API_AUTH", "AUTH"));
         assertFalse(AuditLogIndex.matchesAction("JOB_CREATED", "AUTH"));
+        assertTrue(AuditLogIndex.matchesAction("USER_CREATED", "USER"));
+        assertTrue(AuditLogIndex.matchesAction("USER_DELETED", "USER"));
+        assertTrue(AuditLogIndex.matchesAction("USER_CONFIG_UPDATED", "USER"));
+        assertFalse(AuditLogIndex.matchesAction("JOB_CREATED", "USER"));
+        assertTrue(AuditLogIndex.matchesAction("SECURITY_CONFIG_UPDATED", "SECURITY"));
+        assertTrue(AuditLogIndex.matchesAction("AUTH_STRATEGY_CHANGED", "SECURITY"));
         assertTrue(AuditLogStorage.matchesActionFilter("[CLI] JOB DELETED", "JOB_DELETED"));
         assertTrue(AuditLogStorage.matchesActionFilter("LOGIN", "AUTH"));
+        assertTrue(AuditLogStorage.matchesActionFilter("USER_CREATED", "USER"));
+        assertTrue(AuditLogStorage.matchesActionFilter("USER_DELETED", "USER"));
+        assertTrue(AuditLogStorage.matchesActionFilter("SECURITY_CONFIG_UPDATED", "SECURITY"));
+    }
+
+    @Test
+    public void testQueryWithNullUsernameInEntries() throws Exception {
+        AuditLogEntry e = new AuditLogEntry("placeholder", "JOB_DELETED", "jobX", "deleted");
+        java.lang.reflect.Field userField = AuditLogEntry.class.getDeclaredField("username");
+        userField.setAccessible(true);
+        userField.set(e, null);
+
+        index.index(e);
+
+        List<AuditLogEntry> res = assertDoesNotThrow(() ->
+                index.query("admin", "JOB_DELETED", null, null, null));
+        assertTrue(res.isEmpty());
     }
 }

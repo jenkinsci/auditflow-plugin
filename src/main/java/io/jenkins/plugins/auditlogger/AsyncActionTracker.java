@@ -84,10 +84,10 @@ public class AsyncActionTracker {
     }
 
     private boolean matches(CliAction action, String affectedObject) {
-        if (affectedObject == null) return false;
+        if (affectedObject == null || action.args == null) return false;
         String lowerAffected = affectedObject.toLowerCase(java.util.Locale.ENGLISH);
         for (String arg : action.args) {
-            if (arg != null && !arg.isEmpty() && lowerAffected.contains(arg.toLowerCase(java.util.Locale.ENGLISH))) {
+            if (arg != null && !arg.isEmpty() && !arg.startsWith("-") && lowerAffected.contains(arg.toLowerCase(java.util.Locale.ENGLISH))) {
                 return true;
             }
         }

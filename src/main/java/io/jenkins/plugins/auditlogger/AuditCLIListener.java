@@ -17,6 +17,7 @@ public class AuditCLIListener implements CLIListener {
 
     @Override
     public void onCompleted(CLIContext context, int exitCode) {
+        if (context == null) return;
         try {
             AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
             if (config == null || !config.isEnableSystemConfigEvents()) {
@@ -25,6 +26,9 @@ public class AuditCLIListener implements CLIListener {
 
             String username = resolveCurrentUser(context);
             String command = context.getCommand();
+            if (command.isEmpty()) {
+                command = "unknown";
+            }
 
             String details = "CLI Command: " + command + " | Exit Code: " + exitCode
                     + (context.getArgs() != null && !context.getArgs().isEmpty()

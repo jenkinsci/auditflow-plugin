@@ -65,4 +65,14 @@ public class AsyncActionTrackerTest {
         String user = tracker.resolveUser("git", now);
         assertNull(user);
     }
+
+    @Test
+    public void testCliFlagsDoNotMatchTargets() {
+        long now = System.currentTimeMillis();
+        tracker.register("userFlag", "build", Arrays.asList("-s", "-v", "real-job"), now - 1000);
+
+        // "service-frontend" contains "-s" as substring, but "-s" is a flag and should be ignored
+        assertNull(tracker.resolveUser("service-frontend", now), "CLI flag -s should not match target containing -s");
+        assertEquals("userFlag", tracker.resolveUser("real-job", now));
+    }
 }

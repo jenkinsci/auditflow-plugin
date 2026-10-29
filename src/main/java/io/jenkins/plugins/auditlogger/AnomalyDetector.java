@@ -311,18 +311,28 @@ public class AnomalyDetector {
         FailedLoginWindow window = failedLogins.get(user);
         if (window != null) {
             int failures;
+            int windowMinutes = config != null
+                    ? config.getAnomalyFailedLoginsWindowMinutes()
+                    : DEFAULT_FAILED_LOGIN_WINDOW_MINUTES;
+            long eventTime = entry.getTimestamp();
+            long cutoff = eventTime - Math.max(1, windowMinutes) * 60_000L;
+
             synchronized (window) {
+                while (!window.timestamps.isEmpty() && window.timestamps.peekFirst() <= cutoff) {
+                    window.timestamps.removeFirst();
+                }
                 failures = window.timestamps.size();
-            }
-            if (failures >= 3) {
-                if (!hasActiveOpenAlert(user, AnomalyType.SUSPICIOUS_AUTH_PATTERN)) {
-                    AnomalyAlert alert = new AnomalyAlert(
-                            AnomalyType.SUSPICIOUS_AUTH_PATTERN,
-                            user,
-                            "Suspicious authentication pattern: User \"" + user + "\" successfully logged in immediately after "
-                                + failures + " failed login attempts (potential credential compromise).",
-                            "CRITICAL");
-                    addAlert(alert, config);
+                if (failures >= 3) {
+                    window.timestamps.clear();
+                    if (!hasActiveOpenAlert(user, AnomalyType.SUSPICIOUS_AUTH_PATTERN)) {
+                        AnomalyAlert alert = new AnomalyAlert(
+                                AnomalyType.SUSPICIOUS_AUTH_PATTERN,
+                                user,
+                                "Suspicious authentication pattern: User \"" + user + "\" successfully logged in immediately after "
+                                    + failures + " failed login attempts (potential credential compromise).",
+                                "CRITICAL");
+                        addAlert(alert, config);
+                    }
                 }
             }
         }
@@ -404,7 +414,13 @@ public class AnomalyDetector {
             sendEmailNotification(alert, currentConfig.getAlertEmailAddresses());
         }
         if (currentConfig != null && currentConfig.isEnableWebhookAlerts()) {
-            sendWebhookNotification(alert, currentConfig.getWebhookUrl());
+            List<WebhookEndpoint> endpoints = currentConfig.resolveActiveEndpoints(
+                    "ANOMALY", alert.severity, alert.type != null ? alert.type.name() : "");
+            for (WebhookEndpoint ep : endpoints) {
+                if (ep != null && !ep.getPlainWebhookUrl().isEmpty()) {
+                    sendWebhookNotification(alert, ep.getPlainWebhookUrl());
+                }
+            }
         }
     }
 
@@ -483,7 +499,7 @@ public class AnomalyDetector {
 
     private boolean hasActiveOpenAlert(String user, AnomalyType type) {
         for (AnomalyAlert alert : activeAlerts) {
-            if (!alert.isDismissed() && alert.type == type && alert.user.equals(user)) {
+            if (!alert.isDismissed() && alert.type == type && java.util.Objects.equals(alert.user, user)) {
                 return true;
             }
         }
@@ -623,6 +639,16 @@ public class AnomalyDetector {
                 failedLogins.remove(candidates.get(i).getKey(), candidates.get(i).getValue());
             }
         }
+
+        if (userIpHistory.size() > MAX_TRACKED_USERS) {
+            int removeCount = userIpHistory.size() - MAX_TRACKED_USERS;
+            java.util.Iterator<String> it = userIpHistory.keySet().iterator();
+            while (it.hasNext() && removeCount > 0) {
+                it.next();
+                it.remove();
+                removeCount--;
+            }
+        }
     }
 
     private void trimAlerts() {
@@ -751,35 +777,14 @@ public class AnomalyDetector {
 
     /** Protected for testing */
     protected void sendWebhook(String url, String json) throws Exception {
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(30))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(json))
-                .build();
-        client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenAccept(resp -> {
-                    if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
-                        LOGGER.info("Successfully sent anomaly webhook alert to " + url);
-                    } else {
-                        String bodySnippet = resp.body() != null && !resp.body().trim().isEmpty()
-                                ? " - Response: " + resp.body().trim()
-                                : "";
-                        LOGGER.warning("Webhook returned HTTP " + resp.statusCode() + " for " + url + bodySnippet);
-                    }
-                })
-                .exceptionally(ex -> {
-                    LOGGER.log(Level.WARNING, "Webhook async request failed for " + url, ex);
-                    return null;
-                });
+        if (url == null || url.trim().isEmpty()) {
+            return;
+        }
+        WebhookDispatcher.getInstance().sendWithRetry(url, json, 0);
     }
 
     private static String escapeJson(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+        return WebhookDispatcher.escapeJson(s);
     }
     
     /**
