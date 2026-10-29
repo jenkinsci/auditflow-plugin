@@ -50,33 +50,58 @@
         CATALOG_BY_ID[CATALOG[i].id.toUpperCase()] = CATALOG[i];
     }
 
+    var initializedPickers = (typeof WeakSet !== 'undefined') ? new WeakSet() : null;
+
     function findScopeSelect(container) {
-        var current = container;
+        var chunk = container.closest ? container.closest('.repeated-chunk, tr[name*="webhookEndpoints"], div[name*="webhookEndpoints"]') : null;
+        if (chunk) {
+            var sel = chunk.querySelector('select[name*="scope"]');
+            if (sel) return sel;
+        }
+        var current = container.parentElement;
         while (current && current !== document.body) {
-            var select = current.querySelector('select[name="_.scope"], select[name="scope"]');
+            var select = current.querySelector('select[name*="scope"]');
             if (select) {
                 return select;
             }
+            if (current.classList && current.classList.contains('repeated-chunk')) break;
             current = current.parentElement;
         }
         return null;
     }
 
     function findMinSeveritySelect(container) {
-        var current = container;
+        var chunk = container.closest ? container.closest('.repeated-chunk, tr[name*="webhookEndpoints"], div[name*="webhookEndpoints"]') : null;
+        if (chunk) {
+            var sel = chunk.querySelector('select[name*="minSeverity"]');
+            if (sel) return sel;
+        }
+        var current = container.parentElement;
         while (current && current !== document.body) {
-            var select = current.querySelector('select[name="_.minSeverity"], select[name="minSeverity"]');
+            var select = current.querySelector('select[name*="minSeverity"]');
             if (select) {
                 return select;
             }
+            if (current.classList && current.classList.contains('repeated-chunk')) break;
             current = current.parentElement;
         }
         return null;
     }
 
     function initEventPicker(container) {
-        if (!container || container.dataset.initialized === 'true') {
+        if (!container) {
             return;
+        }
+        if (initializedPickers) {
+            if (initializedPickers.has(container)) {
+                return;
+            }
+            initializedPickers.add(container);
+        } else {
+            if (container.dataset.afBound === 'true') {
+                return;
+            }
+            container.dataset.afBound = 'true';
         }
         container.dataset.initialized = 'true';
 
@@ -106,18 +131,36 @@
         var minSeveritySelect = findMinSeveritySelect(container);
         var highlightedIndex = -1;
         var currentFiltered = [];
+        var navigableNodes = [];
+
+        function refreshSelects() {
+            if (!scopeSelect) {
+                scopeSelect = findScopeSelect(container);
+                if (scopeSelect) {
+                    scopeSelect.addEventListener('change', onScopeChange);
+                }
+            }
+            if (!minSeveritySelect) {
+                minSeveritySelect = findMinSeveritySelect(container);
+                if (minSeveritySelect) {
+                    minSeveritySelect.addEventListener('change', onMinSeverityChange);
+                }
+            }
+        }
 
         function getCurrentScope() {
-            return scopeSelect ? scopeSelect.value : 'ALL_ALERTS';
+            refreshSelects();
+            return (scopeSelect && scopeSelect.value) ? scopeSelect.value : 'ALL_ALERTS';
         }
 
         function getCurrentMinSeverity() {
-            return minSeveritySelect && minSeveritySelect.value ? minSeveritySelect.value.toUpperCase() : 'HIGH';
+            refreshSelects();
+            return (minSeveritySelect && minSeveritySelect.value) ? minSeveritySelect.value.toUpperCase() : 'ALL';
         }
 
         function getMinSeverityScore() {
             var s = getCurrentMinSeverity();
-            return SEVERITY_SCORES[s] !== undefined ? SEVERITY_SCORES[s] : 3;
+            return SEVERITY_SCORES[s] !== undefined ? SEVERITY_SCORES[s] : 0;
         }
 
         function syncToHidden() {
@@ -207,6 +250,7 @@
         }
 
         function openMenu() {
+            refreshSelects();
             renderMenu();
             menu.style.display = 'block';
         }
@@ -214,6 +258,20 @@
         function closeMenu() {
             menu.style.display = 'none';
             highlightedIndex = -1;
+            updateHighlight();
+        }
+
+        function updateHighlight() {
+            for (var i = 0; i < navigableNodes.length; i++) {
+                if (i === highlightedIndex) {
+                    navigableNodes[i].classList.add('auditflow-event-picker__item--highlighted');
+                    if (typeof navigableNodes[i].scrollIntoView === 'function') {
+                        navigableNodes[i].scrollIntoView({ block: 'nearest' });
+                    }
+                } else {
+                    navigableNodes[i].classList.remove('auditflow-event-picker__item--highlighted');
+                }
+            }
         }
 
         function getAvailableOptions(query) {
@@ -241,20 +299,26 @@
                     continue;
                 }
 
-                // Minimum severity filtering
                 var itemScore = item.severity && SEVERITY_SCORES[item.severity] !== undefined ? SEVERITY_SCORES[item.severity] : 0;
-                if (itemScore < minScore) {
-                    continue;
-                }
+                var isBelow = itemScore < minScore;
 
                 if (!q) {
-                    results.push(item);
+                    // Empty query: adapt suggestions to chosen minimum severity
+                    if (isBelow) {
+                        continue;
+                    }
+                    var clone = Object.assign ? Object.assign({}, item) : item;
+                    clone.isBelowThreshold = false;
+                    results.push(clone);
                 } else {
+                    // Explicit search query: allow finding any catalog event matching query
                     var matchId = item.id.toLowerCase().indexOf(q) !== -1;
                     var matchLabel = item.label.toLowerCase().indexOf(q) !== -1;
                     var matchDesc = item.desc.toLowerCase().indexOf(q) !== -1;
                     if (matchId || matchLabel || matchDesc) {
-                        results.push(item);
+                        var searchClone = Object.assign ? Object.assign({}, item) : item;
+                        searchClone.isBelowThreshold = isBelow;
+                        results.push(searchClone);
                     }
                 }
             }
@@ -266,6 +330,7 @@
             currentFiltered = getAvailableOptions(q);
             menu.innerHTML = '';
             highlightedIndex = -1;
+            navigableNodes = [];
 
             var currentMinSev = getCurrentMinSeverity();
             if (currentFiltered.length === 0 && !q) {
@@ -321,6 +386,14 @@
                         lbl.textContent = option.label;
                         left.appendChild(lbl);
 
+                        if (option.isBelowThreshold) {
+                            var belowHint = document.createElement('span');
+                            belowHint.className = 'auditflow-event-picker__below-hint';
+                            belowHint.textContent = '(< ' + currentMinSev + ')';
+                            belowHint.title = 'Severity (' + option.severity + ') is below endpoint minimum severity (' + currentMinSev + ')';
+                            left.appendChild(belowHint);
+                        }
+
                         row.appendChild(left);
 
                         var right = document.createElement('span');
@@ -334,6 +407,7 @@
                         });
 
                         menu.appendChild(row);
+                        navigableNodes.push(row);
                     })(list[j]);
                 }
             }
@@ -342,7 +416,15 @@
             addGroup('🚨 Anomaly Heuristics', anomalies);
             addGroup('⚡ Direct Audit Actions', actions);
 
-            // Allow adding freeform custom action if typed query doesn't match an existing ID
+            // If query typed but no catalog items matched, show helpful notice
+            if (q && currentFiltered.length === 0) {
+                var noMatch = document.createElement('div');
+                noMatch.className = 'auditflow-event-picker__empty';
+                noMatch.textContent = 'No catalog events matching "' + q + '".';
+                menu.appendChild(noMatch);
+            }
+
+            // Allow adding freeform custom action if typed query doesn't match an existing selected tag
             if (q) {
                 var customDiv = document.createElement('div');
                 customDiv.className = 'auditflow-event-picker__custom-add';
@@ -352,13 +434,23 @@
                     addTag(q.toUpperCase());
                 });
                 menu.appendChild(customDiv);
+                navigableNodes.push(customDiv);
             }
         }
 
-        // Event listeners
-        box.addEventListener('click', function() {
+        function handleOpen(e) {
+            if (e) {
+                e.stopPropagation();
+            }
+            if (menu.style.display !== 'block') {
+                openMenu();
+            }
             input.focus();
-        });
+        }
+
+        // Event listeners on box and input
+        box.addEventListener('click', handleOpen);
+        input.addEventListener('click', handleOpen);
 
         input.addEventListener('focus', function() {
             openMenu();
@@ -369,43 +461,70 @@
         });
 
         input.addEventListener('keydown', function(e) {
-            if (e.key === 'Backspace' && input.value === '' && tags.length > 0) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (menu.style.display !== 'block') {
+                    openMenu();
+                } else if (navigableNodes.length > 0) {
+                    highlightedIndex = (highlightedIndex + 1) % navigableNodes.length;
+                    updateHighlight();
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (menu.style.display !== 'block') {
+                    openMenu();
+                } else if (navigableNodes.length > 0) {
+                    highlightedIndex = (highlightedIndex - 1 + navigableNodes.length) % navigableNodes.length;
+                    updateHighlight();
+                }
+            } else if (e.key === 'Backspace' && input.value === '' && tags.length > 0) {
                 tags.pop();
                 syncToHidden();
                 renderChips();
                 openMenu();
             } else if (e.key === 'Enter') {
                 e.preventDefault();
-                var q = input.value.trim();
-                if (currentFiltered.length > 0) {
+                if (highlightedIndex >= 0 && navigableNodes[highlightedIndex]) {
+                    navigableNodes[highlightedIndex].dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                } else if (currentFiltered.length > 0) {
                     addTag(currentFiltered[0].id);
-                } else if (q) {
-                    addTag(q.toUpperCase());
+                } else {
+                    var q = input.value.trim();
+                    if (q) {
+                        addTag(q.toUpperCase());
+                    }
                 }
             } else if (e.key === 'Escape') {
                 closeMenu();
             }
         });
 
-        input.addEventListener('blur', function() {
-            setTimeout(closeMenu, 200);
+        // Close dropdown cleanly when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!container.contains(e.target)) {
+                closeMenu();
+            }
         });
 
+        function onScopeChange() {
+            if (menu.style.display !== 'none') {
+                renderMenu();
+            }
+        }
+
+        function onMinSeverityChange() {
+            renderChips();
+            if (menu.style.display !== 'none') {
+                renderMenu();
+            }
+        }
+
         if (scopeSelect) {
-            scopeSelect.addEventListener('change', function() {
-                if (menu.style.display !== 'none') {
-                    renderMenu();
-                }
-            });
+            scopeSelect.addEventListener('change', onScopeChange);
         }
 
         if (minSeveritySelect) {
-            minSeveritySelect.addEventListener('change', function() {
-                renderChips();
-                if (menu.style.display !== 'none') {
-                    renderMenu();
-                }
-            });
+            minSeveritySelect.addEventListener('change', onMinSeverityChange);
         }
 
         renderChips();
@@ -418,8 +537,8 @@
             var btn = buttons[i];
             var txt = (btn.textContent || btn.value || '').trim();
             if (txt.toLowerCase() === 'change password' || txt.toLowerCase() === 'change password...') {
-                var container = btn.closest('.repeated-chunk, tr, td, div.jenkins-form-item, div.jenkins-input-group');
-                if (container && (container.innerHTML.indexOf('webhookUrl') !== -1 || container.closest('.auditflow-endpoint-header') || container.querySelector('input[name*="webhookUrl"]'))) {
+                var container = btn.closest ? btn.closest('.repeated-chunk, tr, td, div.jenkins-form-item, div.jenkins-input-group') : null;
+                if (container && (container.innerHTML.indexOf('webhookUrl') !== -1 || (container.closest && container.closest('.auditflow-endpoint-header')) || container.querySelector('input[name*="webhookUrl"]'))) {
                     if (btn.tagName.toLowerCase() === 'input') {
                         btn.value = 'Update URL';
                     } else {
@@ -453,7 +572,7 @@
         if (window.MutationObserver) {
             try {
                 var observer = new MutationObserver(function() {
-                    renameChangePasswordButtons();
+                    initAll();
                 });
                 observer.observe(document.body, { childList: true, subtree: true });
             } catch (ignored) {}

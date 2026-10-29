@@ -63,6 +63,11 @@
     width: 100%;
     max-width: 680px;
     font-family: inherit;
+    z-index: 20;
+}
+
+.auditflow-event-picker:focus-within {
+    z-index: 50;
 }
 
 .auditflow-event-picker__box {
@@ -186,7 +191,7 @@
     border: 1px solid var(--dropdown-border, #cbd5e1);
     border-radius: var(--border-radius-base, 6px);
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
+    z-index: 1050;
 }
 
 .auditflow-event-picker__group-header {
@@ -310,6 +315,15 @@
     font-weight: 500;
 }
 
-.auditflow-event-picker__custom-add:hover {
+.auditflow-event-picker__custom-add:hover,
+.auditflow-event-picker__custom-add.auditflow-event-picker__item--highlighted {
     background: #f0f9ff;
+}
+
+.auditflow-event-picker__below-hint {
+    font-size: 10px;
+    color: #b45309;
+    margin-left: 6px;
+    font-weight: 500;
+    font-style: italic;
 }
