@@ -86,4 +86,18 @@ public class AuditLogIndexTest {
         assertTrue(AuditLogStorage.matchesActionFilter("[CLI] JOB DELETED", "JOB_DELETED"));
         assertTrue(AuditLogStorage.matchesActionFilter("LOGIN", "AUTH"));
     }
+
+    @Test
+    public void testQueryWithNullUsernameInEntries() throws Exception {
+        AuditLogEntry e = new AuditLogEntry("placeholder", "JOB_DELETED", "jobX", "deleted");
+        java.lang.reflect.Field userField = AuditLogEntry.class.getDeclaredField("username");
+        userField.setAccessible(true);
+        userField.set(e, null);
+
+        index.index(e);
+
+        List<AuditLogEntry> res = assertDoesNotThrow(() ->
+                index.query("admin", "JOB_DELETED", null, null, null));
+        assertTrue(res.isEmpty());
+    }
 }

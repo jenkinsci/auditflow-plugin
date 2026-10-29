@@ -90,7 +90,7 @@ public class AuditLogIndex {
         else return Collections.emptyList();
 
         return results.stream()
-                .filter(e -> username == null || username.isEmpty() || e.getUsername().equalsIgnoreCase(username))
+                .filter(e -> username == null || username.isEmpty() || (e.getUsername() != null && e.getUsername().equalsIgnoreCase(username)))
                 .filter(e -> action == null || action.isEmpty() || matchesAction(e.getAction(), action))
                 .filter(e -> severity == null || severity.isEmpty() || severity.equals(e.getSeverity()))
                 .filter(e -> startTime == null || e.getTimestamp() >= startTime)

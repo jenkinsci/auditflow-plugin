@@ -193,4 +193,29 @@ class CoverageFixesTest {
         config.setWebhookUrl(null);
         assertEquals("", config.getWebhookUrl(), "getWebhookUrl should return empty string when null");
     }
+
+    @Test
+    void testAuditLogEntrySerializerNullSafety() {
+        AuditLogEntrySerializer serializer = new AuditLogEntrySerializer();
+        com.google.gson.JsonElement el = serializer.serialize(null, AuditLogEntry.class, null);
+        assertTrue(el.isJsonNull());
+    }
+
+    @Test
+    void testAuditSessionListenerNullSafety() {
+        assertDoesNotThrow(() -> AuditSessionListener.associateSession(null, "user", "1.2.3.4", "agent"));
+        assertDoesNotThrow(() -> AuditSessionListener.associateUsernameWithSession(null, "user"));
+        AuditSessionListener listener = new AuditSessionListener();
+        assertDoesNotThrow(() -> listener.sessionCreated(null));
+        assertDoesNotThrow(() -> listener.sessionDestroyed(null));
+    }
+
+    @Test
+    @WithJenkins
+    void testAuditPageDecoratorUrlFallback(JenkinsRule j) {
+        AuditFlowPageDecorator decorator = new AuditFlowPageDecorator();
+        String url = decorator.getAuditFlowUrl();
+        assertNotNull(url);
+        assertTrue(url.contains("auditflow-logs"));
+    }
 }

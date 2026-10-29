@@ -37,9 +37,11 @@ public class AuditSessionListener implements HttpSessionListener {
 
     @Override
     public void sessionCreated(HttpSessionEvent event) {
+        if (event == null || event.getSession() == null) return;
         try {
             HttpSession session = event.getSession();
             String sessionId = session.getId();
+            if (sessionId == null) return;
 
             if (activeSessions.size() >= MAX_TRACKED_SESSIONS) {
                 // Evict oldest 10%
@@ -65,9 +67,11 @@ public class AuditSessionListener implements HttpSessionListener {
 
     @Override
     public void sessionDestroyed(HttpSessionEvent event) {
+        if (event == null || event.getSession() == null) return;
         try {
             HttpSession session = event.getSession();
             String sessionId = session.getId();
+            if (sessionId == null) return;
             SessionMetadata metadata = activeSessions.remove(sessionId);
 
             if (metadata != null && metadata.username != null) {
@@ -102,6 +106,7 @@ public class AuditSessionListener implements HttpSessionListener {
     }
 
     public static void associateSession(String sessionId, String username, String sourceIp, String userAgent) {
+        if (sessionId == null || sessionId.isBlank()) return;
         activeSessions.computeIfPresent(sessionId, (k, metadata) -> {
             metadata.username = username;
             if ((metadata.sourceIp == null || metadata.sourceIp.isEmpty()) && sourceIp != null && !"unknown".equalsIgnoreCase(sourceIp) && !"N/A".equalsIgnoreCase(sourceIp)) {

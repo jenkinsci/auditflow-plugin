@@ -81,10 +81,10 @@ public class AuditAlertEngine {
             String value = kv[1].trim();
             boolean matches;
             switch (key) {
-                case "action":   matches = entry.getAction().contains(value); break;
-                case "severity": matches = value.equals(entry.getSeverity()); break;
-                case "user":     matches = value.equals(entry.getUsername()); break;
-                case "target":   matches = entry.getTarget().contains(value); break;
+                case "action":   matches = entry.getAction() != null && entry.getAction().contains(value); break;
+                case "severity": matches = Objects.equals(value, entry.getSeverity()); break;
+                case "user":     matches = Objects.equals(value, entry.getUsername()); break;
+                case "target":   matches = entry.getTarget() != null && entry.getTarget().contains(value); break;
                 default:         matches = false;
             }
             if (!matches) return false;
@@ -93,7 +93,8 @@ public class AuditAlertEngine {
     }
 
     private void fireAlert(AlertRule rule, AuditLogEntry entry) {
-        String throttleKey = rule.name + ":" + entry.getUsername();
+        String user = entry.getUsername() != null ? entry.getUsername() : "SYSTEM";
+        String throttleKey = (rule.name != null ? rule.name : "") + ":" + user;
         long now = System.currentTimeMillis();
         Long last = lastAlertTime.get(throttleKey);
         if (last != null && (now - last) < MIN_ALERT_INTERVAL_MS) return;
@@ -102,7 +103,7 @@ public class AuditAlertEngine {
         evictStaleThrottles(now);
 
         String message = String.format("Alert: %s | User: %s | Action: %s | Target: %s",
-                rule.name, entry.getUsername(), entry.getAction(), entry.getTarget());
+                rule.name, user, entry.getAction(), entry.getTarget());
         AuditAlert alert = new AuditAlert(rule.name, entry, message, entry.getSeverity());
 
         pendingAlerts.addFirst(alert);
@@ -131,14 +132,12 @@ public class AuditAlertEngine {
                         break;
                     case "slack":   
                         LOGGER.fine("Slack alert: " + alert.ruleId); 
-                        // slack needs this json format, hope it works
-                        String slackPayload = "{\"text\": \"" + alert.message.replace("\"", "\\\"") + "\"}";
+                        String slackPayload = "{\"text\": \"" + escapeJsonString(alert.message) + "\"}";
                         sendWebhook(rule.recipients, slackPayload);
                         break;
                     case "teams":
                         LOGGER.fine("Teams alert: " + alert.ruleId);
-                        // teams uses the exact same json text as slack, yay less work
-                        String teamsPayload = "{\"text\": \"" + alert.message.replace("\"", "\\\"") + "\"}";
+                        String teamsPayload = "{\"text\": \"" + escapeJsonString(alert.message) + "\"}";
                         sendWebhook(rule.recipients, teamsPayload);
                         break;
                     case "webhook": 
@@ -153,26 +152,41 @@ public class AuditAlertEngine {
         }
     }
 
+    static String escapeJsonString(String text) {
+        if (text == null) return "";
+        return text.replace("\\", "\\\\")
+                   .replace("\"", "\\\"")
+                   .replace("\b", "\\b")
+                   .replace("\f", "\\f")
+                   .replace("\n", "\\n")
+                   .replace("\r", "\\r")
+                   .replace("\t", "\\t");
+    }
+
     // sending it to the url here
     protected void sendWebhook(String urlString, String jsonPayload) throws Exception {
         if (urlString == null || urlString.isEmpty()) return;
         
         java.net.URL url = new java.net.URL(urlString);
         java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-        // setting the method to post
+        conn.setConnectTimeout(10_000);
+        conn.setReadTimeout(10_000);
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
-        conn.setDoOutput(true); // gotta set this to true to send body
+        conn.setDoOutput(true);
 
-        try (java.io.OutputStream os = conn.getOutputStream()) {
-            byte[] input = jsonPayload.getBytes("utf-8");
-            os.write(input, 0, input.length);
-        }
+        try {
+            try (java.io.OutputStream os = conn.getOutputStream()) {
+                byte[] input = jsonPayload.getBytes("utf-8");
+                os.write(input, 0, input.length);
+            }
 
-        int responseCode = conn.getResponseCode();
-        // check if it failed lol
-        if (responseCode >= 400) {
-            LOGGER.warning("Webhook failed with response code: " + responseCode);
+            int responseCode = conn.getResponseCode();
+            if (responseCode >= 400) {
+                LOGGER.warning("Webhook failed with response code: " + responseCode);
+            }
+        } finally {
+            conn.disconnect();
         }
     }
 

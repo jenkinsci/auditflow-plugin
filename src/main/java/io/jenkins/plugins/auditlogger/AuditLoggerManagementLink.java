@@ -100,7 +100,9 @@ public class AuditLoggerManagementLink extends ManagementLink {
             response.put("logs", toDisplayEntries(page.entries, displayZone));
             response.put("summary", buildSummary(filteredEntries, displayZone));
             response.put("insights", buildInsights(filteredEntries, config, displayZone));
-            response.put("anomalies", mapAnomalyAlerts(AuditLogStorage.getInstance().getAnomalyDetector().getAlerts(10, config)));
+            AnomalyDetector detector = AuditLogStorage.getInstance() != null ? AuditLogStorage.getInstance().getAnomalyDetector() : null;
+            List<AnomalyDetector.AnomalyAlert> apiAlerts = detector != null ? detector.getAlerts(10, config) : java.util.Collections.emptyList();
+            response.put("anomalies", mapAnomalyAlerts(apiAlerts));
             response.put("anomalyConfig", buildAnomalyConfig(config));
             response.put("displayTimeZone", displayZone.getId());
             response.put("displayToday", LocalDate.now(displayZone).toString());
@@ -974,9 +976,9 @@ public class AuditLoggerManagementLink extends ManagementLink {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
 
         try {
-            AnomalyDetector detector = AuditLogStorage.getInstance().getAnomalyDetector();
+            AnomalyDetector detector = AuditLogStorage.getInstance() != null ? AuditLogStorage.getInstance().getAnomalyDetector() : null;
             AuditLoggerConfiguration config = AuditLoggerConfiguration.get();
-            List<AnomalyDetector.AnomalyAlert> alerts = detector.getAlerts(50, config);
+            List<AnomalyDetector.AnomalyAlert> alerts = detector != null ? detector.getAlerts(50, config) : java.util.Collections.emptyList();
 
             var gson = new com.google.gson.GsonBuilder().create();
             var response = new LinkedHashMap<String, Object>();

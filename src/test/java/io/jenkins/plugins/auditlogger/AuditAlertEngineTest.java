@@ -127,4 +127,26 @@ public class AuditAlertEngineTest {
         assertTrue(receivedPayloads.get(0).contains("Alert: "));
         assertTrue(receivedPayloads.get(1).contains("Alert: "));
     }
+
+    @Test
+    public void testEvaluateWithNullTargetAndUser() throws Exception {
+        AuditAlertEngine engine = new AuditAlertEngine();
+        AuditAlertEngine.AlertRule rule = new AuditAlertEngine.AlertRule("testRule", "target=foo&user=alice", "webhook", "http://example.com");
+        engine.addRule(rule);
+
+        AuditLogEntry entry = new AuditLogEntry("alice", "LOGIN", "placeholder", "details");
+        java.lang.reflect.Field targetField = AuditLogEntry.class.getDeclaredField("target");
+        targetField.setAccessible(true);
+        targetField.set(entry, null);
+
+        assertDoesNotThrow(() -> engine.evaluate(entry));
+        engine.shutdown();
+    }
+
+    @Test
+    public void testEscapeJsonString() {
+        assertEquals("", AuditAlertEngine.escapeJsonString(null));
+        assertEquals("hello \\\"world\\\"\\nline2\\\\test\\tcol",
+                AuditAlertEngine.escapeJsonString("hello \"world\"\nline2\\test\tcol"));
+    }
 }
