@@ -181,6 +181,37 @@
             </div>
         </f:entry>
         <f:block>
+            <h4>Dashboard Display</h4>
+            <div class="jenkins-section__description">
+                Controls what is displayed on the AuditFlow dashboard. Does not affect background audit logging.
+            </div>
+        </f:block>
+        <f:optionalBlock title="Stats counters row (display metrics summary boxes at the top of the dashboard)"
+                         name="enableDashboardStats"
+                         checked="${descriptor.isEnableDashboardStats()}">
+            <f:entry title="Today's Events counter">
+                <f:checkbox name="showMetricTotal" checked="${descriptor.isShowMetricTotal()}"/>
+            </f:entry>
+            <f:entry title="Logins counter">
+                <f:checkbox name="showMetricLogins" checked="${descriptor.isShowMetricLogins()}"/>
+            </f:entry>
+            <f:entry title="Failed Logins counter">
+                <f:checkbox name="showMetricFailedLogins" checked="${descriptor.isShowMetricFailedLogins()}"/>
+            </f:entry>
+            <f:entry title="Builds counter">
+                <f:checkbox name="showMetricBuilds" checked="${descriptor.isShowMetricBuilds()}"/>
+            </f:entry>
+            <f:entry title="Job Events counter">
+                <f:checkbox name="showMetricJobs" checked="${descriptor.isShowMetricJobs()}"/>
+            </f:entry>
+            <f:entry title="Config Changes counter">
+                <f:checkbox name="showMetricConfig" checked="${descriptor.isShowMetricConfig()}"/>
+            </f:entry>
+        </f:optionalBlock>
+        <f:entry title="High risk events panel (display quick-action cards for high-risk activity)">
+            <f:checkbox name="enableRiskLevels" checked="${descriptor.isEnableRiskLevels()}"/>
+        </f:entry>
+        <f:block>
             <h4>Export and Integrations</h4>
             <div class="jenkins-section__description">
                 Download audit log data or integrate with downstream tools.
