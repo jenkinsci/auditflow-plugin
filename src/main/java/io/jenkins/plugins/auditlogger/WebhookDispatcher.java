@@ -80,6 +80,22 @@ public class WebhookDispatcher {
     }
 
     /**
+     * Checks whether a webhook URL targets Microsoft Teams or Power Automate Workflows.
+     */
+    public static boolean isTeamsWebhookUrl(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return false;
+        }
+        String lower = url.toLowerCase(Locale.ROOT);
+        return lower.contains("powerplatform.com")
+                || lower.contains("logic.azure.com")
+                || lower.contains("webhook.office.com")
+                || lower.contains("office.com/webhook")
+                || lower.contains("powerautomate.com")
+                || lower.contains("flow.microsoft.com");
+    }
+
+    /**
      * Dispatches an anomaly alert to all active endpoints configured in AuditLoggerConfiguration.
      */
     public void dispatchAnomaly(AnomalyAlert alert, AuditLoggerConfiguration config) {
@@ -98,12 +114,21 @@ public class WebhookDispatcher {
 
         String jenkinsUrl = getJenkinsRootUrl();
         String isoTimestamp = Instant.ofEpochMilli(alert.timestamp).toString();
-        String jsonPayload = buildAnomalyPayload(alert, jenkinsUrl, isoTimestamp);
+        String slackPayload = buildAnomalyPayload(alert, jenkinsUrl, isoTimestamp);
+        String teamsPayload = null;
 
         for (WebhookEndpoint ep : endpoints) {
             String url = ep.getPlainWebhookUrl();
             if (!url.isEmpty()) {
-                getExecutor().submit(() -> sendWithRetry(url, jsonPayload, 0));
+                if (isTeamsWebhookUrl(url)) {
+                    if (teamsPayload == null) {
+                        teamsPayload = buildTeamsAnomalyPayload(alert, jenkinsUrl, isoTimestamp);
+                    }
+                    final String payload = teamsPayload;
+                    getExecutor().submit(() -> sendWithRetry(url, payload, 0));
+                } else {
+                    getExecutor().submit(() -> sendWithRetry(url, slackPayload, 0));
+                }
             }
         }
     }
@@ -128,12 +153,21 @@ public class WebhookDispatcher {
         String jenkinsUrl = getJenkinsRootUrl();
         long entryTimeMs = entry.getTimestamp() > 0 ? entry.getTimestamp() : System.currentTimeMillis();
         String isoTimestamp = Instant.ofEpochMilli(entryTimeMs).toString();
-        String jsonPayload = buildAuditLogPayload(entry, jenkinsUrl, isoTimestamp);
+        String slackPayload = buildAuditLogPayload(entry, jenkinsUrl, isoTimestamp);
+        String teamsPayload = null;
 
         for (WebhookEndpoint ep : endpoints) {
             String url = ep.getPlainWebhookUrl();
             if (!url.isEmpty()) {
-                getExecutor().submit(() -> sendWithRetry(url, jsonPayload, 0));
+                if (isTeamsWebhookUrl(url)) {
+                    if (teamsPayload == null) {
+                        teamsPayload = buildTeamsAuditLogPayload(entry, jenkinsUrl, isoTimestamp);
+                    }
+                    final String payload = teamsPayload;
+                    getExecutor().submit(() -> sendWithRetry(url, payload, 0));
+                } else {
+                    getExecutor().submit(() -> sendWithRetry(url, slackPayload, 0));
+                }
             }
         }
     }
@@ -265,6 +299,118 @@ public class WebhookDispatcher {
         json.append("}");
 
         return json.toString();
+    }
+
+    /**
+     * Builds a native Microsoft Teams Adaptive Card JSON payload for an audit log event,
+     * fully compliant with Microsoft Teams Workflows (Power Automate) input schema.
+     */
+    public String buildTeamsAuditLogPayload(AuditLogEntry entry, String jenkinsUrl, String isoTimestamp) {
+        String severity = entry.getSeverity() != null ? entry.getSeverity() : "INFO";
+        String user = entry.getUsername() != null ? entry.getUsername() : "SYSTEM";
+        String action = entry.getAction() != null ? entry.getAction() : "";
+        String details = entry.getDetails() != null ? entry.getDetails() : "";
+        String target = entry.getTarget() != null ? entry.getTarget() : "";
+
+        String title = getSeverityEmoji(severity) + " [AuditFlow Alert] " + severity + ": " + action;
+        String auditflowUrl = jenkinsUrl != null && !jenkinsUrl.trim().isEmpty()
+                ? (jenkinsUrl.endsWith("/") ? jenkinsUrl + "manage/auditflow-logs/" : jenkinsUrl + "/manage/auditflow-logs/")
+                : "";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        sb.append("\"type\":\"message\",");
+        sb.append("\"attachments\":[{");
+        sb.append("\"contentType\":\"application/vnd.microsoft.card.adaptive\",");
+        sb.append("\"contentUrl\":null,");
+        sb.append("\"content\":{");
+        sb.append("\"$schema\":\"http://adaptivecards.io/schemas/adaptive-card.json\",");
+        sb.append("\"type\":\"AdaptiveCard\",");
+        sb.append("\"version\":\"1.4\",");
+        sb.append("\"body\":[");
+        sb.append("{\"type\":\"TextBlock\",\"text\":\"").append(escapeJson(title))
+                .append("\",\"weight\":\"Bolder\",\"size\":\"Medium\",\"wrap\":true},");
+        sb.append("{\"type\":\"FactSet\",\"facts\":[");
+        sb.append("{\"title\":\"Severity\",\"value\":\"").append(escapeJson(severity)).append("\"},");
+        sb.append("{\"title\":\"User\",\"value\":\"").append(escapeJson(user)).append("\"},");
+        sb.append("{\"title\":\"Action\",\"value\":\"").append(escapeJson(action)).append("\"},");
+        sb.append("{\"title\":\"Timestamp\",\"value\":\"").append(escapeJson(isoTimestamp != null ? isoTimestamp : "")).append("\"}");
+        if (!target.isEmpty()) {
+            sb.append(",{\"title\":\"Target\",\"value\":\"").append(escapeJson(target)).append("\"}");
+        }
+        if (!details.isEmpty()) {
+            sb.append(",{\"title\":\"Details\",\"value\":\"").append(escapeJson(details)).append("\"}");
+        }
+        sb.append("]}");
+        sb.append(",{\"type\":\"TextBlock\",\"text\":\"Jenkins AuditFlow\",\"isSubtle\":true,\"size\":\"Small\"}");
+        sb.append("]");
+
+        if (!auditflowUrl.isEmpty()) {
+            sb.append(",\"actions\":[");
+            sb.append("{\"type\":\"Action.OpenUrl\",\"title\":\"Open AuditFlow Dashboard\",\"url\":\"")
+                    .append(escapeJson(auditflowUrl)).append("\"}");
+            sb.append("]");
+        }
+
+        sb.append("}");
+        sb.append("}]");
+        sb.append("}");
+
+        return sb.toString();
+    }
+
+    /**
+     * Builds a native Microsoft Teams Adaptive Card JSON payload for an anomaly alert,
+     * fully compliant with Microsoft Teams Workflows (Power Automate) input schema.
+     */
+    public String buildTeamsAnomalyPayload(AnomalyAlert alert, String jenkinsUrl, String isoTimestamp) {
+        String severity = alert.severity != null ? alert.severity : "HIGH";
+        String user = alert.user != null ? alert.user : "SYSTEM";
+        String readableType = alert.type != null ? getReadableAnomalyType(alert.type) : "Anomaly Alert";
+        String details = alert.details != null ? alert.details : "";
+
+        String title = getSeverityEmoji(severity) + " [AuditFlow Alert] " + severity + ": " + readableType;
+        String auditflowUrl = jenkinsUrl != null && !jenkinsUrl.trim().isEmpty()
+                ? (jenkinsUrl.endsWith("/") ? jenkinsUrl + "manage/auditflow-logs/" : jenkinsUrl + "/manage/auditflow-logs/")
+                : "";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        sb.append("\"type\":\"message\",");
+        sb.append("\"attachments\":[{");
+        sb.append("\"contentType\":\"application/vnd.microsoft.card.adaptive\",");
+        sb.append("\"contentUrl\":null,");
+        sb.append("\"content\":{");
+        sb.append("\"$schema\":\"http://adaptivecards.io/schemas/adaptive-card.json\",");
+        sb.append("\"type\":\"AdaptiveCard\",");
+        sb.append("\"version\":\"1.4\",");
+        sb.append("\"body\":[");
+        sb.append("{\"type\":\"TextBlock\",\"text\":\"").append(escapeJson(title))
+                .append("\",\"weight\":\"Bolder\",\"size\":\"Medium\",\"wrap\":true},");
+        sb.append("{\"type\":\"FactSet\",\"facts\":[");
+        sb.append("{\"title\":\"Severity\",\"value\":\"").append(escapeJson(severity)).append("\"},");
+        sb.append("{\"title\":\"User\",\"value\":\"").append(escapeJson(user)).append("\"},");
+        sb.append("{\"title\":\"Anomaly Type\",\"value\":\"").append(escapeJson(readableType)).append("\"},");
+        sb.append("{\"title\":\"Timestamp\",\"value\":\"").append(escapeJson(isoTimestamp != null ? isoTimestamp : "")).append("\"}");
+        if (!details.isEmpty()) {
+            sb.append(",{\"title\":\"Details\",\"value\":\"").append(escapeJson(details)).append("\"}");
+        }
+        sb.append("]}");
+        sb.append(",{\"type\":\"TextBlock\",\"text\":\"Jenkins AuditFlow\",\"isSubtle\":true,\"size\":\"Small\"}");
+        sb.append("]");
+
+        if (!auditflowUrl.isEmpty()) {
+            sb.append(",\"actions\":[");
+            sb.append("{\"type\":\"Action.OpenUrl\",\"title\":\"Open AuditFlow Dashboard\",\"url\":\"")
+                    .append(escapeJson(auditflowUrl)).append("\"}");
+            sb.append("]");
+        }
+
+        sb.append("}");
+        sb.append("}]");
+        sb.append("}");
+
+        return sb.toString();
     }
 
     /**

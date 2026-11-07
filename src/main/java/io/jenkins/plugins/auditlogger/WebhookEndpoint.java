@@ -492,6 +492,32 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
     }
 
     /**
+     * Builds a Microsoft Teams Adaptive Card test payload compliant with Power Automate schema.
+     */
+    public static String buildTeamsTestPayload() {
+        return "{"
+                + "\"type\":\"message\","
+                + "\"attachments\":[{"
+                + "\"contentType\":\"application/vnd.microsoft.card.adaptive\","
+                + "\"contentUrl\":null,"
+                + "\"content\":{"
+                + "\"$schema\":\"http://adaptivecards.io/schemas/adaptive-card.json\","
+                + "\"type\":\"AdaptiveCard\","
+                + "\"version\":\"1.4\","
+                + "\"body\":["
+                + "{\"type\":\"TextBlock\",\"text\":\"\\u2705 **[AuditFlow] Webhook Endpoint Test Successful**\",\"weight\":\"Bolder\",\"size\":\"Medium\",\"wrap\":true},"
+                + "{\"type\":\"FactSet\",\"facts\":["
+                + "{\"title\":\"Status\",\"value\":\"Connected\"},"
+                + "{\"title\":\"Source\",\"value\":\"Jenkins AuditFlow\"}"
+                + "]},"
+                + "{\"type\":\"TextBlock\",\"text\":\"Jenkins AuditFlow Test\",\"isSubtle\":true,\"size\":\"Small\"}"
+                + "]"
+                + "}"
+                + "}]"
+                + "}";
+    }
+
+    /**
      * Sends a harmless test payload to verify webhook connectivity and response.
      * Can be invoked by both endpoint test buttons and global single webhook test button.
      */
@@ -506,19 +532,24 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
 
         try {
             long nowSec = Instant.now().getEpochSecond();
-            String testPayload = "{"
-                    + "\"attachments\":[{"
-                    + "\"color\":\"#2EB886\","
-                    + "\"fallback\":\"[AuditFlow Test] Webhook endpoint test successful.\","
-                    + "\"title\":\"\u2705 [AuditFlow] Webhook Endpoint Test Successful\","
-                    + "\"fields\":["
-                    + "{\"title\":\"Status\",\"value\":\"Connected\",\"short\":true},"
-                    + "{\"title\":\"Source\",\"value\":\"Jenkins AuditFlow\",\"short\":true}"
-                    + "],"
-                    + "\"footer\":\"Jenkins AuditFlow Test\","
-                    + "\"ts\":" + nowSec
-                    + "}]"
-                    + "}";
+            String testPayload;
+            if (WebhookDispatcher.isTeamsWebhookUrl(url)) {
+                testPayload = buildTeamsTestPayload();
+            } else {
+                testPayload = "{"
+                        + "\"attachments\":[{"
+                        + "\"color\":\"#2EB886\","
+                        + "\"fallback\":\"[AuditFlow Test] Webhook endpoint test successful.\","
+                        + "\"title\":\"\u2705 [AuditFlow] Webhook Endpoint Test Successful\","
+                        + "\"fields\":["
+                        + "{\"title\":\"Status\",\"value\":\"Connected\",\"short\":true},"
+                        + "{\"title\":\"Source\",\"value\":\"Jenkins AuditFlow\",\"short\":true}"
+                        + "],"
+                        + "\"footer\":\"Jenkins AuditFlow Test\","
+                        + "\"ts\":" + nowSec
+                        + "}]"
+                        + "}";
+            }
 
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(10))
