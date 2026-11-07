@@ -178,6 +178,8 @@ class WebhookDispatcherTest {
         assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://myorg.webhook.office.com/webhookb2/uuid@tenant/IncomingWebhook/xxx"));
         assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://prod-05.powerautomate.com/workflows/test"));
         assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://flow.microsoft.com/triggers/manual"));
+        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://prod-01.usgovvirginia.logic.azure.us/workflows/gov-test"));
+        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://gov.api.powerplatform.us/powerautomate/automations/direct/workflows/gov"));
     }
 
     @Test

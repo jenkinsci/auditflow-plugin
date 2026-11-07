@@ -567,8 +567,9 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
             if (status >= 200 && status < 300) {
                 return FormValidation.ok("Webhook test successful! (HTTP " + status + ")");
             } else {
-                String snippet = response.body() != null && !response.body().trim().isEmpty()
-                        ? ": " + response.body().trim()
+                String rawBody = response.body() != null ? response.body().trim() : "";
+                String snippet = !rawBody.isEmpty()
+                        ? ": " + (rawBody.length() > 250 ? rawBody.substring(0, 250) + "..." : rawBody)
                         : "";
                 return FormValidation.error("Webhook endpoint returned HTTP " + status + snippet);
             }

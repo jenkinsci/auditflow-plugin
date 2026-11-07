@@ -87,12 +87,12 @@ public class WebhookDispatcher {
             return false;
         }
         String lower = url.toLowerCase(Locale.ROOT);
-        return lower.contains("powerplatform.com")
-                || lower.contains("logic.azure.com")
+        return lower.contains("powerplatform.")
+                || lower.contains("logic.azure.")
                 || lower.contains("webhook.office.com")
                 || lower.contains("office.com/webhook")
-                || lower.contains("powerautomate.com")
-                || lower.contains("flow.microsoft.com");
+                || lower.contains("powerautomate.")
+                || lower.contains("flow.microsoft.");
     }
 
     /**
@@ -440,7 +440,10 @@ public class WebhookDispatcher {
                             LOGGER.warning("Webhook returned HTTP " + code + " for " + maskedUrl + ". Retrying in " + delaySec + "s (attempt " + (attempt + 1) + "/" + MAX_RETRIES + ")");
                             getExecutor().schedule(() -> sendWithRetry(url, json, attempt + 1), delaySec, TimeUnit.SECONDS);
                         } else {
-                            String snippet = resp.body() != null && !resp.body().trim().isEmpty() ? " - Response: " + resp.body().trim() : "";
+                            String rawBody = resp.body() != null ? resp.body().trim() : "";
+                            String snippet = !rawBody.isEmpty()
+                                    ? " - Response: " + (rawBody.length() > 250 ? rawBody.substring(0, 250) + "..." : rawBody)
+                                    : "";
                             LOGGER.warning("Webhook failed with HTTP " + code + " for " + maskedUrl + snippet);
                         }
                     })
