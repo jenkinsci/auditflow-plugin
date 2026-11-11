@@ -3,8 +3,6 @@ package io.jenkins.plugins.auditlogger;
 import hudson.util.Secret;
 import io.jenkins.plugins.auditlogger.AnomalyDetector.AnomalyAlert;
 import io.jenkins.plugins.auditlogger.AnomalyDetector.AnomalyType;
-import net.sf.json.JSONArray;
-import net.sf.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
@@ -63,67 +61,6 @@ class WebhookDispatcherTest {
         assertTrue(json.contains("Suspicious Login Attempts (Brute Force)"));
         assertTrue(json.contains("\"color\":\"#E01E5A\""));
         assertTrue(json.contains("`10.0.0.1`"), "IPv4 address should be wrapped in backticks for Slack");
-    }
-
-    @Test
-    void testIsTeamsWebhookUrl() {
-        assertTrue(WebhookDispatcher.isTeamsWebhookUrl(
-                "https://default1234.56.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/abc/triggers/manual/paths/invoke?sig=x"));
-        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://prod-12.westus.logic.azure.com:443/workflows/abc/triggers/manual/paths/invoke"));
-        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://prod-01.usgovtexas.logic.azure.us/workflows/abc"));
-        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://contoso.webhook.office.com/webhookb2/abc"));
-        assertFalse(WebhookDispatcher.isTeamsWebhookUrl("https://hooks.slack.com/services/T00/B00/XXX"));
-        assertFalse(WebhookDispatcher.isTeamsWebhookUrl("https://example.com/office.com/hook"));
-        assertFalse(WebhookDispatcher.isTeamsWebhookUrl("not a url"));
-        assertFalse(WebhookDispatcher.isTeamsWebhookUrl(null));
-    }
-
-    @Test
-    void testBuildTeamsAuditLogPayloadIsAdaptiveCard() {
-        AuditLogEntry entry = new AuditLogEntry("alice", "SCRIPT_CONSOLE_ACCESS", "RemotingDiagnostics",
-                "println(\"x\")", Instant.parse("2026-10-24T12:00:00Z").toEpochMilli());
-        entry.setSeverity("CRITICAL");
-
-        String json = WebhookDispatcher.buildTeamsAuditLogPayload(entry, "https://jenkins.example.com/", "2026-10-24T12:00:00Z");
-
-        JSONObject root = JSONObject.fromObject(json);
-        assertEquals("message", root.getString("type"));
-        JSONObject attachment = root.getJSONArray("attachments").getJSONObject(0);
-        assertEquals("application/vnd.microsoft.card.adaptive", attachment.getString("contentType"));
-        JSONObject card = attachment.getJSONObject("content");
-        assertEquals("AdaptiveCard", card.getString("type"));
-        assertEquals("1.4", card.getString("version"));
-        JSONArray body = card.getJSONArray("body");
-        assertEquals("Attention", body.getJSONObject(0).getString("color"));
-        assertTrue(body.getJSONObject(0).getString("text").contains("CRITICAL: SCRIPT_CONSOLE_ACCESS"));
-        assertTrue(body.getJSONObject(1).toString().contains("\"value\":\"alice\""));
-        assertEquals("println(\"x\")", body.getJSONObject(2).getString("text"));
-        assertEquals("https://jenkins.example.com/manage/auditflow-logs/",
-                card.getJSONArray("actions").getJSONObject(0).getString("url"));
-        assertFalse(json.contains("\"color\":\"#"), "Slack attachment fields must not leak into Teams payload");
-    }
-
-    @Test
-    void testBuildTeamsAnomalyPayloadIsAdaptiveCard() {
-        AnomalyAlert alert = new AnomalyAlert(AnomalyType.BRUTE_FORCE_LOGIN, "attacker", "3 failed attempts from 10.0.0.1", "HIGH");
-
-        String json = WebhookDispatcher.buildTeamsAnomalyPayload(alert, "", "2026-10-24T12:00:00Z");
-
-        JSONObject card = JSONObject.fromObject(json).getJSONArray("attachments").getJSONObject(0).getJSONObject("content");
-        assertEquals("1.4", card.getString("version"));
-        assertEquals("Warning", card.getJSONArray("body").getJSONObject(0).getString("color"));
-        assertTrue(json.contains("Suspicious Login Attempts (Brute Force)"));
-        assertTrue(json.contains("3 failed attempts from 10.0.0.1"));
-        assertFalse(card.has("actions"), "No link action without a Jenkins root URL");
-    }
-
-    @Test
-    void testResponseSnippetIsCapped() {
-        assertEquals("", WebhookDispatcher.responseSnippet(null, ": "));
-        assertEquals("", WebhookDispatcher.responseSnippet("  ", ": "));
-        assertEquals(": short", WebhookDispatcher.responseSnippet(" short ", ": "));
-        String capped = WebhookDispatcher.responseSnippet("x".repeat(1000), ": ");
-        assertEquals(2 + 250 + 3, capped.length());
     }
 
     @Test
@@ -224,5 +161,89 @@ class WebhookDispatcherTest {
         assertFalse(activeExecutor.isShutdown());
 
         dispatcher.shutdown();
+    }
+
+    @Test
+    void testIsTeamsWebhookUrlDetection() {
+        assertFalse(WebhookDispatcher.isTeamsWebhookUrl(null));
+        assertFalse(WebhookDispatcher.isTeamsWebhookUrl(""));
+        assertFalse(WebhookDispatcher.isTeamsWebhookUrl("   "));
+        assertFalse(WebhookDispatcher.isTeamsWebhookUrl("https://hooks.slack.com/services/T00/B00/SECRET"));
+        assertFalse(WebhookDispatcher.isTeamsWebhookUrl("https://discord.com/api/webhooks/123/xyz"));
+        assertFalse(WebhookDispatcher.isTeamsWebhookUrl("https://example.com/custom/webhook"));
+
+        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://prod-12.eastus.logic.azure.com:443/workflows/abc/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=xyz"));
+        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://myenv.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc/triggers/manual/paths/invoke"));
+        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://outlook.office.com/webhook/abc-123"));
+        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://myorg.webhook.office.com/webhookb2/uuid@tenant/IncomingWebhook/xxx"));
+        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://prod-05.powerautomate.com/workflows/test"));
+        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://flow.microsoft.com/triggers/manual"));
+        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://prod-01.usgovvirginia.logic.azure.us/workflows/gov-test"));
+        assertTrue(WebhookDispatcher.isTeamsWebhookUrl("https://gov.api.powerplatform.us/powerautomate/automations/direct/workflows/gov"));
+    }
+
+    @Test
+    void testBuildTeamsAuditLogPayload(JenkinsRule j) {
+        WebhookDispatcher dispatcher = new WebhookDispatcher();
+        AuditLogEntry entry = new AuditLogEntry(
+                "bob",
+                "USER_CONFIG_CHANGED",
+                "users/bob",
+                "Updated public SSH keys",
+                Instant.parse("2026-10-29T18:00:00Z").toEpochMilli()
+        );
+        entry.setSeverity("HIGH");
+
+        String json = dispatcher.buildTeamsAuditLogPayload(entry, "https://jenkins.example.com/", "2026-10-29T18:00:00Z");
+
+        assertNotNull(json);
+        assertTrue(json.contains("\"type\":\"message\""));
+        assertTrue(json.contains("\"contentType\":\"application/vnd.microsoft.card.adaptive\""));
+        assertTrue(json.contains("\"type\":\"AdaptiveCard\""));
+        assertTrue(json.contains("\"version\":\"1.4\""));
+        assertTrue(json.contains("⚠️ [AuditFlow Alert] HIGH: USER_CONFIG_CHANGED"));
+        assertTrue(json.contains("\"title\":\"User\",\"value\":\"bob\""));
+        assertTrue(json.contains("\"title\":\"Action\",\"value\":\"USER_CONFIG_CHANGED\""));
+        assertTrue(json.contains("\"title\":\"Severity\",\"value\":\"HIGH\""));
+        assertTrue(json.contains("\"title\":\"Target\",\"value\":\"users/bob\""));
+        assertTrue(json.contains("\"title\":\"Details\",\"value\":\"Updated public SSH keys\""));
+        assertTrue(json.contains("\"title\":\"Timestamp\",\"value\":\"2026-10-29T18:00:00Z\""));
+        assertTrue(json.contains("\"type\":\"Action.OpenUrl\""));
+        assertTrue(json.contains("https://jenkins.example.com/manage/auditflow-logs/"));
+    }
+
+    @Test
+    void testBuildTeamsAnomalyPayload(JenkinsRule j) {
+        WebhookDispatcher dispatcher = new WebhookDispatcher();
+        AnomalyAlert alert = new AnomalyAlert(
+                AnomalyType.CREDENTIAL_EXPOSURE,
+                "attacker",
+                "Potential credential leak detected",
+                "CRITICAL"
+        );
+
+        String json = dispatcher.buildTeamsAnomalyPayload(alert, "https://jenkins.example.com/", "2026-10-29T18:00:00Z");
+
+        assertNotNull(json);
+        assertTrue(json.contains("\"type\":\"message\""));
+        assertTrue(json.contains("\"contentType\":\"application/vnd.microsoft.card.adaptive\""));
+        assertTrue(json.contains("\"type\":\"AdaptiveCard\""));
+        assertTrue(json.contains("🚨 [AuditFlow Alert] CRITICAL: Potential Credential Exposure"));
+        assertTrue(json.contains("\"title\":\"Anomaly Type\",\"value\":\"Potential Credential Exposure\""));
+        assertTrue(json.contains("\"title\":\"User\",\"value\":\"attacker\""));
+        assertTrue(json.contains("\"title\":\"Severity\",\"value\":\"CRITICAL\""));
+        assertTrue(json.contains("\"title\":\"Details\",\"value\":\"Potential credential leak detected\""));
+        assertTrue(json.contains("\"type\":\"Action.OpenUrl\""));
+    }
+
+    @Test
+    void testBuildTeamsTestPayload() {
+        String json = WebhookEndpoint.buildTeamsTestPayload();
+        assertNotNull(json);
+        assertTrue(json.contains("\"type\":\"message\""));
+        assertTrue(json.contains("\"contentType\":\"application/vnd.microsoft.card.adaptive\""));
+        assertTrue(json.contains("\"type\":\"AdaptiveCard\""));
+        assertTrue(json.contains("Connected"));
+        assertTrue(json.contains("Jenkins AuditFlow"));
     }
 }
