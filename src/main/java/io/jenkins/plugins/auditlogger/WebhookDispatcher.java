@@ -11,6 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executors;
@@ -99,11 +100,13 @@ public class WebhookDispatcher {
         String jenkinsUrl = getJenkinsRootUrl();
         String isoTimestamp = Instant.ofEpochMilli(alert.timestamp).toString();
         String jsonPayload = buildAnomalyPayload(alert, jenkinsUrl, isoTimestamp);
+        String teamsPayload = buildTeamsAnomalyPayload(alert, jenkinsUrl, isoTimestamp);
 
         for (WebhookEndpoint ep : endpoints) {
             String url = ep.getPlainWebhookUrl();
             if (!url.isEmpty()) {
-                getExecutor().submit(() -> sendWithRetry(url, jsonPayload, 0));
+                String payload = isTeamsWebhookUrl(url) ? teamsPayload : jsonPayload;
+                getExecutor().submit(() -> sendWithRetry(url, payload, 0));
             }
         }
     }
@@ -129,11 +132,13 @@ public class WebhookDispatcher {
         long entryTimeMs = entry.getTimestamp() > 0 ? entry.getTimestamp() : System.currentTimeMillis();
         String isoTimestamp = Instant.ofEpochMilli(entryTimeMs).toString();
         String jsonPayload = buildAuditLogPayload(entry, jenkinsUrl, isoTimestamp);
+        String teamsPayload = buildTeamsAuditLogPayload(entry, jenkinsUrl, isoTimestamp);
 
         for (WebhookEndpoint ep : endpoints) {
             String url = ep.getPlainWebhookUrl();
             if (!url.isEmpty()) {
-                getExecutor().submit(() -> sendWithRetry(url, jsonPayload, 0));
+                String payload = isTeamsWebhookUrl(url) ? teamsPayload : jsonPayload;
+                getExecutor().submit(() -> sendWithRetry(url, payload, 0));
             }
         }
     }
@@ -268,6 +273,124 @@ public class WebhookDispatcher {
     }
 
     /**
+     * Returns true for Microsoft Teams / Power Automate / Logic Apps webhook hosts
+     * (including sovereign clouds), which reject Slack-style attachments and require Adaptive Cards.
+     */
+    public static boolean isTeamsWebhookUrl(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return false;
+        }
+        try {
+            String host = URI.create(url.trim()).getHost();
+            if (host == null) {
+                return false;
+            }
+            host = host.toLowerCase(Locale.ROOT);
+            return host.contains(".powerplatform.") || host.contains(".logic.azure.") || host.endsWith(".office.com");
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Builds a Microsoft Teams Adaptive Card (v1.4) payload for a direct audit log event.
+     */
+    public static String buildTeamsAuditLogPayload(AuditLogEntry entry, String jenkinsUrl, String isoTimestamp) {
+        String severity = entry.getSeverity() != null ? entry.getSeverity() : "INFO";
+        String action = entry.getAction() != null ? entry.getAction() : "";
+        String target = entry.getTarget() != null ? entry.getTarget() : "";
+
+        List<String[]> facts = new ArrayList<>();
+        facts.add(new String[] {"Severity", severity});
+        facts.add(new String[] {"User", entry.getUsername() != null ? entry.getUsername() : "SYSTEM"});
+        facts.add(new String[] {"Action", action});
+        facts.add(new String[] {"Timestamp", isoTimestamp != null ? isoTimestamp : ""});
+        if (!target.isEmpty()) {
+            facts.add(new String[] {"Target", target});
+        }
+        return buildTeamsAdaptiveCard(getSeverityEmoji(severity) + " [AuditFlow Alert] " + severity + ": " + action,
+                severity, facts, entry.getDetails(), getAuditflowLogsUrl(jenkinsUrl));
+    }
+
+    /**
+     * Builds a Microsoft Teams Adaptive Card (v1.4) payload for an anomaly alert.
+     */
+    public static String buildTeamsAnomalyPayload(AnomalyAlert alert, String jenkinsUrl, String isoTimestamp) {
+        String severity = alert.severity != null ? alert.severity : "HIGH";
+        String readableType = alert.type != null ? getReadableAnomalyType(alert.type) : "Anomaly Alert";
+
+        List<String[]> facts = new ArrayList<>();
+        facts.add(new String[] {"Severity", severity});
+        facts.add(new String[] {"User", alert.user != null ? alert.user : "SYSTEM"});
+        facts.add(new String[] {"Anomaly Type", alert.type != null ? alert.type.name() : ""});
+        facts.add(new String[] {"Timestamp", isoTimestamp != null ? isoTimestamp : ""});
+        return buildTeamsAdaptiveCard(getSeverityEmoji(severity) + " [AuditFlow Alert] " + severity + ": " + readableType,
+                severity, facts, alert.details, getAuditflowLogsUrl(jenkinsUrl));
+    }
+
+    /**
+     * Wraps an Adaptive Card in the message envelope Teams workflows expect:
+     * attachments[].contentType + attachments[].content (fixes TriggerInputSchemaMismatch).
+     */
+    static String buildTeamsAdaptiveCard(String title, String severity, List<String[]> facts, String details, String linkUrl) {
+        StringBuilder json = new StringBuilder();
+        json.append("{\"type\":\"message\",\"attachments\":[{");
+        json.append("\"contentType\":\"application/vnd.microsoft.card.adaptive\",");
+        json.append("\"contentUrl\":null,");
+        json.append("\"content\":{");
+        json.append("\"$schema\":\"http://adaptivecards.io/schemas/adaptive-card.json\",");
+        json.append("\"type\":\"AdaptiveCard\",\"version\":\"1.4\",");
+        json.append("\"body\":[");
+        json.append("{\"type\":\"TextBlock\",\"size\":\"Medium\",\"weight\":\"Bolder\",\"wrap\":true,\"color\":\"")
+                .append(getTeamsSeverityColor(severity)).append("\",\"text\":\"").append(escapeJson(title)).append("\"},");
+        json.append("{\"type\":\"FactSet\",\"facts\":[");
+        for (int i = 0; i < facts.size(); i++) {
+            if (i > 0) {
+                json.append(',');
+            }
+            json.append("{\"title\":\"").append(escapeJson(facts.get(i)[0]))
+                    .append("\",\"value\":\"").append(escapeJson(facts.get(i)[1])).append("\"}");
+        }
+        json.append("]}");
+        if (details != null && !details.isEmpty()) {
+            json.append(",{\"type\":\"TextBlock\",\"wrap\":true,\"text\":\"").append(escapeJson(details)).append("\"}");
+        }
+        json.append("]");
+        if (linkUrl != null && !linkUrl.isEmpty()) {
+            json.append(",\"actions\":[{\"type\":\"Action.OpenUrl\",\"title\":\"View AuditFlow Logs\",\"url\":\"")
+                    .append(escapeJson(linkUrl)).append("\"}]");
+        }
+        json.append("}}]}");
+        return json.toString();
+    }
+
+    static String getTeamsSeverityColor(String severity) {
+        if (severity == null) return "Accent";
+        switch (severity.toUpperCase(Locale.ENGLISH)) {
+            case "CRITICAL": return "Attention";
+            case "HIGH": return "Warning";
+            case "MEDIUM": return "Good";
+            default: return "Accent";
+        }
+    }
+
+    private static String getAuditflowLogsUrl(String jenkinsUrl) {
+        if (jenkinsUrl == null || jenkinsUrl.trim().isEmpty()) {
+            return "";
+        }
+        return jenkinsUrl.endsWith("/") ? jenkinsUrl + "manage/auditflow-logs/" : jenkinsUrl + "/manage/auditflow-logs/";
+    }
+
+    /** Caps webhook error response bodies (Power Automate returns long JSON errors) for logs and UI. */
+    static String responseSnippet(String body, String prefix) {
+        if (body == null || body.trim().isEmpty()) {
+            return "";
+        }
+        String trimmed = body.trim();
+        return prefix + (trimmed.length() > 250 ? trimmed.substring(0, 250) + "..." : trimmed);
+    }
+
+    /**
      * Performs HTTP POST dispatch with retry for transient rate limits (HTTP 429) and server errors (HTTP 5xx).
      */
     void sendWithRetry(String url, String json, int attempt) {
@@ -294,7 +417,7 @@ public class WebhookDispatcher {
                             LOGGER.warning("Webhook returned HTTP " + code + " for " + maskedUrl + ". Retrying in " + delaySec + "s (attempt " + (attempt + 1) + "/" + MAX_RETRIES + ")");
                             getExecutor().schedule(() -> sendWithRetry(url, json, attempt + 1), delaySec, TimeUnit.SECONDS);
                         } else {
-                            String snippet = resp.body() != null && !resp.body().trim().isEmpty() ? " - Response: " + resp.body().trim() : "";
+                            String snippet = responseSnippet(resp.body(), " - Response: ");
                             LOGGER.warning("Webhook failed with HTTP " + code + " for " + maskedUrl + snippet);
                         }
                     })

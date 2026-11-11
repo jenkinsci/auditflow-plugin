@@ -759,7 +759,9 @@ public class AnomalyDetector {
                     .toString();
             
             // Build comprehensive JSON payload
-            String json = buildWebhookPayload(alert, jenkinsUrl, isoTimestamp);
+            String json = WebhookDispatcher.isTeamsWebhookUrl(webhookUrl)
+                    ? WebhookDispatcher.buildTeamsAnomalyPayload(alert, jenkinsUrl, isoTimestamp)
+                    : buildWebhookPayload(alert, jenkinsUrl, isoTimestamp);
             
             // Validate payload before sending
             List<String> payloadErrors = AnomalyAlertValidator.validateWebhookPayload(json);

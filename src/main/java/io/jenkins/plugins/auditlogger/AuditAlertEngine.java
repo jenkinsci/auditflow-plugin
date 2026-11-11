@@ -137,7 +137,11 @@ public class AuditAlertEngine {
                         break;
                     case "teams":
                         LOGGER.fine("Teams alert: " + alert.ruleId);
-                        String teamsPayload = "{\"text\": \"" + escapeJsonString(alert.message) + "\"}";
+                        String severity = alert.severity != null ? alert.severity : "INFO";
+                        String teamsPayload = WebhookDispatcher.buildTeamsAdaptiveCard(
+                                WebhookDispatcher.getSeverityEmoji(severity) + " [AuditFlow Alert] " + severity + ": " + alert.ruleId,
+                                severity, Arrays.asList(new String[] {"Rule", alert.ruleId}, new String[] {"Severity", severity}),
+                                alert.message, null);
                         sendWebhook(rule.recipients, teamsPayload);
                         break;
                     case "webhook": 

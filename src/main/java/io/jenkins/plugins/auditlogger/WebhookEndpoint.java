@@ -506,7 +506,11 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
 
         try {
             long nowSec = Instant.now().getEpochSecond();
-            String testPayload = "{"
+            String testPayload = WebhookDispatcher.isTeamsWebhookUrl(url)
+                    ? WebhookDispatcher.buildTeamsAdaptiveCard("✅ [AuditFlow] Webhook Endpoint Test Successful", "MEDIUM",
+                            java.util.Arrays.asList(new String[] {"Status", "Connected"}, new String[] {"Source", "Jenkins AuditFlow"}),
+                            null, null)
+                    : "{"
                     + "\"attachments\":[{"
                     + "\"color\":\"#2EB886\","
                     + "\"fallback\":\"[AuditFlow Test] Webhook endpoint test successful.\","
@@ -536,9 +540,7 @@ public class WebhookEndpoint extends AbstractDescribableImpl<WebhookEndpoint> im
             if (status >= 200 && status < 300) {
                 return FormValidation.ok("Webhook test successful! (HTTP " + status + ")");
             } else {
-                String snippet = response.body() != null && !response.body().trim().isEmpty()
-                        ? ": " + response.body().trim()
-                        : "";
+                String snippet = WebhookDispatcher.responseSnippet(response.body(), ": ");
                 return FormValidation.error("Webhook endpoint returned HTTP " + status + snippet);
             }
         } catch (Exception e) {
