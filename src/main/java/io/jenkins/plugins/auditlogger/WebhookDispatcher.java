@@ -414,6 +414,35 @@ public class WebhookDispatcher {
     }
 
     /**
+     * Builds a minimal Teams Adaptive Card (v1.4) with a title and a FactSet,
+     * for callers without a dedicated builder (e.g. AuditAlertEngine's "teams" channel).
+     */
+    static String buildTeamsAdaptiveCard(String title, List<String[]> facts) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"type\":\"message\",\"attachments\":[{");
+        sb.append("\"contentType\":\"application/vnd.microsoft.card.adaptive\",");
+        sb.append("\"contentUrl\":null,");
+        sb.append("\"content\":{");
+        sb.append("\"$schema\":\"http://adaptivecards.io/schemas/adaptive-card.json\",");
+        sb.append("\"type\":\"AdaptiveCard\",\"version\":\"1.4\",");
+        sb.append("\"body\":[");
+        sb.append("{\"type\":\"TextBlock\",\"text\":\"").append(escapeJson(title))
+                .append("\",\"weight\":\"Bolder\",\"size\":\"Medium\",\"wrap\":true},");
+        sb.append("{\"type\":\"FactSet\",\"facts\":[");
+        for (int i = 0; i < facts.size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append("{\"title\":\"").append(escapeJson(facts.get(i)[0]))
+                    .append("\",\"value\":\"").append(escapeJson(facts.get(i)[1])).append("\"}");
+        }
+        sb.append("]}");
+        sb.append(",{\"type\":\"TextBlock\",\"text\":\"Jenkins AuditFlow\",\"isSubtle\":true,\"size\":\"Small\"}");
+        sb.append("]}}]}");
+        return sb.toString();
+    }
+
+    /**
      * Performs HTTP POST dispatch with retry for transient rate limits (HTTP 429) and server errors (HTTP 5xx).
      */
     void sendWithRetry(String url, String json, int attempt) {
