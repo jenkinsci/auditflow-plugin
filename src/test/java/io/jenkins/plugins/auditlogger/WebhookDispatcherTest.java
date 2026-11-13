@@ -246,4 +246,34 @@ class WebhookDispatcherTest {
         assertTrue(json.contains("Connected"));
         assertTrue(json.contains("Jenkins AuditFlow"));
     }
+
+    @Test
+    void testBuildTeamsAdaptiveCardHelper() {
+        // Normal case with facts
+        List<String[]> facts = List.of(
+                new String[]{"Rule", "LOGIN_BRUTE_FORCE"},
+                new String[]{"Severity", "HIGH"},
+                new String[]{"Details", "3 attempts from 10.0.0.1"}
+        );
+        String card = WebhookDispatcher.buildTeamsAdaptiveCard("⚠️ Alert Title", facts);
+        assertNotNull(card);
+        assertTrue(card.contains("\"type\":\"message\""));
+        assertTrue(card.contains("\"contentType\":\"application/vnd.microsoft.card.adaptive\""));
+        assertTrue(card.contains("\"type\":\"AdaptiveCard\""));
+        assertTrue(card.contains("\"version\":\"1.4\""));
+        assertTrue(card.contains("⚠️ Alert Title"));
+        assertTrue(card.contains("\"title\":\"Rule\",\"value\":\"LOGIN_BRUTE_FORCE\""));
+
+        // Null facts edge case - should not throw NPE
+        String nullCard = WebhookDispatcher.buildTeamsAdaptiveCard("Null Facts Test", null);
+        assertNotNull(nullCard);
+        assertTrue(nullCard.contains("Null Facts Test"));
+        assertFalse(nullCard.contains("\"type\":\"FactSet\""));
+
+        // Empty facts edge case
+        String emptyCard = WebhookDispatcher.buildTeamsAdaptiveCard("Empty Facts Test", List.of());
+        assertNotNull(emptyCard);
+        assertTrue(emptyCard.contains("Empty Facts Test"));
+        assertFalse(emptyCard.contains("\"type\":\"FactSet\""));
+    }
 }

@@ -427,16 +427,22 @@ public class WebhookDispatcher {
         sb.append("\"type\":\"AdaptiveCard\",\"version\":\"1.4\",");
         sb.append("\"body\":[");
         sb.append("{\"type\":\"TextBlock\",\"text\":\"").append(escapeJson(title))
-                .append("\",\"weight\":\"Bolder\",\"size\":\"Medium\",\"wrap\":true},");
-        sb.append("{\"type\":\"FactSet\",\"facts\":[");
-        for (int i = 0; i < facts.size(); i++) {
-            if (i > 0) {
-                sb.append(',');
+                .append("\",\"weight\":\"Bolder\",\"size\":\"Medium\",\"wrap\":true}");
+        if (facts != null && !facts.isEmpty()) {
+            sb.append(",{\"type\":\"FactSet\",\"facts\":[");
+            boolean first = true;
+            for (String[] fact : facts) {
+                if (fact != null && fact.length >= 2) {
+                    if (!first) {
+                        sb.append(',');
+                    }
+                    sb.append("{\"title\":\"").append(escapeJson(fact[0]))
+                            .append("\",\"value\":\"").append(escapeJson(fact[1])).append("\"}");
+                    first = false;
+                }
             }
-            sb.append("{\"title\":\"").append(escapeJson(facts.get(i)[0]))
-                    .append("\",\"value\":\"").append(escapeJson(facts.get(i)[1])).append("\"}");
+            sb.append("]}");
         }
-        sb.append("]}");
         sb.append(",{\"type\":\"TextBlock\",\"text\":\"Jenkins AuditFlow\",\"isSubtle\":true,\"size\":\"Small\"}");
         sb.append("]}}]}");
         return sb.toString();
