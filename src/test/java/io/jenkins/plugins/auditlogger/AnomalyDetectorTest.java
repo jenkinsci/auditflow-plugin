@@ -286,6 +286,40 @@ class AnomalyDetectorTest {
         assertTrue(json.contains("\"jenkinsUrl\""), "JSON should contain jenkinsUrl field");
     }
 
+    @Test
+    void testWebhookNotificationRoutesTeamsPayloadToPowerAutomate(JenkinsRule j) {
+        final List<String[]> captured = new ArrayList<>();
+        AnomalyDetector teamsDetector = new AnomalyDetector() {
+            @Override
+            protected void sendEmail(jakarta.mail.internet.MimeMessage msg) throws Exception {}
+
+            @Override
+            protected void sendWebhook(String url, String json) throws Exception {
+                captured.add(new String[]{url, json});
+            }
+        };
+
+        AuditLoggerConfiguration config = new AuditLoggerConfiguration();
+        config.setAnomalyFailedLogins(true);
+        config.setAnomalyFailedLoginsThreshold(2);
+        config.setAnomalyFailedLoginsWindowMinutes(1);
+        config.setEnableWebhookAlerts(true);
+        config.setWebhookUrl("https://prod-01.westus.environment.api.powerplatform.com/workflows/123/triggers/manual/paths/invoke");
+
+        long now = System.currentTimeMillis();
+        teamsDetector.analyze(new AuditLogEntry("attacker", "FAILED_LOGIN", "jenkins", "", now), config);
+        teamsDetector.analyze(new AuditLogEntry("attacker", "FAILED_LOGIN", "jenkins", "", now + 1000), config);
+
+        assertEquals(1, captured.size(), "sendWebhook should have been called for Teams");
+        String url = captured.get(0)[0];
+        String json = captured.get(0)[1];
+        assertTrue(WebhookDispatcher.isTeamsWebhookUrl(url));
+        assertTrue(json.contains("\"type\":\"message\""));
+        assertTrue(json.contains("\"contentType\":\"application/vnd.microsoft.card.adaptive\""));
+        assertTrue(json.contains("\"type\":\"AdaptiveCard\""));
+        assertTrue(json.contains("\"version\":\"1.4\""));
+    }
+
    
 
     @Test

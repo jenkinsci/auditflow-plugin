@@ -126,6 +126,8 @@ public class AuditAlertEngineTest {
         assertEquals(2, receivedPayloads.size());
         assertTrue(receivedPayloads.get(0).contains("Alert: "));
         assertTrue(receivedPayloads.get(1).contains("Alert: "));
+        assertTrue(receivedPayloads.stream().anyMatch(p -> p.contains("\"contentType\":\"application/vnd.microsoft.card.adaptive\"")),
+                "Teams channel must send an Adaptive Card");
     }
 
     @Test

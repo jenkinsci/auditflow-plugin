@@ -758,8 +758,13 @@ public class AnomalyDetector {
             String isoTimestamp = Instant.ofEpochMilli(alert.timestamp)
                     .toString();
             
-            // Build comprehensive JSON payload
-            String json = buildWebhookPayload(alert, jenkinsUrl, isoTimestamp);
+            // Build comprehensive JSON payload (Teams Adaptive Card vs Slack payload)
+            String json;
+            if (WebhookDispatcher.isTeamsWebhookUrl(webhookUrl)) {
+                json = WebhookDispatcher.getInstance().buildTeamsAnomalyPayload(alert, jenkinsUrl, isoTimestamp);
+            } else {
+                json = buildWebhookPayload(alert, jenkinsUrl, isoTimestamp);
+            }
             
             // Validate payload before sending
             List<String> payloadErrors = AnomalyAlertValidator.validateWebhookPayload(json);
